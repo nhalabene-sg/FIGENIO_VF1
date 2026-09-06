@@ -1,0 +1,30 @@
+# Système
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+.DS_Store
+$RECYCLE.BIN/
+
+# Éditeurs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Secrets et fichiers locaux (ne jamais publier une URL /exec)
+.env
+.env.*
+*.pem
+*.key
+secrets.txt
+exec-url.txt
+
+# Temporaires / sauvegardes Office
+*.log
+*.tmp
+*.bak
+~$*
+
+# Dépôts Git imbriqués
+**/.git/
