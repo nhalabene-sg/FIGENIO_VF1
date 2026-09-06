@@ -3,6 +3,31 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <script>
+      (function () {
+        try {
+          var p = location.pathname || '';
+          if (/github\.io$/i.test(location.hostname) && p && p.charAt(p.length - 1) !== '/' && !/\.[a-z0-9]+$/i.test(p)) {
+            location.replace(p + '/' + (location.search || '') + (location.hash || ''));
+          }
+        } catch (eSlash) {}
+      })();
+      window.abeneMissingLibs = [];
+      window.addEventListener('error', function (e) {
+        var el = e && e.target;
+        if (el && el.tagName === 'SCRIPT' && el.src && /\/libs\//.test(el.src)) {
+          window.abeneMissingLibs.push(el.src);
+        }
+      }, true);
+      window.addEventListener('DOMContentLoaded', function () {
+        if (!window.abeneMissingLibs || !window.abeneMissingLibs.length) return;
+        var b = document.createElement('div');
+        b.setAttribute('role', 'alert');
+        b.style.cssText = 'position:fixed;z-index:99999;left:0;right:0;top:0;padding:12px 16px;background:#8b1e1e;color:#fff;font:14px/1.45 Segoe UI,sans-serif;box-shadow:0 2px 8px rgba(0,0,0,.25);';
+        b.innerHTML = 'Ficheiros da aplicação em falta (pasta <b>libs/</b>). No GitHub isto não abre a app: vá a <b>Settings → Pages</b>, origem <b>Deploy from a branch</b>, ramo <b>main</b>, pasta <b>/</b>. Depois abra <b>https://SEU-UTILIZADOR.github.io/SEU-REPO/</b>. Envie também <b>.nojekyll</b>, <b>index.html</b>, <b>libs/</b> e <b>branding/</b> na raiz (não dentro de uma pasta ABENE).';
+        document.body.insertBefore(b, document.body.firstChild);
+      });
+    </script>
     <meta name="theme-color" content="#2b579a">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -4147,6 +4172,7 @@
                 <button onclick="undo()" data-i18n-title="undo" title="Anular">↶</button>
                 <button onclick="redo()" data-i18n-title="redo" title="Refazer">↷</button>
                 <button onclick="openCompanySettings()" data-i18n-title="companySettings" title="Definições da empresa">⚙</button>
+                <button onclick="abeneSheetsRefresh && abeneSheetsRefresh().catch(function(){})" data-i18n-title="sheetsRefreshTitle" title="Atualizar da folha">↻</button>
             </div>
             <input class="doc-title-input" id="docTitle" value="Documento1" data-i18n-title="docName" title="Nome do documento" onchange="renameDocument(this.value)" onkeydown="if(event.key==='Enter'){this.blur();}" />
         </div>
@@ -4981,6 +5007,10 @@
                         <span class="icon">🏢</span>
                         <span data-i18n="company">Empresa</span>
                     </button>
+                    <button class="ribbon-btn" onclick="abeneSheetsRefresh && abeneSheetsRefresh().catch(function(){})">
+                        <span class="icon">↻</span>
+                        <span data-i18n="sheetsRefresh">Atualizar da folha</span>
+                    </button>
                 </div>
                 <div class="ribbon-group-label" data-i18n="groupConvert">Converter</div>
             </div>
@@ -5303,6 +5333,7 @@
             <span id="excelStatusAgg"></span>
             <span class="status-page-jump" onclick="jumpToPageFromStatus()" data-i18n-title="gotoPage" title="Ir para a página"><span data-i18n="statusPage">Página</span> <span id="pageNum">1</span> <span data-i18n="statusOf">de</span> <span id="totalPages">1</span></span>
             <span id="sheetsSyncStatus" onclick="openCompanySettings()" style="cursor:pointer;font-size:11px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>
+            <button type="button" onclick="abeneSheetsRefresh && abeneSheetsRefresh().catch(function(){})" style="border:0;background:rgba(255,255,255,.15);color:inherit;cursor:pointer;font-size:11px;padding:1px 8px;border-radius:3px;" data-i18n="sheetsRefresh" data-i18n-title="sheetsRefreshTitle" title="Atualizar da folha">↻ Atualizar</button>
             <span id="collabPresence" class="abene-collab-presence" data-i18n-title="collabPeers" title=""></span>
             <span id="saveStatus">Modificado</span>
             <span><span id="wordCountStatus">0</span> <span data-i18n="statusWords">palavras</span></span>
@@ -5344,6 +5375,7 @@
         <div class="dropdown-item" onclick="saveDocument()">💾 <span data-i18n="fileSave">Guardar</span> <span class="shortcut" data-i18n-shortcut="scSave">Ctrl+B</span></div>
         <div class="dropdown-item" onclick="abeneSheetsPush && abeneSheetsPush('manual').then(function(){ if(typeof showToast==='function') showToast(typeof t==='function'?t('sheetsPushed'):'Sincronizado.'); }).catch(function(){})">☁ <span data-i18n="sheetsPush">Sincronizar Google Sheets</span></div>
         <div class="dropdown-item" onclick="abeneSheetsPull && abeneSheetsPull().catch(function(){})">☁ <span data-i18n="sheetsPull">Restaurar do Google Sheets</span></div>
+        <div class="dropdown-item" onclick="abeneSheetsRefresh && abeneSheetsRefresh().catch(function(){})">↻ <span data-i18n="sheetsRefresh">Atualizar da folha</span></div>
         <div class="dropdown-item" onclick="abeneCollabShare && abeneCollabShare()">🔗 <span data-i18n="collabShare">Partilhar</span></div>
         <div class="dropdown-item" onclick="saveAsText()">📝 <span data-i18n="fileSaveTxt">Guardar como texto</span></div>
         <div class="dropdown-item" onclick="exportMarkdown()">📑 <span data-i18n="fileMd">Exportar Markdown (.md)</span></div>
@@ -9873,6 +9905,7 @@ p { margin: 0 0 8pt 0; }
                     <button type="button" class="btn-secondary" onclick="saveCompanySettings(true); if(window.abeneSheetsTest) abeneSheetsTest().catch(function(){})">${t('sheetsTest')}</button>
                     <button type="button" class="btn-secondary" onclick="saveCompanySettings(true); if(window.abeneSheetsPush) abeneSheetsPush('manual').then(function(){alert(t('sheetsPushed'))}).catch(function(){alert(t('sheetsPingFail'))})">${t('sheetsPush')}</button>
                     <button type="button" class="btn-secondary" onclick="saveCompanySettings(true); if(window.abeneSheetsPull) abeneSheetsPull().catch(function(){})">${t('sheetsPull')}</button>
+                    <button type="button" class="btn-primary" onclick="saveCompanySettings(true); if(window.abeneSheetsRefresh) abeneSheetsRefresh().catch(function(){})">${t('sheetsRefresh')}</button>
                 </div>
                 <p style="font-size:11px;color:#666;margin-top:8px;">${companyData.sheetsLastSync ? (t('sheetsLast') + ' ' + companyData.sheetsLastSync) : t('sheetsNever')}</p>
                 <h4 style="color:#2b579a;margin-top:18px;">${t('xlModuleTitle')}</h4>

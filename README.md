@@ -14,7 +14,9 @@ Não envie o resto de `PROJETO AFONSO`, nem `exemples/`, nem outras aplicações
 
 ```
 .
-├── index.html                 ← abrir este ficheiro
+├── index.html                 ← abrir este ficheiro (ou a URL GitHub Pages)
+├── 404.html
+├── .nojekyll                  ← obrigatório para GitHub Pages
 ├── README.md
 ├── LICENSE
 ├── .gitignore
@@ -78,25 +80,27 @@ Colar de novo `emaildrive.gs.txt` no Apps Script, depois **Implementar → Gerir
 
 ## Publicar no GitHub
 
-Recomendado: repositório **privado** (fluxo interno da empresa).
+A página do repositório (`github.com/…`) **não executa** a aplicação. Clicar em `index.html` no GitHub mostra o código, não o editor.
+
+Para **usar no browser pela internet**, ative **GitHub Pages** (passos abaixo).  
+Para **só guardar o código**: repositório privado + abrir `index.html` no computador (ZIP ou clone).
 
 ### Não colocar no repositório
 
-- URL `/exec` (é o acesso à vossa folha)
 - palavras-passe, `.env`, capturas com dados de clientes
 - a pasta pai `PROJETO AFONSO` ou outras aplicações
 
-O jeton por omissão está em `apps-script/emaildrive.gs.txt` (`CFG.TOKEN`). Se o GitHub for **público**, altere-o no script, volte a implementar, e não partilhe o `/exec`.
+O jeton por omissão está em `apps-script/emaildrive.gs.txt` (`CFG.TOKEN`). Se o GitHub for **público**, altere-o no script, volte a implementar, e não partilhe o `/exec` com estranhos.
 
 ### Método A — site GitHub (sem Git no PC)
 
 1. Ir a [https://github.com/new](https://github.com/new).
 2. Nome sugerido: `genius-raros` (ou o que preferir).
-3. Visibilidade: **Private**.
+3. Visibilidade: **Public** se quiser GitHub Pages no plano gratuito. **Private** só funciona como site se tiver GitHub Pro.
 4. **Não** marcar “Add a README” (já existe neste dossier).
 5. Create repository → **uploading an existing file**.
-6. Arrastar **todo o conteúdo desta pasta** (incluindo `index.html`, `libs/`, `branding/`, `apps-script/`, `README.md`, `LICENSE`, `.gitignore`).
-7. Commit.
+6. Arrastar **o conteúdo desta pasta** (os ficheiros, não a pasta `ABENE` em si): `index.html`, `.nojekyll`, `404.html`, `libs/`, `branding/`, `apps-script/`, `README.md`, `LICENSE`.
+7. Commit. Os ficheiros que começam por ponto (`.nojekyll`) têm de ir também — no explorador Windows: Ver → Itens ocultos.
 
 ### Método B — Git no computador
 
@@ -113,11 +117,20 @@ git push -u origin main
 
 Substituir `VOSSO-UTILIZADOR` e `VOSSO-REPO`. Autenticar com GitHub (token ou GitHub Desktop).
 
-### GitHub Pages (opcional)
+### GitHub Pages — abrir a app (obrigatório para o site)
 
-Settings → Pages → Deploy from branch `main` → pasta `/` (root).  
-A app abre em `https://VOSSO-UTILIZADOR.github.io/VOSSO-REPO/`.  
-A sincronização Google continua a precisar do URL `/exec` nas Definições (não o grave no código).
+1. No repositório: **Settings → Pages**.
+2. **Build and deployment → Source** : **Deploy from a branch**.
+3. Branch **`main`** (ou `master`), pasta **`/ (root)`** → **Save**.
+4. Esperar 1 a 2 minutos. A URL aparece no cimo da página Pages:
+   `https://VOSSO-UTILIZADOR.github.io/VOSSO-REPO/`
+5. Abrir **essa** URL (com a barra `/` no fim). Não abrir `github.com/…`.
+
+Se a página fica em branco ou falta o editor: `index.html` não está na **raiz** do repositório (foi enviada a pasta `ABENE` inteira). Mova os ficheiros para a raiz, ou abra `https://…github.io/VOSSO-REPO/ABENE/`.
+
+Depois de atualizar os ficheiros no GitHub, recarregar com **Ctrl+F5**.
+
+Se alterar o script Google: colar de novo `emaildrive.gs.txt` e **Implementar → Gerir → lápis → Nova versão**.
 
 ---
 
