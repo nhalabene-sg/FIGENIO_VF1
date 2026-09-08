@@ -264,7 +264,7 @@
     }
     function restoreCloud(driveFileId) {
         if (!driveFileId) return;
-        if (!root.confirm(tt('cRestoreVer', 'Restaurar esta versão?'))) return;
+        try { if (typeof root.saveDocument === 'function') root.saveDocument({ silent: true }); } catch (e) {}
         call('COLLAB_GET_VERSION', { driveFileId: driveFileId }).then(function (json) {
             if (!json || !json.html) return;
             var ed = (root.abene && root.abene.editor) || document.getElementById('editor');

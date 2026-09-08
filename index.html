@@ -2506,6 +2506,9 @@
             flex-direction: column;
             align-items: center;
         }
+        .paper-preview-col[hidden] {
+            display: none !important;
+        }
         .paper-preview-col-caption {
             display: none;
             margin: 0 0 10px;
@@ -2767,19 +2770,20 @@
             body.abene-printing #abeneExportRoot {
                 display: block !important;
                 position: static !important;
-                left: auto !important;
-                top: auto !important;
-                width: auto !important;
+                left: 0 !important;
+                top: 0 !important;
+                width: var(--export-page-w, 794px) !important;
                 height: auto !important;
                 opacity: 1 !important;
                 pointer-events: none;
                 background: #fff !important;
+                z-index: auto !important;
             }
             body.abene-printing .abene-export-sheet {
-                width: var(--export-page-w) !important;
-                height: var(--export-page-h) !important;
-                min-height: var(--export-page-h) !important;
-                max-height: var(--export-page-h) !important;
+                width: var(--export-page-w, 794px) !important;
+                height: var(--export-page-h, 1123px) !important;
+                min-height: var(--export-page-h, 1123px) !important;
+                max-height: var(--export-page-h, 1123px) !important;
                 overflow: hidden !important;
                 page-break-after: always;
                 break-after: page;
@@ -2805,6 +2809,20 @@
                 background: #fff !important;
                 padding: var(--pad-top, 96px) var(--pad-right, 96px) var(--pad-bottom, 96px) var(--pad-left, 96px) !important;
             }
+            body.abene-printing .abene-page-flow {
+                background: #fff !important;
+                box-shadow: none !important;
+            }
+            body.abene-printing .page-gap-band {
+                display: none !important;
+                background: #fff !important;
+            }
+            body.abene-printing .abene-export-root .page-header-zone,
+            body.abene-printing .abene-export-root .page-footer-zone {
+                background: #fff !important;
+                z-index: 12 !important;
+                --hf-seam: 0px;
+            }
         }
         .abene-export-root {
             --export-page-h: var(--page-h, 1123px);
@@ -2814,20 +2832,18 @@
             left: -20000px;
             top: 0;
         }
-        #abenePdfMount {
-            position: fixed;
-            left: 0;
-            top: 0;
-            overflow: hidden;
-            background: #fff;
-            pointer-events: none;
-            z-index: 1;
+        .abene-export-root.abene-capture-live {
+            position: fixed !important;
+            left: 0 !important;
+            top: 0 !important;
+            right: auto !important;
+            opacity: 1 !important;
+            z-index: 2147483000 !important;
+            background: #fff !important;
         }
-        #abenePdfMount .abene-export-sheet {
-            margin: 0 !important;
-            box-shadow: none !important;
-            page-break-after: auto !important;
-            break-after: auto !important;
+        .html2pdf__overlay,
+        .html2pdf__container {
+            overflow: visible !important;
         }
         .abene-export-root .abene-page-flow,
         .abene-export-root .page-break-marker,
@@ -2839,6 +2855,10 @@
             break-before: auto !important;
             page-break-before: auto !important;
         }
+        .abene-export-root .abene-page-flow {
+            background: #fff !important;
+            box-shadow: none !important;
+        }
         .abene-export-root .header-content,
         .abene-export-root .footer-content { opacity: 1 !important; }
         .abene-export-root .hf-tab,
@@ -2847,7 +2867,11 @@
         .abene-export-root .hf-close,
         .abene-export-root .hf-placeholder { display: none !important; }
         .abene-export-root .page-header-zone,
-        .abene-export-root .page-footer-zone { background: #fff !important; }
+        .abene-export-root .page-footer-zone {
+            background: #fff !important;
+            z-index: 12 !important;
+            --hf-seam: 0px;
+        }
         .abene-export-root .page-chrome { pointer-events: none; }
         .abene-export-root .abene-footnotes.abene-notes-source,
         #abeneFnMeasure { display: none !important; }
@@ -5719,7 +5743,7 @@
                         <input type="text" id="devisClientContact" value="">
                     </div>
                     <div class="form-group">
-                        <label data-i18n="workSite">Local da obra</label>
+                        <label data-i18n="workSite">Local da obra/Serviço</label>
                         <input type="text" id="devisSite" value="" placeholder="Fração / morada da intervenção">
                     </div>
                 </div>
@@ -8293,7 +8317,7 @@
         }
 
         function closeApp() {
-            if (documentState.dirty && !confirm(t('cUnsavedClose'))) return;
+            try { saveDocument({ silent: true }); } catch (e) {}
             window.close();
             document.body.innerHTML = '<div style="padding:32px;font-family:Segoe UI,sans-serif;">' + t('aClosed') + '</div>';
         }
@@ -8308,7 +8332,23 @@
         }
 
         // Zoom
+        window.abeneHoldViewZoom = function () {
+            if (!window._abeneFreezeZoom) {
+                window._abeneSavedZoom = currentZoom;
+                window._abeneFreezeZoom = true;
+            }
+            return window._abeneSavedZoom;
+        };
+        window.abeneReleaseViewZoom = function () {
+            if (!window._abeneFreezeZoom) return;
+            var z = window._abeneSavedZoom;
+            window._abeneFreezeZoom = false;
+            window._abeneSavedZoom = null;
+            if (typeof z === 'number' && z !== currentZoom) setZoom(z);
+        };
+
         function setZoom(val) {
+            if (window._abeneFreezeZoom) return;
             currentZoom = parseInt(val, 10);
             const z = currentZoom / 100;
             const box = document.getElementById('pageContainer');
@@ -8554,14 +8594,9 @@
         }
 
         function recordTrackedInput() {
-            if (documentState.tracking) return;
-            if (!lastEditorHTML || editor.innerHTML === lastEditorHTML) return;
-            const currentText = editor.innerText;
-            const previousText = new DOMParser().parseFromString(lastEditorHTML, 'text/html').body.innerText;
-            if (currentText.length > previousText.length) {
-                const marker = editor.lastElementChild;
-                if (marker && marker.textContent) marker.classList.add('abene-change');
-            }
+            // Les insertions suivies sont déjà encapsulées par beforeinput/paste.
+            // Ne jamais marquer le dernier bloc entier : cela détruit sa mise en page à l'export.
+            return;
         }
 
         function acceptAllChanges() {
@@ -8591,8 +8626,8 @@
 
         // ========== FILE FUNCTIONS ==========
         function confirmReplaceDocument() {
-            if (!documentState.dirty) return true;
-            return confirm(t('cOpenOther'));
+            try { saveDocument({ silent: true }); } catch (e) {}
+            return true;
         }
 
         /** Remet l’éditeur à l’état d’origine (sans mélange avec le document précédent). */
@@ -8712,10 +8747,7 @@
         }
 
         function newDocument() {
-            if (!confirm(t('cNewDoc'))) {
-                closeAllDropdowns();
-                return;
-            }
+            try { saveDocument({ silent: true }); } catch (e) {}
             resetEditorToOriginal();
             editor.innerHTML = '<p></p>';
             renameDocument((localStorage.getItem('abeneLanguage') || 'pt-PT') === 'pt-PT' ? 'Documento1' : 'Document1');
@@ -8918,36 +8950,68 @@
         function saveAsText() {
             const tmp = document.createElement('div');
             tmp.innerHTML = persistableEditorHtml();
-            downloadFile(tmp.innerText, (documentState.name || 'document') + '.txt', 'text/plain');
+            flattenExportDomLocal(tmp);
+            tmp.style.cssText = 'position:fixed;left:-20000px;top:0;width:' + getPageWidth() + 'px;white-space:pre-wrap;';
+            document.body.appendChild(tmp);
+            const text = tmp.innerText
+                .replace(/\u00a0/g, ' ')
+                .replace(/[ \t]+\n/g, '\n')
+                .replace(/\n{3,}/g, '\n\n')
+                .trimEnd();
+            tmp.remove();
+            downloadFile(text, (documentState.name || 'document') + '.txt', 'text/plain');
             closeAllDropdowns();
         }
 
         function exportPDF() {
             if (window.abeneBuildPagedExport && window.html2pdf) {
                 window.abeneRemoveExportRoot && window.abeneRemoveExportRoot();
+                if (typeof refreshPagination === 'function') refreshPagination();
                 const root = window.abeneBuildPagedExport();
                 if (!root) { closeAllDropdowns(); return; }
                 const geo = window.abeneInjectPrintPageSize ? window.abeneInjectPrintPageSize() : { w: getPageWidth(), h: getPageHeight(), wmm: 210, hmm: 297 };
-                root.style.position = 'fixed';
-                root.style.left = '-20000px';
-                root.style.top = '0';
-                root.style.zIndex = '0';
-                root.style.background = '#fff';
                 document.body.appendChild(root);
+                if (window.abeneHoldViewZoom) window.abeneHoldViewZoom();
+                if (window.ABENE && window.ABENE.Export && typeof window.ABENE.Export.savePagedPdf === 'function') {
+                    var ds = documentState || {};
+                    var donePdf = function () {
+                        if (window.abeneRemoveExportRoot) window.abeneRemoveExportRoot();
+                        if (window.abeneReleaseViewZoom) window.abeneReleaseViewZoom();
+                    };
+                    window.ABENE.Export.savePagedPdf(root, {
+                        w: geo.w, h: geo.h, wmm: geo.wmm, hmm: geo.hmm,
+                        orientation: pageOrientation
+                    }, (ds.name || 'document') + '.pdf').then(donePdf).catch(function () {
+                        donePdf();
+                        printDocument();
+                    });
+                    showToast(t('toastPdf'));
+                    closeAllDropdowns();
+                    return;
+                }
+                root.classList.add('abene-capture-live');
+                root.style.position = 'fixed';
+                root.style.left = '0';
+                root.style.top = '0';
+                root.style.zIndex = '2147483000';
+                root.style.background = '#fff';
                 var job = html2pdf().set({
                     margin: 0,
                     filename: (documentState.name || 'document') + '.pdf',
-                    image: { type: 'jpeg', quality: 0.98 },
+                    image: { type: 'jpeg', quality: 0.93 },
                     html2canvas: { scale: 2, useCORS: true, allowTaint: true, backgroundColor: '#ffffff', width: geo.w, windowWidth: geo.w, imageTimeout: 4000 },
                     jsPDF: { unit: 'mm', format: [geo.wmm, geo.hmm], orientation: pageOrientation === 'landscape' ? 'landscape' : 'portrait' },
-                    pagebreak: { mode: ['css'], after: '.abene-export-sheet' }
+                    pagebreak: { mode: 'css', after: '.abene-export-sheet' }
                 }).from(root);
-                var donePdf = function () { if (window.abeneRemoveExportRoot) window.abeneRemoveExportRoot(); };
+                var doneLegacy = function () {
+                    if (window.abeneRemoveExportRoot) window.abeneRemoveExportRoot();
+                    if (window.abeneReleaseViewZoom) window.abeneReleaseViewZoom();
+                };
                 try {
                     var p = job.save();
-                    if (p && typeof p.then === 'function') p.then(donePdf).catch(donePdf);
-                    else setTimeout(donePdf, 8000);
-                } catch (err) { donePdf(); }
+                    if (p && typeof p.then === 'function') p.then(doneLegacy).catch(doneLegacy);
+                    else setTimeout(doneLegacy, 8000);
+                } catch (err) { doneLegacy(); }
                 showToast(t('toastPdf'));
                 closeAllDropdowns();
                 return;
@@ -9049,7 +9113,7 @@
                     companyLetterhead('ATA', [['Data', d]], 'Documento interno') +
                     minutesBody + companyFooter(false) + '</div>'
             };
-            if (!confirm(t('cLoadTpl'))) return;
+            try { saveDocument({ silent: true }); } catch (e) {}
             editor.innerHTML = templates[type] || templates.blank;
             if (type !== 'blank') {
                 var coName = (companyData && companyData.name) || 'Genius Raros';
@@ -9124,21 +9188,73 @@
                 if (window.PageGeometry && typeof window.PageGeometry.pxToMm === 'function') return window.PageGeometry.pxToMm(px).toFixed(2);
                 return ((Number(px) || 0) * 25.4 / 96).toFixed(2);
             };
-            const bodyHtml = persistableEditorHtml();
-            const headerHtml = headerHtmlForWord();
-            const footerHtml = footerHtmlForWord();
-            const settings = projectSettings().replace(/"/g, '&quot;');
-            const content = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="UTF-8"><meta name="abene-settings" content="${settings}"><!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View></w:WordDocument></xml><![endif]--><style>
+            const box = document.createElement('div');
+            box.className = 'page';
+            box.innerHTML = persistableEditorHtml();
+            flattenExportDomLocal(box);
+            box.style.cssText = 'position:fixed;left:0;top:0;width:' + w + 'px;background:#fff;z-index:0;';
+            document.body.appendChild(box);
+            const finishWord = function () {
+                box.querySelectorAll('img').forEach(function (img) {
+                    var src = img.getAttribute('src') || '';
+                    if (src && src.indexOf('data:') !== 0) {
+                        try {
+                            var c = document.createElement('canvas');
+                            var iw = Math.max(1, img.naturalWidth || img.width || 54);
+                            var ih = Math.max(1, img.naturalHeight || img.height || 54);
+                            c.width = iw; c.height = ih;
+                            c.getContext('2d').drawImage(img, 0, 0, iw, ih);
+                            img.setAttribute('src', c.toDataURL('image/png'));
+                        } catch (eImg) {}
+                    }
+                });
+                Array.prototype.forEach.call(box.querySelectorAll('*'), function (el) {
+                    var cs = getComputedStyle(el);
+                    var keep = [
+                        'font-family:' + cs.fontFamily,
+                        'font-size:' + cs.fontSize,
+                        'font-weight:' + cs.fontWeight,
+                        'font-style:' + cs.fontStyle,
+                        'color:' + cs.color,
+                        'text-align:' + cs.textAlign,
+                        'line-height:' + cs.lineHeight
+                    ];
+                    if (cs.backgroundColor && cs.backgroundColor !== 'rgba(0, 0, 0, 0)' && cs.backgroundColor !== 'transparent') {
+                        keep.push('background-color:' + cs.backgroundColor);
+                    }
+                    if (el.tagName === 'TABLE' || el.tagName === 'TD' || el.tagName === 'TH') {
+                        keep.push('border:' + cs.border);
+                        keep.push('padding:' + cs.padding);
+                        keep.push('vertical-align:' + cs.verticalAlign);
+                        if (el.tagName === 'TABLE') keep.push('width:100%;border-collapse:collapse');
+                    }
+                    el.setAttribute('style', keep.join(';'));
+                });
+                const bodyHtml = box.innerHTML;
+                if (box.parentNode) box.parentNode.removeChild(box);
+                const headerHtml = headerHtmlForWord();
+                const footerHtml = footerHtmlForWord()
+                    .replace(/\{PAGE\}/gi, '<span style="mso-field-code: PAGE"></span>')
+                    .replace(/\{NUMPAGES\}/gi, '<span style="mso-field-code: NUMPAGES"></span>');
+                const settings = projectSettings().replace(/"/g, '&quot;');
+                const content = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="UTF-8"><meta name="abene-settings" content="${settings}"><!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View></w:WordDocument></xml><![endif]--><style>
 @page Section1 { size: ${pxmm(w)}mm ${pxmm(h)}mm; margin: ${pxmm(pageMargins.top)}mm ${pxmm(pageMargins.right)}mm ${pxmm(pageMargins.bottom)}mm ${pxmm(pageMargins.left)}mm; mso-header: h1; mso-footer: f1; }
 div.Section1 { page: Section1; font-family: Calibri, sans-serif; font-size: 11pt; line-height: 1.08; }
 p { margin: 0 0 8pt 0; }
+table { border-collapse: collapse; }
 </style></head><body>
 <div style="mso-element:header" id="h1">${headerHtml}</div>
 <div style="mso-element:footer" id="f1">${footerHtml}</div>
 <div class="Section1" data-abene-editor="1">${bodyHtml}</div>
 </body></html>`;
-            downloadFile(content, (documentState.name || 'document') + '.doc', 'application/msword');
-            closeAllDropdowns();
+                downloadFile(content, (documentState.name || 'document') + '.doc', 'application/msword');
+                closeAllDropdowns();
+            };
+            if (window.ABENE && window.ABENE.Export && typeof window.ABENE.Export.embedImages === 'function') {
+                window.ABENE.Export.embedImages(box).then(finishWord).catch(finishWord);
+            } else {
+                finishWord();
+            }
         }
 
         function cssColorToHex(c) {
@@ -9210,24 +9326,103 @@ p { margin: 0 0 8pt 0; }
             return runs.length ? runs : [new TextRun({ text: ' ', font: 'Calibri' })];
         }
 
+        function flattenExportDomLocal(rootEl) {
+            if (window.ABENE && window.ABENE.Export && typeof window.ABENE.Export.flatten === 'function') {
+                return window.ABENE.Export.flatten(rootEl);
+            }
+            if (!rootEl || !rootEl.querySelectorAll) return rootEl;
+            rootEl.querySelectorAll('del.abene-change').forEach(function (n) { n.remove(); });
+            var guard = 0;
+            while (guard++ < 80) {
+                var list = rootEl.querySelectorAll('ins.abene-change, span.abene-change');
+                if (!list.length) break;
+                var n = list[list.length - 1];
+                if (!n.parentNode) break;
+                while (n.firstChild) n.parentNode.insertBefore(n.firstChild, n);
+                n.parentNode.removeChild(n);
+            }
+            rootEl.querySelectorAll('.abene-change').forEach(function (n) {
+                n.classList.remove('abene-change');
+                n.removeAttribute('data-author');
+                n.removeAttribute('data-date');
+            });
+            return rootEl;
+        }
+
+        function docxBorder(color, sz) {
+            const BorderStyle = window.docx && window.docx.BorderStyle;
+            const style = BorderStyle ? BorderStyle.SINGLE : 'single';
+            return { style: style, size: sz || 4, color: color || '0B1223' };
+        }
+
         function docxPushBlock(node, children, api) {
-            const { Paragraph, TextRun, Table, TableRow, TableCell, WidthType, HeadingLevel, AlignmentType, ImageRun } = api;
+            const { Paragraph, TextRun, Table, TableRow, TableCell, WidthType, HeadingLevel, AlignmentType, ImageRun, ShadingType, PageBreak } = api;
+            if (node.nodeType === Node.TEXT_NODE) {
+                var raw = (node.textContent || '').replace(/\u00a0/g, ' ');
+                if (raw.trim()) children.push(new Paragraph({ children: [new TextRun({ text: raw, font: 'Calibri' })] }));
+                return;
+            }
             if (node.nodeType !== Node.ELEMENT_NODE) return;
             if (node.classList.contains('page-decoration') || node.classList.contains('abene-page-flow') || node.classList.contains('watermark') || node.classList.contains('abene-img-anchor')) return;
+            if (node.classList.contains('page-break-marker') || node.classList.contains('abene-section-break')) {
+                if (PageBreak) children.push(new Paragraph({ children: [new PageBreak()] }));
+                return;
+            }
             if (node.tagName === 'TABLE') {
                 if (node.getAttribute && node.getAttribute('data-abene-cont')) return;
+                const tblW = Math.max(1, node.offsetWidth || 600);
+                const isItems = node.classList.contains('gr-items') || node.classList.contains('abene-quote-table');
+                const isKv = node.classList.contains('gr-kv');
                 const rows = Array.from(node.rows).filter(function (row) {
                     return !row.getAttribute('data-abene-cloned-head');
-                }).map(row => new TableRow({
-                    tableHeader: !!(row.parentNode && row.parentNode.tagName === 'THEAD') ||
-                        !!(row.cells.length && row.querySelector('th') && !row.querySelector('td')),
-                    cantSplit: true,
-                    children: Array.from(row.cells).map(cell => new TableCell({
-                        children: [new Paragraph({ children: docxRuns(cell, TextRun, ImageRun) })]
-                    }))
-                }));
+                }).map(function (row) {
+                    const isHead = !!(row.parentNode && row.parentNode.tagName === 'THEAD') ||
+                        !!(row.cells.length && row.querySelector('th') && !row.querySelector('td'));
+                    return new TableRow({
+                        tableHeader: isHead,
+                        cantSplit: true,
+                        children: Array.from(row.cells).map(function (cell) {
+                            const cs = window.getComputedStyle ? getComputedStyle(cell) : cell.style;
+                            const bgRaw = cssColorToHex(cs.backgroundColor || cell.style.backgroundColor);
+                            const isTh = cell.tagName === 'TH' || isHead;
+                            const fill = isTh && isItems ? '0B1223' : (bgRaw && bgRaw !== '000000' && bgRaw !== 'ffffff' ? bgRaw : (isKv && isTh ? 'F4EFE3' : ''));
+                            const baseRuns = docxRuns(cell, TextRun, ImageRun);
+                            const runs = (isTh && isItems)
+                                ? [new TextRun({
+                                    text: (cell.innerText || ' ').replace(/\s+/g, ' ').trim() || ' ',
+                                    font: 'Calibri',
+                                    bold: true,
+                                    color: 'FFFFFF',
+                                    size: 16
+                                })]
+                                : baseRuns;
+                            const pct = Math.max(6, Math.round(((cell.offsetWidth || 80) / tblW) * 100));
+                            const cellOpts = {
+                                width: { size: pct, type: WidthType.PERCENTAGE },
+                                margins: { top: 60, bottom: 60, left: 80, right: 80 },
+                                children: [new Paragraph({
+                                    children: runs,
+                                    alignment: docxAlign(cell, AlignmentType)
+                                })]
+                            };
+                            if (fill && ShadingType) cellOpts.shading = { type: ShadingType.CLEAR, fill: fill };
+                            const bColor = isItems ? (isTh ? '243049' : 'D4CFC2') : (isKv ? 'E6DFD0' : 'CCCCCC');
+                            cellOpts.borders = {
+                                top: docxBorder(bColor, 4),
+                                bottom: docxBorder(bColor, 4),
+                                left: docxBorder(bColor, 4),
+                                right: docxBorder(bColor, 4)
+                            };
+                            return new TableCell(cellOpts);
+                        })
+                    });
+                });
                 if (!rows.length) return;
-                children.push(new Table({ rows, width: { size: 100, type: WidthType.PERCENTAGE } }));
+                children.push(new Table({
+                    rows: rows,
+                    width: { size: 100, type: WidthType.PERCENTAGE }
+                }));
+                children.push(new Paragraph({ children: [new TextRun({ text: ' ' })], spacing: { after: 80 } }));
                 return;
             }
             if (node.tagName === 'UL' || node.tagName === 'OL') {
@@ -9262,6 +9457,14 @@ p { margin: 0 0 8pt 0; }
                 return;
             }
             if (node.tagName === 'DIV' || node.tagName === 'SECTION') {
+                if (node.classList.contains('gr-goldbar') || node.classList.contains('gr-rules')) {
+                    children.push(new Paragraph({
+                        border: { bottom: { color: 'C9A84C', space: 1, style: 'single', size: 12 } },
+                        children: [new TextRun({ text: ' ' })],
+                        spacing: { after: 120 }
+                    }));
+                    return;
+                }
                 Array.from(node.childNodes).forEach(function (ch) { docxPushBlock(ch, children, api); });
                 return;
             }
@@ -9278,20 +9481,25 @@ p { margin: 0 0 8pt 0; }
         async function exportDocx() {
             if (!window.docx) { alert(t('aNoDocx')); return; }
             if (window.abenePrepareForExport) window.abenePrepareForExport();
-            const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, WidthType, HeadingLevel, Header, Footer, AlignmentType, PageNumber, PageOrientation, ImageRun } = window.docx;
-            const api = { Paragraph, TextRun, Table, TableRow, TableCell, WidthType, HeadingLevel, AlignmentType, ImageRun };
+            const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, WidthType, HeadingLevel, Header, Footer, AlignmentType, PageNumber, PageOrientation, ImageRun, ShadingType, PageBreak, BorderStyle } = window.docx;
+            const api = { Paragraph, TextRun, Table, TableRow, TableCell, WidthType, HeadingLevel, AlignmentType, ImageRun, ShadingType, PageBreak, BorderStyle };
             const children = [];
             const dpi = (window.PageGeometry && window.PageGeometry.dpi) || 96;
             const pxToTwip = function (px) { return Math.round((Number(px) || 0) * 1440 / dpi); };
             const docxSrc = document.createElement('div');
+            docxSrc.className = 'page';
             if (typeof abeneGetCleanHtml === 'function') docxSrc.innerHTML = abeneGetCleanHtml(editor);
             else {
                 Array.from(editor.childNodes).forEach(function (n) { docxSrc.appendChild(n.cloneNode(true)); });
             }
+            flattenExportDomLocal(docxSrc);
+            docxSrc.style.cssText = 'position:fixed;left:0;top:0;width:' + getPageWidth() + 'px;background:#fff;z-index:0;opacity:1;';
+            document.body.appendChild(docxSrc);
             if (window.ABENE && window.ABENE.Export && typeof window.ABENE.Export.embedImages === 'function') {
                 try { await window.ABENE.Export.embedImages(docxSrc); } catch (eImg) {}
             }
             docxSrc.childNodes.forEach(node => docxPushBlock(node, children, api));
+            if (docxSrc.parentNode) docxSrc.parentNode.removeChild(docxSrc);
             if (!children.length) children.push(new Paragraph({ children: [new TextRun({ text: ' ', font: 'Calibri' })] }));
             const headerChildren = [];
             const tpl = pageHeaderTemplate || (pageHeaderText ? 'text' : 'blank');
@@ -9844,7 +10052,8 @@ p { margin: 0 0 8pt 0; }
 
         function restoreVersion(index) {
             const version = documentVersions[index];
-            if (!version || !confirm(t('cRestoreVer'))) return;
+            if (!version) return;
+            try { saveDocument({ silent: true }); } catch (e) {}
             editor.innerHTML = version.html;
             documentState.name = version.name;
             documentState.dirty = true;
@@ -9883,11 +10092,24 @@ p { margin: 0 0 8pt 0; }
 
         function printDocument() {
             if (window.abeneBuildPagedExport) {
+                if (window.abeneHoldViewZoom) window.abeneHoldViewZoom();
                 window.abeneRemoveExportRoot && window.abeneRemoveExportRoot();
+                document.querySelectorAll('.html2pdf__overlay, .html2pdf__container').forEach(function (n) { n.remove(); });
                 if (typeof refreshPagination === 'function') refreshPagination();
                 const root = window.abeneBuildPagedExport();
-                if (!root) { window.print(); closeAllDropdowns(); return; }
+                if (!root) {
+                    window.print();
+                    if (window.abeneReleaseViewZoom) setTimeout(window.abeneReleaseViewZoom, 400);
+                    closeAllDropdowns();
+                    return;
+                }
                 if (window.abeneInjectPrintPageSize) window.abeneInjectPrintPageSize();
+                root.classList.add('abene-capture-live');
+                root.style.position = 'fixed';
+                root.style.left = '0';
+                root.style.top = '0';
+                root.style.opacity = '1';
+                root.style.zIndex = '2147483000';
                 document.body.appendChild(root);
                 document.body.classList.add('abene-printing');
                 var cleaned = false;
@@ -9895,23 +10117,19 @@ p { margin: 0 0 8pt 0; }
                     if (cleaned) return;
                     cleaned = true;
                     window.removeEventListener('afterprint', cleanup);
+                    document.querySelectorAll('.html2pdf__overlay, .html2pdf__container').forEach(function (n) { n.remove(); });
                     if (window.abeneRemoveExportRoot) window.abeneRemoveExportRoot();
+                    if (window.abeneReleaseViewZoom) setTimeout(window.abeneReleaseViewZoom, 450);
                 };
                 window.addEventListener('afterprint', cleanup);
-                var startPrint = function () {
+                requestAnimationFrame(function () {
                     requestAnimationFrame(function () {
-                        requestAnimationFrame(function () {
-                            setTimeout(function () {
-                                window.print();
-                                setTimeout(cleanup, 120000);
-                            }, 50);
-                        });
+                        setTimeout(function () {
+                            window.print();
+                            setTimeout(cleanup, 120000);
+                        }, 120);
                     });
-                };
-                var embed = window.ABENE && window.ABENE.Export && typeof window.ABENE.Export.embedImages === 'function'
-                    ? window.ABENE.Export.embedImages(root)
-                    : Promise.resolve();
-                Promise.resolve(embed).then(startPrint).catch(startPrint);
+                });
                 closeAllDropdowns();
                 return;
             }

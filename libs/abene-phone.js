@@ -87,7 +87,11 @@
             sizer.style.height = Math.ceil(h * z + 16) + 'px';
         }
     }
+    function zoomFrozen() {
+        return !!(window._abeneFreezeZoom || (document.body && document.body.classList.contains('abene-printing')));
+    }
     function fitPageToPhone(force) {
+        if (zoomFrozen()) return;
         if (!markPhone()) {
             layoutPhoneZoom();
             return;
@@ -187,6 +191,7 @@
         if (typeof window.setZoom !== 'function' || window.setZoom._abenePhone) return;
         origSetZoom = window.setZoom;
         window.setZoom = function (val) {
+            if (zoomFrozen()) return;
             var n = parseInt(val, 10);
             if (document.body.classList.contains('abene-phone')) n = Math.max(50, Math.min(200, n));
             origSetZoom(n);
@@ -297,6 +302,12 @@
         if (window.matchMedia) {
             var mql = window.matchMedia(MQ);
             var onMq = function () {
+                if (zoomFrozen()) return;
+                if (!isPhone()) {
+                    markPhone();
+                    layoutPhoneZoom();
+                    return;
+                }
                 userZoomed = false;
                 fitPageToPhone(true);
             };
@@ -304,10 +315,12 @@
             else if (mql.addListener) mql.addListener(onMq);
         }
         window.addEventListener('orientationchange', function () {
+            if (zoomFrozen()) return;
             userZoomed = false;
             setTimeout(function () { fitPageToPhone(true); }, 180);
         });
         window.addEventListener('resize', function () {
+            if (zoomFrozen()) return;
             markPhone();
             layoutPhoneZoom();
             clampOpenUi();

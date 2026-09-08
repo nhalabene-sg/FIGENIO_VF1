@@ -61,6 +61,7 @@
         return text.length > 30;
     }
     function finishInsert() {
+        relabelWorkSite();
         if (typeof saveUndoState === 'function') saveUndoState();
         if (typeof updateStats === 'function') updateStats();
         if (typeof refreshPagination === 'function') refreshPagination();
@@ -434,7 +435,7 @@
         var ivaNote = ivaMention(data.tva, data.ivaRegime);
         var factRows = [];
         if (data.object) factRows.push(['Objeto', esc(data.object)]);
-        if (data.site) factRows.push(['Local da obra', esc(data.site)]);
+        if (data.site) factRows.push(['Local da obra/Serviço', esc(data.site)]);
         if (data.payTerms) factRows.push(['Prazo de pagamento', esc(data.payTerms)]);
         var linkReport = editorHasContent()
             ? '<p class="gr-iva-note">O relatório precedente faz parte integrante deste orçamento.</p>'
@@ -764,9 +765,18 @@
         }
     }
 
+    function relabelWorkSite(root) {
+        var box = root || ed();
+        if (!box || !box.querySelectorAll) return;
+        box.querySelectorAll('.gr-kv th').forEach(function (th) {
+            if ((th.textContent || '').trim() === 'Local da obra') th.textContent = 'Local da obra/Serviço';
+        });
+    }
+
     function refreshLetterheads() {
         var editor = ed();
         if (!editor) return;
+        relabelWorkSite(editor);
         editor.querySelectorAll('[data-abene-block]').forEach(function (block) {
             var titleEl = block.querySelector('.gr-doc-title');
             var kickEl = block.querySelector('.gr-doc-kicker');
@@ -1235,7 +1245,7 @@
             return;
         }
         window.html2pdf().set({
-            margin: [10, 10, 12, 10],
+            margin: 0,
             filename: name,
             image: { type: 'jpeg', quality: 0.98 },
             html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
@@ -1314,7 +1324,7 @@
         }
         try {
             var worker = window.html2pdf().set({
-                margin: [10, 10, 12, 10],
+                margin: 0,
                 filename: (num || 'papel') + '.pdf',
                 image: { type: 'jpeg', quality: 0.92 },
                 html2canvas: { scale: 1.6, useCORS: true, backgroundColor: '#ffffff' },

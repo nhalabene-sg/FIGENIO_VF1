@@ -3618,16 +3618,7 @@
         var m = A().pageMargins || { top: 96, bottom: 96, left: 96, right: 96 };
         var chrome = document.getElementById('pageChrome');
         var used = typeof window.abeneCountUsedPages === 'function' ? window.abeneCountUsedPages(editor) : 1;
-        var chromePages = 0;
-        if (chrome) {
-            chrome.querySelectorAll('[data-page]').forEach(function (z) {
-                chromePages = Math.max(chromePages, Number(z.getAttribute('data-page') || 0) || 0);
-            });
-        }
-        var rawH = Math.max(editor.scrollHeight || 0, chrome && chrome.offsetHeight ? chrome.offsetHeight : 0);
-        var overflow = rawH - used * h;
-        var pages = Math.max(1, used, chromePages);
-        if (overflow > 8) pages = Math.max(pages, Math.ceil((rawH - 2) / h));
+        var pages = Math.max(1, used);
         var totalH = pages * h;
         var root = document.createElement('div');
         root.id = 'abeneExportRoot';
@@ -3675,6 +3666,8 @@
             edClone.querySelectorAll('.abene-page-flow').forEach(function (sp) {
                 var hh = sp.style.getPropertyValue('--flow-h') || sp.style.height || (sp.offsetHeight + 'px');
                 if (hh) sp.style.setProperty('height', hh, 'important');
+                sp.style.setProperty('background', '#fff', 'important');
+                sp.style.setProperty('box-shadow', 'none', 'important');
             });
             inner.appendChild(edClone);
             if (chrome && chrome.childNodes.length) {
@@ -3683,10 +3676,17 @@
                 chClone.classList.remove('hf-guides-on');
                 chClone.querySelectorAll('.hf-tab, .hf-rule, .page-gap-band, .hf-close').forEach(function (n) { n.remove(); });
                 chClone.querySelectorAll('[contenteditable]').forEach(function (el) { el.contentEditable = 'false'; });
+                chClone.querySelectorAll('.page-header-zone').forEach(function (zone) {
+                    zone.style.background = '#fff';
+                    zone.style.zIndex = '12';
+                });
                 chClone.querySelectorAll('.page-footer-zone').forEach(function (zone) {
                     var pg = Math.max(0, Number(zone.getAttribute('data-page') || '1') - 1);
                     zone.style.height = m.bottom + 'px';
                     zone.style.top = (pg * h + h - m.bottom) + 'px';
+                    zone.style.setProperty('--hf-seam', '0px');
+                    zone.style.background = '#fff';
+                    zone.style.zIndex = '12';
                 });
                 chClone.style.position = 'absolute';
                 chClone.style.top = '0';
