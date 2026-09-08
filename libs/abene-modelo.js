@@ -73,7 +73,9 @@
     function writeUi(o) {
         o = o || loadOpts();
         document.querySelectorAll('.modelo-style-card').forEach(function (btn) {
-            btn.classList.toggle('on', btn.getAttribute('data-style') === o.style);
+            var selected = btn.getAttribute('data-style') === o.style;
+            btn.classList.toggle('on', selected);
+            btn.setAttribute('aria-pressed', selected ? 'true' : 'false');
         });
         Object.keys(UI_MAP).forEach(function (k) {
             var el = document.getElementById(UI_MAP[k]);
@@ -109,8 +111,8 @@
         var prev = fieldsFromDoc();
         return {
             work: stored.work || prev.work || tt('mdlWorkDef') || 'Título do relatório',
-            ref: stored.ref || prev.ref || (tt('hfRefPrefix') || 'Nº ') + 'GR-RAP-' + y + '-001',
-            date: stored.date || prev.date || (tt('hfDatePrefix') || 'Data : ') + iso,
+            ref: stored.ref || prev.ref || 'GR-RAP-' + y + '-001',
+            date: stored.date || prev.date || iso,
             client: stored.client || prev.client || tt('mdlClientDef') || 'Cliente',
             site: stored.site || prev.site || tt('mdlSiteDef') || 'Obra / local',
             tech: stored.tech || prev.tech || tt('mdlTechDef') || 'Técnico responsável',
@@ -146,19 +148,26 @@
         return '<div class="' + st + '" data-abene-block="cover">' +
             '<div class="abene-cover-top">' +
             '<div class="abene-cover-brand">' + logo +
-            '<div class="abene-cover-name">' + name + '</div></div>' +
+            '<div class="abene-cover-brand-copy"><div class="abene-cover-name">' + name + '</div>' +
+            (co.legalForm ? '<div class="abene-cover-legal">' + esc(co.legalForm) + '</div>' : '') + '</div></div>' +
             '<div class="abene-cover-kicker">' + esc(tt('mdlCoverKicker')) + '</div>' +
             '</div>' +
             '<div class="abene-cover-mid">' +
+            '<div class="abene-cover-accent"></div>' +
             '<div class="abene-cover-kind" data-abene-field="doctype">' + esc(kindTitle(opts)) + '</div>' +
             '<div class="abene-cover-work" data-abene-field="work">' + esc(meta.work) + '</div>' +
-            '<div class="abene-cover-ref" data-abene-field="ref">' + esc(meta.ref) + '</div>' +
-            '<div class="abene-cover-date" data-abene-field="date">' + esc(meta.date) + '</div>' +
+            '<div class="abene-cover-meta">' +
+            '<div><span>' + esc(tt('mdlFieldRef')) + '</span><strong data-abene-field="ref">' + esc(meta.ref) + '</strong></div>' +
+            '<div><span>' + esc(tt('mdlFieldDate')) + '</span><strong data-abene-field="date">' + esc(meta.date) + '</strong></div>' +
+            '<div><span>' + esc(tt('mdlFieldVersion')) + '</span><strong data-abene-field="version">' + esc(meta.version) + '</strong></div>' +
+            '</div>' +
             '</div>' +
             '<div class="abene-cover-bottom">' +
             '<div class="abene-cover-gold"></div>' +
+            '<div class="abene-cover-footline"><div>' +
             (slogan ? '<div class="abene-cover-slogan">' + slogan + '</div>' : '') +
             (co.address ? '<div class="abene-cover-addr">' + esc(co.address) + '</div>' : '') +
+            '</div><div class="abene-cover-docmark">' + esc(kindTitle(opts)) + '</div></div>' +
             '</div></div>';
     }
 
@@ -176,11 +185,11 @@
             : '<div class="abene-tp-name">' + name + '</div>';
         return '<div class="' + st + '" data-abene-block="titlepage">' +
             logo +
-            '<div class="abene-tp-heading">' + esc(tt('mdlTitlepage')) + '</div>' +
+            '<div class="abene-tp-heading-row"><div class="abene-tp-heading">' + esc(tt('mdlTitlepage')) + '</div>' +
+            '<div class="abene-tp-doc-type" data-abene-field="doctype">' + esc(kindTitle(opts)) + '</div></div>' +
             '<div class="abene-cover-gold"></div>' +
-            '<table class="abene-tp-table">' +
-            idRow(tt('mdlFieldDoc'), 'doctype', kindTitle(opts)) +
-            idRow(tt('mdlFieldWork'), 'work', meta.work) +
+            '<div class="abene-tp-work" data-abene-field="work">' + esc(meta.work) + '</div>' +
+            '<div class="abene-tp-table-wrap"><table class="abene-tp-table">' +
             idRow(tt('mdlFieldRef'), 'ref', meta.ref) +
             idRow(tt('mdlFieldDate'), 'date', meta.date) +
             idRow(tt('mdlFieldClient'), 'client', meta.client) +
@@ -188,7 +197,7 @@
             idRow(tt('mdlFieldVersion'), 'version', meta.version) +
             idRow(tt('mdlFieldTech'), 'tech', meta.tech) +
             (co.nif ? idRow(tt('taxId') || 'NIF', 'nif', co.nif) : '') +
-            '</table>' +
+            '</table></div>' +
             '<p class="abene-tp-note">' + esc(tt('mdlTitleHint')) + '</p>' +
             '</div>';
     }
@@ -307,7 +316,9 @@
 
     window.selectModeloStyle = function (style, ev) {
         document.querySelectorAll('.modelo-style-card').forEach(function (btn) {
-            btn.classList.toggle('on', btn.getAttribute('data-style') === style);
+            var selected = btn.getAttribute('data-style') === style;
+            btn.classList.toggle('on', selected);
+            btn.setAttribute('aria-pressed', selected ? 'true' : 'false');
         });
         if (ev) ev.stopPropagation();
         var o = readUi();
@@ -426,13 +437,14 @@
                 '<input id="mdlMeta_' + id + '" type="text" value="' + esc(val) + '"></div>';
         }
         openGenericModal(tt('mdlMeta'),
+            '<div class="modelo-meta-grid">' +
             field('work', tt('mdlFieldWork'), m.work) +
             field('ref', tt('mdlFieldRef'), m.ref) +
             field('date', tt('mdlFieldDate'), m.date) +
             field('client', tt('mdlFieldClient'), m.client) +
             field('site', tt('mdlFieldSite'), m.site) +
             field('tech', tt('mdlFieldTech'), m.tech) +
-            field('version', tt('mdlFieldVersion'), m.version),
+            field('version', tt('mdlFieldVersion'), m.version) + '</div>',
             '<button class="btn-secondary" onclick="closeModal(\'genericModal\')">' + esc(tt('cancel')) + '</button>' +
             '<button class="btn-primary" onclick="saveModeloMeta()">' + esc(tt('ok')) + '</button>'
         );

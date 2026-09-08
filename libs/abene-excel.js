@@ -50,6 +50,97 @@
         if (E().fnLocalName) return E().fnLocalName(canon, locale());
         return canon;
     }
+    function boolText(v) {
+        if (E().boolName) return E().boolName(!!v, locale());
+        return v ? 'TRUE' : 'FALSE';
+    }
+    function fnArgsText(id) {
+        var raw = FN_ARGS[id];
+        if (raw == null) return '';
+        var loc = locale();
+        var i = /^fr/i.test(loc) ? 1 : /^en/i.test(loc) ? 2 : /^es/i.test(loc) ? 3 : 0;
+        var sep = i === 2 ? ',' : ';';
+        var s = String(raw).replace(/;/g, sep);
+        if (i === 0) return s;
+        var g = {
+            'se_verdadeiro': ['se_verdadeiro', 'si_vrai', 'value_if_true', 'si_verdadero'],
+            'se_falso': ['se_falso', 'si_faux', 'value_if_false', 'si_falso'],
+            'valor_se_erro': ['valor_se_erro', 'valeur_si_erreur', 'value_if_error', 'valor_si_error'],
+            'valor_se_na': ['valor_se_na', 'valeur_si_na', 'value_if_na', 'valor_si_nd'],
+            'intervalo_soma': ['intervalo_soma', 'plage_somme', 'sum_range', 'rango_suma'],
+            'intervalo_média': ['intervalo_média', 'plage_moyenne', 'average_range', 'rango_promedio'],
+            'núm_dígitos': ['núm_dígitos', 'nb_décimales', 'num_digits', 'núm_decimales'],
+            'núm_caract': ['núm_caract', 'nb_caract', 'num_chars', 'núm_caract'],
+            'núm_escolhido': ['núm_escolhido', 'nb_choisi', 'number_chosen', 'núm_elegido'],
+            'núm_linha': ['núm_linha', 'n°_ligne', 'row_num', 'núm_fila'],
+            'núm_coluna': ['núm_coluna', 'n°_colonne', 'column_num', 'núm_columna'],
+            'índice_col': ['índice_col', 'no_index', 'col_index', 'índice_col'],
+            'índice_lin': ['índice_lin', 'no_ligne', 'row_index', 'índice_fil'],
+            'texto_proc': ['texto_proc', 'texte_cherché', 'find_text', 'texto_buscado'],
+            'data_início': ['data_início', 'date_début', 'start_date', 'fecha_inicio'],
+            'data_fim': ['data_fim', 'date_fin', 'end_date', 'fecha_fin'],
+            'vetor_proc': ['vetor_proc', 'vecteur_rech', 'lookup_vector', 'vector_busq'],
+            'vetor_resultado': ['vetor_resultado', 'vecteur_résultat', 'result_vector', 'vector_resultado'],
+            'predefinição': ['predefinição', 'défaut', 'default', 'predeterminado'],
+            'estimativa': ['estimativa', 'estimation', 'guess', 'estimación'],
+            'ignorar_vazio': ['ignorar_vazio', 'ignorer_vide', 'ignore_empty', 'ignorar_vacío'],
+            'delimitador': ['delimitador', 'délimiteur', 'delimiter', 'delimitador'],
+            'aproximado': ['aproximado', 'approximatif', 'range_lookup', 'aproximado'],
+            'referência': ['referência', 'référence', 'reference', 'referencia'],
+            'numerador': ['numerador', 'numérateur', 'numerator', 'numerador'],
+            'denominador': ['denominador', 'dénominateur', 'denominator', 'denominador'],
+            'múltiplo': ['múltiplo', 'multiple', 'significance', 'múltiplo'],
+            'critério': ['critério', 'critère', 'criteria', 'criterio'],
+            'intervalo': ['intervalo', 'plage', 'range', 'rango'],
+            'potência': ['potência', 'puissance', 'power', 'potencia'],
+            'instância': ['instância', 'instance', 'instance_num', 'instancia'],
+            'ângulo': ['ângulo', 'angle', 'angle', 'ángulo'],
+            'número': ['número', 'nombre', 'number', 'número'],
+            'matriz': ['matriz', 'matrice', 'array', 'matriz'],
+            'valores': ['valores', 'valeurs', 'values', 'valores'],
+            'periodo': ['período', 'période', 'per', 'período'],
+            'período': ['período', 'période', 'per', 'período'],
+            'unidade': ['unidade', 'unité', 'unit', 'unidad'],
+            'feriados': ['feriados', 'jours_fériés', 'holidays', 'festivos'],
+            'residual': ['residual', 'résiduelle', 'salvage', 'residual'],
+            'custo': ['custo', 'coût', 'cost', 'costo'],
+            'vida': ['vida', 'durée', 'life', 'vida'],
+            'ordem': ['ordem', 'ordre', 'order', 'orden'],
+            'formato': ['formato', 'format', 'format_text', 'formato'],
+            'dentro': ['dentro', 'dans_texte', 'within_text', 'dentro_de'],
+            'início': ['início', 'début', 'start_num', 'inicio'],
+            'meses': ['meses', 'mois', 'months', 'meses'],
+            'antigo': ['antigo', 'ancien', 'old_text', 'antiguo'],
+            'vezes': ['vezes', 'fois', 'number_times', 'veces'],
+            'texto1': ['texto1', 'texte1', 'text1', 'texto1'],
+            'texto2': ['texto2', 'texte2', 'text2', 'texto2'],
+            'texto': ['texto', 'texte', 'text', 'texto'],
+            'valor1': ['valor1', 'valeur1', 'value1', 'valor1'],
+            'valor2': ['valor2', 'valeur2', 'value2', 'valor2'],
+            'núm1': ['núm1', 'nombre1', 'number1', 'núm1'],
+            'núm2': ['núm2', 'nombre2', 'number2', 'núm2'],
+            'lógico1': ['lógico1', 'logique1', 'logical1', 'lógico1'],
+            'lógico2': ['lógico2', 'logique2', 'logical2', 'lógico2'],
+            'lógico': ['lógico', 'logique', 'logical', 'lógico'],
+            'teste1': ['teste1', 'test1', 'logical_test1', 'prueba1'],
+            'teste': ['teste', 'test', 'logical_test', 'prueba'],
+            'índice': ['índice', 'index', 'index_num', 'índice'],
+            'divisor': ['divisor', 'diviseur', 'divisor', 'divisor'],
+            'nper': ['nper', 'npm', 'nper', 'nper'],
+            'pgto': ['pgto', 'vpm', 'pmt', 'pago'],
+            'taxa': ['taxa', 'taux', 'rate', 'tasa'],
+            'valor': ['valor', 'valeur', 'value', 'valor'],
+            'data': ['data', 'date', 'serial_number', 'fecha'],
+            'tipo': ['tipo', 'type', 'type', 'tipo'],
+            'base': ['base', 'base', 'base', 'base'],
+            'núm': ['núm', 'nombre', 'number', 'núm'],
+            'novo': ['novo', 'nouveau', 'new_text', 'nuevo']
+        };
+        Object.keys(g).sort(function (a, b) { return b.length - a.length; }).forEach(function (k) {
+            if (s.indexOf(k) >= 0) s = s.split(k).join(g[k][i]);
+        });
+        return s;
+    }
     function sumFn() { return locFn('SUM'); }
     function isNumericCell(ce) {
         if (!ce) return false;
@@ -312,7 +403,7 @@
     function updateFnDlgMeta() {
         var syn = document.getElementById('xlFnSyntax');
         var des = document.getElementById('xlFnDesc');
-        var args = FN_ARGS[_fnDlgPick];
+        var args = fnArgsText(_fnDlgPick);
         var name = locFn(_fnDlgPick);
         if (syn) syn.textContent = args != null && args !== '' ? (name + '(' + args + ')') : (name + '()');
         if (des) des.textContent = fnHelpText(_fnDlgPick) || tt('xlFnHint', 'Insere a função na barra de fórmulas, no idioma atual.');
@@ -465,7 +556,7 @@
     function parseRaw(raw) {
         var s = String(raw == null ? '' : raw).trim();
         if (s === '') return { type: 'e', value: '' };
-        if (/^TRUE|VERDADEIRO|VRAI$/i.test(s)) return { type: 'b', value: true };
+        if (/^TRUE|VERDADEIRO|VRAI|VERDADERO$/i.test(s)) return { type: 'b', value: true };
         if (/^FALSE|FALSO|FAUX$/i.test(s)) return { type: 'b', value: false };
         if (/^-?\d+([.,]\d+)?%?$/.test(s.replace(/\s/g, ''))) {
             return { type: 'n', value: E().num(s) };
@@ -631,7 +722,7 @@
             if (ce.fmt === 'time') return v.toLocaleTimeString(locale(), { hour: '2-digit', minute: '2-digit' });
             return v.toLocaleDateString(locale());
         }
-        if (typeof v === 'boolean') return v ? 'TRUE' : 'FALSE';
+        if (typeof v === 'boolean') return boolText(v);
         if (typeof v === 'number') {
             if (ce.fmt === 'pct') return (v * 100).toFixed(2).replace('.', decSep()) + '%';
             if (ce.fmt === 'eur' || ce.fmt === 'cur' || ce.fmt === 'acc') {
@@ -1177,12 +1268,18 @@
     };
 
     var _fxBackup = '';
-    function updateFormulaBar() {
+    function updateFormulaBar(force) {
         var name = document.getElementById('excelNameBox');
         var bar = document.getElementById('excelFormula');
         var ce = cell(sheet(), sel.c, sel.r);
-        if (name && document.activeElement !== name) name.value = key(sel.c, sel.r);
-        if (bar && document.activeElement !== bar) bar.value = ce ? formulaDisplay(ce.raw) : '';
+        if (name && (force || document.activeElement !== name)) name.value = key(sel.c, sel.r);
+        if (bar) {
+            if (force && document.activeElement === bar && bar.value && String(bar.value).charAt(0) === '=' && E().toInvariantFormula) {
+                bar.value = formulaDisplay(E().toInvariantFormula(bar.value));
+            } else if (force || document.activeElement !== bar) {
+                bar.value = ce ? formulaDisplay(ce.raw) : '';
+            }
+        }
         var sz = document.getElementById('xlFontSize');
         if (sz && document.activeElement !== sz) {
             var n = String((ce && ce.size) || 11);
@@ -3270,7 +3367,13 @@
             }
         });
         try { persist(); } catch (e) {}
+        var ined = document.querySelector('.xl-inedit');
+        if (ined && ined.value && String(ined.value).charAt(0) === '=' && E().toInvariantFormula) {
+            ined.value = formulaDisplay(E().toInvariantFormula(ined.value));
+        }
         render();
+        updateFormulaBar(true);
+        updateStatus();
     }
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bootExcelUi);
     else bootExcelUi();

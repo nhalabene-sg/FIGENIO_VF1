@@ -1260,6 +1260,7 @@
             SUBSTITUTE: 'SUBSTITUIR', FIND: 'LOCALIZAR', SEARCH: 'PROCURAR', TEXT: 'TEXTO', VALUE: 'VALOR',
             TODAY: 'HOJE', NOW: 'AGORA', DATE: 'DATA', TIME: 'TEMPO', YEAR: 'ANO', MONTH: 'MÊS', DAY: 'DIA',
             HOUR: 'HORA', MINUTE: 'MINUTO', SECOND: 'SEGUNDO', WEEKDAY: 'DIA.SEMANA', IFERROR: 'SEERRO', IFNA: 'SENA',
+            ABS: 'ABS', MIN: 'MÍNIMO', MAX: 'MÁXIMO', INT: 'INT', TRUNC: 'TRUNCAR',
             ISBLANK: 'ESEVAZIO', ISNUMBER: 'ENUM', ISTEXT: 'ETEXTO', ISERROR: 'EERRO', ISNA: 'ENA',
             VLOOKUP: 'PROCV', HLOOKUP: 'PROCH', INDEX: 'INDICE', MATCH: 'CORRESP', CHOOSE: 'ESCOLHER',
             COLUMN: 'COL', ROW: 'LIN', COLUMNS: 'COLS', ROWS: 'LINS', NA: 'NÃO.DISP',
@@ -1275,13 +1276,14 @@
             XOR: 'XOR', IFS: 'SES', SWITCH: 'SWITCH',
             REPLACE: 'SUBSTITUIR.CARACT', REPT: 'REPT', EXACT: 'EXATO', CLEAN: 'LIMPAR', CHAR: 'CARACT', CODE: 'CÓDIGO',
             DAYS: 'DIAS', EDATE: 'DATAM', EOMONTH: 'FIMMÊS', NETWORKDAYS: 'DIATRABALHO', WEEKNUM: 'NÚMSEMANA', DATEDIF: 'DATEDIF',
-            LOOKUP: 'PROC', TYPE: 'TIPO', ISLOGICAL: 'ELÓGICO', ISNONTEXT: 'ENAÕTEXTO', TRUE: 'VERDADEIRO', FALSE: 'FALSO'
+            LOOKUP: 'PROC', TYPE: 'TIPO', ISLOGICAL: 'ELÓGICO', ISNONTEXT: 'ENÃOTEXTO', TRUE: 'VERDADEIRO', FALSE: 'FALSO'
         },
         'fr-FR': {
             SUM: 'SOMME', AVERAGE: 'MOYENNE', COUNT: 'NB', COUNTA: 'NBVAL', COUNTBLANK: 'NBVIDE',
             IF: 'SI', AND: 'ET', OR: 'OU', NOT: 'NON', SUMIF: 'SOMME.SI', SUMIFS: 'SOMME.SI.ENS',
             COUNTIF: 'NB.SI', COUNTIFS: 'NB.SI.ENS', ROUND: 'ARRONDI', ROUNDUP: 'ARRONDI.SUP', ROUNDDOWN: 'ARRONDI.INF',
             SIGN: 'SIGNE', SQRT: 'RACINE', POWER: 'PUISSANCE', PRODUCT: 'PRODUIT', SUMPRODUCT: 'SOMMEPROD',
+            ABS: 'ABS', MIN: 'MIN', MAX: 'MAX', INT: 'ENT', TRUNC: 'TRONQUE', MOD: 'MOD',
             LEFT: 'GAUCHE', RIGHT: 'DROITE', MID: 'STXT', LEN: 'NBCAR', CONCAT: 'CONCAT',
             TEXTJOIN: 'JOINDRETEXTE', TRIM: 'SUPPRESPACE', UPPER: 'MAJUSCULE', LOWER: 'MINUSCULE', PROPER: 'NOMPROPRE',
             SUBSTITUTE: 'SUBSTITUE', FIND: 'TROUVE', SEARCH: 'CHERCHE', TEXT: 'TEXTE', VALUE: 'CNUM',
@@ -1308,6 +1310,7 @@
             SUM: 'SUMA', AVERAGE: 'PROMEDIO', COUNT: 'CONTAR', COUNTA: 'CONTARA', COUNTBLANK: 'CONTAR.BLANCO',
             IF: 'SI', AND: 'Y', OR: 'O', NOT: 'NO', SUMIF: 'SUMAR.SI', SUMIFS: 'SUMAR.SI.CONJUNTO',
             COUNTIF: 'CONTAR.SI', COUNTIFS: 'CONTAR.SI.CONJUNTO', ROUND: 'REDONDEAR', ROUNDUP: 'REDONDEAR.MAS', ROUNDDOWN: 'REDONDEAR.MENOS',
+            ABS: 'ABS', MIN: 'MIN', MAX: 'MAX',
             INT: 'ENTERO', TRUNC: 'TRUNCAR', MOD: 'RESIDUO', SIGN: 'SIGNO', SQRT: 'RAIZ', POWER: 'POTENCIA', PRODUCT: 'PRODUCTO', SUMPRODUCT: 'SUMAPRODUCTO',
             LEFT: 'IZQUIERDA', RIGHT: 'DERECHA', MID: 'EXTRAE', LEN: 'LARGO', CONCAT: 'CONCATENAR',
             TEXTJOIN: 'UNIRCADENAS', TRIM: 'ESPACIOS', UPPER: 'MAYUSC', LOWER: 'MINUSC', PROPER: 'NOMPROPIO',
@@ -1347,8 +1350,19 @@
         return FN[u] || FN[u.replace(/_/g, '.')] || u;
     }
 
+    function locLang(lang) {
+        var l = String(lang || 'pt-PT');
+        if (/^fr/i.test(l)) return 'fr-FR';
+        if (/^es/i.test(l)) return 'es-ES';
+        if (/^en/i.test(l)) return 'en-US';
+        return 'pt-PT';
+    }
+    function locTable(lang) {
+        return FN_LOC[locLang(lang)] || FN_LOC['pt-PT'] || {};
+    }
+
     function printTokens(tokens, listSep, toEn, lang) {
-        var loc = FN_LOC[lang] || {};
+        var loc = locTable(lang);
         var out = '', i, t, n, u, canon;
         for (i = 0; i < tokens.length; i++) {
             t = tokens[i];
@@ -1369,6 +1383,7 @@
                 u = String(t.v).toUpperCase();
                 canon = canonName(u);
                 if (n && n.t === 'lp') out += toEn ? canon : (loc[canon] || canon);
+                else if (canon === 'TRUE' || canon === 'FALSE') out += toEn ? canon : (loc[canon] || canon);
                 else out += t.v;
             }
         }
@@ -1390,16 +1405,34 @@
     function localizeFormula(formula, lang) {
         var inv = toInvariantFormula(formula);
         if (!inv || inv.charAt(0) !== '=') return formula;
-        lang = lang || 'pt-PT';
-        if (/^en/i.test(lang)) return inv;
+        lang = locLang(lang || 'pt-PT');
+        if (lang === 'en-US') return inv;
         try {
             var tokens = tokenize(inv, ',');
-            var sep = ';';
-            return '=' + printTokens(tokens, sep, false, lang);
+            return '=' + printTokens(tokens, ';', false, lang);
         } catch (e) {
             return inv;
         }
     }
+
+    function fillLocAliases() {
+        var canons = Object.keys(FUNCS);
+        ['en-US', 'pt-PT', 'fr-FR', 'es-ES'].forEach(function (lang) {
+            if (!FN_LOC[lang]) FN_LOC[lang] = {};
+            canons.forEach(function (c) {
+                if (!FN_LOC[lang][c]) FN_LOC[lang][c] = c;
+            });
+        });
+        Object.keys(FN_LOC).forEach(function (lang) {
+            Object.keys(FN_LOC[lang]).forEach(function (canon) {
+                var local = String(FN_LOC[lang][canon] || '').toUpperCase();
+                if (local && !FN[local]) FN[local] = canon;
+                var stripped = local.normalize ? local.normalize('NFD').replace(/[\u0300-\u036f]/g, '') : local;
+                if (stripped && stripped !== local && !FN[stripped]) FN[stripped] = canon;
+            });
+        });
+    }
+    fillLocAliases();
 
     var api = {
         colName: colName,
@@ -1422,10 +1455,16 @@
         fnCanon: canonName,
         fnList: function () { return Object.keys(FUNCS); },
         fnLocalName: function (canon, lang) {
-            lang = lang || 'en-US';
-            if (/^en/i.test(lang)) return canon;
-            var loc = FN_LOC[lang] || {};
+            lang = locLang(lang || 'en-US');
+            if (lang === 'en-US') return canon;
+            var loc = locTable(lang);
             return loc[canon] || canon;
+        },
+        locLang: locLang,
+        boolName: function (v, lang) {
+            lang = locLang(lang);
+            var loc = locTable(lang);
+            return v ? (loc.TRUE || 'TRUE') : (loc.FALSE || 'FALSE');
         }
     };
     root.AbeneExcelEngine = api;

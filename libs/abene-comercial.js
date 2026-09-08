@@ -1291,7 +1291,10 @@
         }
 
         function sendWith(atts) {
-            toastMsg('mailSending', 'A enviar pelo Gmail da conta Google ligada…');
+            var list = Array.isArray(atts) ? atts : [];
+            toastMsg('mailSending', list.length
+                ? 'A enviar PDF pelo Gmail da conta Google ligada…'
+                : 'A enviar pelo Gmail da conta Google ligada…');
             window.abeneSendEmail({
                 to: to,
                 subject: subj,
@@ -1300,17 +1303,42 @@
                     ? '<div style="font-family:Segoe UI,Arial,sans-serif">' + html + '</div>'
                     : '',
                 name: co.name || 'Genius Raros',
-                attachments: atts || []
+                attachments: list
             }).then(function (json) {
                 var from = (json && json.from) || co.googleOwnerEmail || '';
-                toastMsg('mailSent', from
-                    ? ('E-mail enviado por ' + from + '.')
-                    : 'E-mail enviado pelo Gmail da conta ligada.');
+                if (list.length) {
+                    toastMsg('mailSentPdf', from
+                        ? ('PDF enviado por ' + from + ' (não definitivo).')
+                        : 'PDF enviado ao cliente (não definitivo).');
+                    markSentToClient();
+                } else {
+                    toastMsg('mailSent', from
+                        ? ('E-mail enviado por ' + from + '.')
+                        : 'E-mail enviado pelo Gmail da conta ligada.');
+                }
             }).catch(function () {
                 if (window.confirm(ui('mailFail', 'Falha no Gmail da conta ligada. Abrir o programa de e-mail deste computador?'))) {
                     mailtoFallback();
                 }
             });
+        }
+
+        function markSentToClient() {
+            try {
+                if (window.abene && window.abene.documentState) {
+                    window.abene.documentState.sentToClient = true;
+                }
+            } catch (e0) {}
+            try {
+                if (window.abeneArquivoApi && typeof window.abeneArquivoApi.markSentToClient === 'function') {
+                    var meta = previewState && previewState.data;
+                    window.abeneArquivoApi.markSentToClient({
+                        client: isQuote ? (meta && meta.client) : (meta && meta.payerName),
+                        number: meta && meta.number,
+                        kind: previewState && previewState.kind
+                    });
+                }
+            } catch (e1) {}
         }
 
         if (!gmailOn) {

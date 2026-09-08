@@ -590,6 +590,14 @@
     window.abeneSendEmail = sendEmail;
     window.abeneExtractSheetId = extractSheetId;
     window.abeneSheetsRefreshI18n = refreshStatusI18n;
+    window.abeneSheetsMetierSnapshot = function () {
+        try {
+            var excel = JSON.parse(localStorage.getItem('abeneExcelWorkbook') || 'null');
+            return collectMetier(excel) || { clients: [], articles: [] };
+        } catch (e) {
+            return { clients: [], articles: [] };
+        }
+    };
     (function hookI18n() {
         var prev = window.abeneAfterI18n;
         window.abeneAfterI18n = function (lang) {

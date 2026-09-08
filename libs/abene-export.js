@@ -377,6 +377,50 @@
         return c;
     }
 
+    function bandInk(canvas, topPx, heightPx, g) {
+        try {
+            if (!canvas || !heightPx) return 0;
+            var scale = canvas.width / Math.max(1, g.w);
+            var y0 = Math.max(0, Math.round(topPx * scale));
+            var h = Math.max(1, Math.min(canvas.height - y0, Math.round(heightPx * scale)));
+            var ctx = canvas.getContext('2d');
+            var data = ctx.getImageData(0, y0, canvas.width, h).data;
+            var ink = 0;
+            for (var i = 0; i < data.length; i += 16) {
+                if (data[i] < 242 || data[i + 1] < 242 || data[i + 2] < 242) ink++;
+            }
+            return ink;
+        } catch (e) {
+            return 0;
+        }
+    }
+
+    function pageCaptureScore(canvas, sheet, pageIndex, g) {
+        var pageNo = String(pageIndex + 1);
+        var header = sheet.querySelector('.page-header-zone[data-page="' + pageNo + '"]');
+        var footer = sheet.querySelector('.page-footer-zone[data-page="' + pageNo + '"]');
+        var topH = header ? Math.max(1, Math.round(header.getBoundingClientRect().height || header.offsetHeight || 96)) : 96;
+        var bottomH = footer ? Math.max(1, Math.round(footer.getBoundingClientRect().height || footer.offsetHeight || 96)) : 96;
+        var headerExpected = !!(header && ((header.textContent || '').trim() || header.querySelector('img,svg,canvas')));
+        var footerExpected = !!(footer && ((footer.textContent || '').trim() || footer.querySelector('img,svg,canvas')));
+        var topInk = bandInk(canvas, 0, topH, g);
+        var bottomInk = bandInk(canvas, Math.max(0, g.h - bottomH), bottomH, g);
+        return (headerExpected ? topInk : -topInk) + (footerExpected ? bottomInk : -bottomInk);
+    }
+
+    function captureBestSheetCanvas(sheet, pageIndex, g) {
+        var first;
+        return grabCanvas(sheet, g, g.h).then(function (canvas) {
+            first = cropCanvas(canvas, g);
+            return afterLayout();
+        }).then(function () {
+            return grabCanvas(sheet, g, g.h);
+        }).then(function (canvas) {
+            var second = cropCanvas(canvas, g);
+            return pageCaptureScore(second, sheet, pageIndex, g) >= pageCaptureScore(first, sheet, pageIndex, g) ? second : first;
+        });
+    }
+
     function stampCanvas(pdf, canvas, g) {
         try {
             pdf.addImage(canvas, 'JPEG', 0, 0, g.wmm, g.hmm, undefined, 'FAST');
@@ -431,9 +475,11 @@
                 });
                 tree.style.height = g.h + 'px';
                 return afterLayout().then(function () {
-                    return grabCanvas(sheet, g, g.h);
+                    /* html2canvas peut rater ponctuellement une bande de page. Deux
+                       captures permettent de garder automatiquement la plus complète. */
+                    return captureBestSheetCanvas(sheet, i, g);
                 }).then(function (c) {
-                    acc.push(cropCanvas(c, g));
+                    acc.push(c);
                     return acc;
                 });
             });
@@ -469,6 +515,38 @@
         });
     }
 
+    function htmlElementToPdfBlob(el) {
+        var g = geo();
+        var hPx = Math.max(g.h, el.scrollHeight || el.offsetHeight || g.h);
+        return grabCanvas(el, g, hPx).then(function (full) {
+            if (canvasLooksEmpty(full)) throw new Error('blank-canvas');
+            var scale = full.width / Math.max(1, g.w);
+            var pageH = Math.max(1, Math.round(g.h * scale));
+            var n = Math.max(1, Math.ceil(full.height / pageH));
+            var orient = g.orientation === 'landscape' ? 'landscape' : 'portrait';
+            return createJsPdf(g).then(function (pdf) {
+                var i, c, ctx, sh, stamped = 0;
+                for (i = 0; i < n; i++) {
+                    if (i > 0) pdf.addPage([g.wmm, g.hmm], orient);
+                    else {
+                        try { pdf.setPage(1); } catch (e0) {}
+                    }
+                    c = document.createElement('canvas');
+                    c.width = full.width;
+                    c.height = pageH;
+                    ctx = c.getContext('2d');
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fillRect(0, 0, c.width, c.height);
+                    sh = Math.min(pageH, full.height - i * pageH);
+                    if (sh > 0) ctx.drawImage(full, 0, i * pageH, full.width, sh, 0, 0, full.width, sh);
+                    if (stampCanvas(pdf, c, g)) stamped++;
+                }
+                if (!stamped) throw new Error('pdf-stamp');
+                return pdf.output('blob');
+            });
+        });
+    }
+
     var ExportApi = {
         get useEngine() { return useEngine; },
         set useEngine(v) { useEngine = !!v; },
@@ -480,7 +558,8 @@
         embedImages: embedImages,
         logoPng: logoPng,
         rasterizeImages: rasterizeImages,
-        savePagedPdf: savePagedPdf
+        savePagedPdf: savePagedPdf,
+        htmlElementToPdfBlob: htmlElementToPdfBlob
     };
     root.ABENE.Export = ExportApi;
 
@@ -561,10 +640,9 @@
         root.exportPDF._abeneExport = true;
     }
 
-    if (typeof root.exportDocx === 'function' && !root.exportDocx._abeneExport) {
-        var origDocx = root.exportDocx;
-        root.exportDocx = async function () {
-            if (!useEngine) return origDocx.apply(this, arguments);
+    function wrapDocxPrep(origFn) {
+        return async function () {
+            if (!useEngine) return origFn.apply(this, arguments);
             wrapImageRun();
             wrapPushBlock();
             prepare();
@@ -583,14 +661,26 @@
             var origClean = root.abeneGetCleanHtml;
             root.abeneGetCleanHtml = function () { return html; };
             try {
-                return await origDocx.apply(this, arguments);
+                return await origFn.apply(this, arguments);
             } catch (e) {
                 root.abeneGetCleanHtml = origClean;
-                return await origDocx.apply(this, arguments);
+                return await origFn.apply(this, arguments);
             } finally {
                 root.abeneGetCleanHtml = origClean;
             }
         };
+    }
+
+    if (typeof root.buildDocxBlob === 'function' && !root.buildDocxBlob._abeneExport) {
+        root.buildDocxBlob = wrapDocxPrep(root.buildDocxBlob);
+        root.buildDocxBlob._abeneExport = true;
+    }
+
+    if (typeof root.exportDocx === 'function' && !root.exportDocx._abeneExport) {
+        /* exportDocx chama buildDocxBlob — só envolva se o helper não existir */
+        if (!(root.buildDocxBlob && root.buildDocxBlob._abeneExport)) {
+            root.exportDocx = wrapDocxPrep(root.exportDocx);
+        }
         root.exportDocx._abeneExport = true;
     }
 

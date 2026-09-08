@@ -13,7 +13,10 @@
         type: 'all',
         concludedOnly: false,
         selectedId: null,
-        previewSource: null
+        previewSource: null,
+        previewTab: 'doc',
+        selectedPdfId: null,
+        eventsBound: false
     };
 
     var STR = {
@@ -56,15 +59,21 @@
             client: 'Cliente',
             concluded: 'Concluído',
             notDone: 'Em curso',
+            sentBadge: 'Enviado PDF',
+            openModify: 'Abrir para modificar',
+            copyAsNew: 'Copiar como novo',
             archived: 'Arquivado',
-            confirmOpen: 'Abrir este documento no editor substitui o conteúdo visível. O arquivo e o Guardar automático não são apagados. Continuar?',
-            confirmCopy: 'Copiar este modelo para o editor substitui o conteúdo visível (cópia nova). O arquivo original fica intacto. Continuar?',
+            confirmOpen: 'Abrir para modificar no editor substitui o conteúdo visível. O arquivo e o Guardar automático não são apagados. Continuar?',
+            confirmOpenFinal: 'Esta é uma versão definitiva (PDF gelado). Para alterar, use «Copiar como novo». Abrir mesmo assim só para consultar no editor?',
+            confirmCopy: 'Copiar este modelo para o editor cria um documento novo (o original e o PDF final ficam intactos). Continuar?',
             pastaPh: 'Ex.: Cozinha Rua das Flores 12',
             clientPh: 'Nome do cliente',
             archivedOk: 'Cópia guardada no arquivo. O documento no editor não foi alterado.',
             quota: 'Arquivo cheio (limite do browser). Exporte um ZIP e continue.',
-            copied: 'Modelo copiado para o editor. O original no arquivo ficou intacto.',
-            opened: 'Documento aberto no editor. A cópia no arquivo ficou intacta.',
+            copied: 'Cópia criada no editor. O original no arquivo ficou intacto.',
+            opened: 'Documento aberto para modificar. A cópia no arquivo ficou intacta.',
+            openedFinalHint: 'Versão definitiva aberta só para consulta. O PDF final no arquivo não foi alterado.',
+            sentMarked: 'Marcado como enviado ao cliente (PDF — não definitivo).',
             zipOk: 'Conjunto descarregado ({n} ficheiro(s)).',
             zipEmpty: 'Nada a descarregar nesta vista.',
             packOk: 'Pack contabilista PT descarregado ({n} documento(s)).',
@@ -78,7 +87,17 @@
             folderOk: 'Pasta criada. Será copiada para o Google Drive na próxima sincronização.',
             openDrive: 'Abrir no Drive',
             archiveConfirm: 'Arquivar em {client} / {pasta}?',
-            archivedAuto: 'Arquivado em {client} / {pasta}.'
+            archivedAuto: 'Arquivado em {client} / {pasta}.',
+            saveFicha: 'Guardar ficha',
+            tabDoc: 'Documento',
+            tabPdf: 'PDF',
+            navHint: 'Pastas à esquerda · ficheiros ao centro · pré-visualização à direita.',
+            archivePanelTitle: 'Arquivar o documento atual',
+            archiveGo: 'Arquivar agora',
+            archiveCancel: 'Cancelar',
+            pdfSavedView: 'Versão gravada — a pré-visualização PDF está abaixo.',
+            createGo: 'Criar',
+            folderPanelTitle: 'Nova pasta no arquivo'
         },
         'fr-FR': {
             title: 'Archives',
@@ -119,15 +138,21 @@
             client: 'Client',
             concluded: 'Conclu',
             notDone: 'En cours',
+            sentBadge: 'PDF envoyé',
+            openModify: 'Ouvrir pour modifier',
+            copyAsNew: 'Copier comme nouveau',
             archived: 'Archivé',
-            confirmOpen: 'Ouvrir ce document dans l’éditeur remplace le contenu visible. L’archive et l’enregistrement auto ne sont pas effacés. Continuer ?',
-            confirmCopy: 'Copier ce modèle dans l’éditeur remplace le contenu visible (nouvelle copie). L’original dans l’archive reste intact. Continuer ?',
+            confirmOpen: 'Ouvrir pour modifier dans l’éditeur remplace le contenu visible. L’archive et l’enregistrement auto ne sont pas effacés. Continuer ?',
+            confirmOpenFinal: 'Version définitive (PDF figé). Pour modifier, utilisez « Copier comme nouveau ». Ouvrir quand même pour consultation ?',
+            confirmCopy: 'Copier ce modèle dans l’éditeur crée un nouveau document (l’original et le PDF final restent intacts). Continuer ?',
             pastaPh: 'Ex. : Cuisine Rue des Fleurs 12',
             clientPh: 'Nom du client',
             archivedOk: 'Copie enregistrée dans l’archive. Le document dans l’éditeur n’a pas changé.',
             quota: 'Archive pleine (limite du navigateur). Exportez un ZIP puis continuez.',
-            copied: 'Modèle copié dans l’éditeur. L’original dans l’archive est intact.',
-            opened: 'Document ouvert dans l’éditeur. La copie dans l’archive est intacte.',
+            copied: 'Copie créée dans l’éditeur. L’original dans l’archive est intact.',
+            opened: 'Document ouvert pour modification. La copie dans l’archive est intacte.',
+            openedFinalHint: 'Version définitive ouverte en consultation. Le PDF final dans l’archive n’a pas changé.',
+            sentMarked: 'Marqué comme envoyé au client (PDF — non définitif).',
             zipOk: 'Ensemble téléchargé ({n} fichier(s)).',
             zipEmpty: 'Rien à télécharger dans cette vue.',
             packOk: 'Pack comptable PT téléchargé ({n} document(s)).',
@@ -141,7 +166,17 @@
             folderOk: 'Dossier créé. Il sera copié vers Google Drive à la prochaine synchro.',
             openDrive: 'Ouvrir dans Drive',
             archiveConfirm: 'Archiver dans {client} / {pasta} ?',
-            archivedAuto: 'Archivé dans {client} / {pasta}.'
+            archivedAuto: 'Archivé dans {client} / {pasta}.',
+            saveFicha: 'Enregistrer la fiche',
+            tabDoc: 'Document',
+            tabPdf: 'PDF',
+            navHint: 'Dossiers à gauche · fichiers au centre · aperçu à droite.',
+            archivePanelTitle: 'Archiver le document actuel',
+            archiveGo: 'Archiver maintenant',
+            archiveCancel: 'Annuler',
+            pdfSavedView: 'Version enregistrée — l’aperçu PDF est ci-dessous.',
+            createGo: 'Créer',
+            folderPanelTitle: 'Nouveau dossier dans l’archive'
         },
         'en-US': {
             title: 'Archive',
@@ -182,15 +217,21 @@
             client: 'Client',
             concluded: 'Concluded',
             notDone: 'In progress',
+            sentBadge: 'PDF sent',
+            openModify: 'Open to edit',
+            copyAsNew: 'Copy as new',
             archived: 'Archived',
-            confirmOpen: 'Opening this document in the editor replaces the visible content. The archive and autosave are not deleted. Continue?',
-            confirmCopy: 'Copying this template into the editor replaces the visible content (new copy). The archive original stays intact. Continue?',
+            confirmOpen: 'Open to edit replaces the visible content. The archive and autosave are not deleted. Continue?',
+            confirmOpenFinal: 'This is a final version (frozen PDF). To change it, use “Copy as new”. Open anyway for viewing?',
+            confirmCopy: 'Copying creates a new document (original and final PDF stay intact). Continue?',
             pastaPh: 'e.g. Kitchen 12 Flower Street',
             clientPh: 'Client name',
             archivedOk: 'Copy stored in the archive. The editor document was not changed.',
             quota: 'Archive full (browser limit). Download a ZIP first.',
-            copied: 'Template copied into the editor. The archive original is intact.',
-            opened: 'Document opened in the editor. The archive copy is intact.',
+            copied: 'Copy created in the editor. The archive original is intact.',
+            opened: 'Document opened to edit. The archive copy is intact.',
+            openedFinalHint: 'Final version opened for viewing. The final PDF in the archive was not changed.',
+            sentMarked: 'Marked as sent to client (PDF — not final).',
             zipOk: 'Set downloaded ({n} file(s)).',
             zipEmpty: 'Nothing to download in this view.',
             packOk: 'PT accounting pack downloaded ({n} document(s)).',
@@ -204,7 +245,17 @@
             folderOk: 'Folder created. It will be copied to Google Drive on the next sync.',
             openDrive: 'Open in Drive',
             archiveConfirm: 'Archive to {client} / {pasta}?',
-            archivedAuto: 'Archived in {client} / {pasta}.'
+            archivedAuto: 'Archived in {client} / {pasta}.',
+            saveFicha: 'Save file card',
+            tabDoc: 'Document',
+            tabPdf: 'PDF',
+            navHint: 'Folders on the left · files in the middle · preview on the right.',
+            archivePanelTitle: 'Archive the current document',
+            archiveGo: 'Archive now',
+            archiveCancel: 'Cancel',
+            pdfSavedView: 'Version saved — PDF preview is below.',
+            createGo: 'Create',
+            folderPanelTitle: 'New archive folder'
         },
         'es-ES': {
             title: 'Archivo',
@@ -245,15 +296,21 @@
             client: 'Cliente',
             concluded: 'Concluido',
             notDone: 'En curso',
+            sentBadge: 'PDF enviado',
+            openModify: 'Abrir para modificar',
+            copyAsNew: 'Copiar como nuevo',
             archived: 'Archivado',
-            confirmOpen: 'Abrir este documento en el editor sustituye el contenido visible. El archivo y el autoguardado no se borran. ¿Continuar?',
-            confirmCopy: 'Copiar este modelo al editor sustituye el contenido visible (copia nueva). El original en el archivo queda intacto. ¿Continuar?',
+            confirmOpen: 'Abrir para modificar sustituye el contenido visible. El archivo y el autoguardado no se borran. ¿Continuar?',
+            confirmOpenFinal: 'Versión definitiva (PDF congelado). Para cambiarla, use «Copiar como nuevo». ¿Abrir solo para consultar?',
+            confirmCopy: 'Copiar crea un documento nuevo (el original y el PDF final quedan intactos). ¿Continuar?',
             pastaPh: 'Ej.: Cocina Rua das Flores 12',
             clientPh: 'Nombre del cliente',
             archivedOk: 'Copia guardada en el archivo. El documento del editor no cambió.',
             quota: 'Archivo lleno (límite del navegador). Descargue un ZIP primero.',
-            copied: 'Modelo copiado al editor. El original en el archivo quedó intacto.',
-            opened: 'Documento abierto en el editor. La copia en el archivo quedó intacta.',
+            copied: 'Copia creada en el editor. El original en el archivo quedó intacto.',
+            opened: 'Documento abierto para modificar. La copia en el archivo quedó intacta.',
+            openedFinalHint: 'Versión definitiva abierta solo para consulta. El PDF final no cambió.',
+            sentMarked: 'Marcado como enviado al cliente (PDF — no definitivo).',
             zipOk: 'Conjunto descargado ({n} fichero(s)).',
             zipEmpty: 'Nada que descargar en esta vista.',
             packOk: 'Pack contable PT descargado ({n} documento(s)).',
@@ -267,7 +324,17 @@
             folderOk: 'Carpeta creada. Se copiará a Google Drive en la próxima sincronización.',
             openDrive: 'Abrir en Drive',
             archiveConfirm: '¿Archivar en {client} / {pasta}?',
-            archivedAuto: 'Archivado en {client} / {pasta}.'
+            archivedAuto: 'Archivado en {client} / {pasta}.',
+            saveFicha: 'Guardar ficha',
+            tabDoc: 'Documento',
+            tabPdf: 'PDF',
+            navHint: 'Carpetas a la izquierda · ficheros al centro · vista previa a la derecha.',
+            archivePanelTitle: 'Archivar el documento actual',
+            archiveGo: 'Archivar ahora',
+            archiveCancel: 'Cancelar',
+            pdfSavedView: 'Versión grabada — la vista PDF está abajo.',
+            createGo: 'Crear',
+            folderPanelTitle: 'Nueva carpeta en el archivo'
         }
     };
 
@@ -474,26 +541,10 @@
         window.open(url, '_blank', 'noopener');
     }
     function createClientFolder() {
-        var name = window.prompt(tr('client'), '');
-        if (name === null) return;
-        name = String(name).trim();
-        if (!name) return;
-        rememberFolder('client', name, '');
-        toast(tr('folderOk'));
-        renderTree();
+        openFolderPanel('client');
     }
     function createPastaFolder() {
-        var client = window.prompt(tr('client'), '');
-        if (client === null) return;
-        var pasta = window.prompt(tr('pasta'), '');
-        if (pasta === null) return;
-        client = String(client).trim();
-        pasta = String(pasta).trim();
-        if (!pasta) return;
-        if (client) rememberFolder('client', client, '');
-        rememberFolder('pasta', pasta, client);
-        toast(tr('folderOk'));
-        renderTree();
+        openFolderPanel('pasta');
     }
     function catalogClients() {
         var fromDocs = allEntries().map(function (e) { return e.client || tr('noClient'); });
@@ -509,6 +560,32 @@
         var fromDocs = allEntries().map(function (e) { return e.pasta || tr('none'); });
         var fromCat = loadFolders().filter(function (f) { return f && f.kind === 'pasta' && f.label; }).map(function (f) { return f.label; });
         return unique(fromDocs.concat(fromCat));
+    }
+    function catalogPastasForClient(client) {
+        var fromDocs = allEntries().filter(function (e) {
+            return (e.client || tr('noClient')) === client;
+        }).map(function (e) { return e.pasta || tr('none'); });
+        var fromCat = loadFolders().filter(function (f) {
+            return f && f.kind === 'pasta' && f.label && (f.client || tr('noClient')) === client;
+        }).map(function (f) { return f.label; });
+        return unique(fromDocs.concat(fromCat));
+    }
+    function folderLabel(id) {
+        id = String(id || 'all');
+        if (id === 'all') return tr('all');
+        if (id === 'done') return tr('done');
+        if (id.indexOf('type:') === 0) return typeLabel(id.slice(5));
+        if (id.indexOf('clientpasta:') === 0) {
+            var cp = id.slice(12).split('|');
+            return (cp[0] || '') + ' / ' + (cp[1] || '');
+        }
+        if (id.indexOf('client:') === 0) return id.slice(7);
+        if (id.indexOf('pasta:') === 0) return id.slice(6);
+        if (id.indexOf('year:') === 0) return id.slice(5);
+        if (id.indexOf('month:') === 0) return id.slice(6);
+        if (id === 'draft:current') return tr('current');
+        if (id === 'draft:versions') return tr('versions');
+        return id.replace(/^[^:]+:/, '');
     }
 
     var IDB_NAME = 'abeneFinalPdf';
@@ -619,7 +696,7 @@
             margin: [mm(m.top), mm(m.right), mm(m.bottom), mm(m.left)],
             filename: 'final.pdf',
             image: { type: 'jpeg', quality: 0.98 },
-            html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
+            html2canvas: { scale: 2, useCORS: true, allowTaint: true, backgroundColor: '#ffffff', logging: false, imageTimeout: 4000 },
             jsPDF: { unit: 'mm', format: fmt, orientation: ori === 'landscape' ? 'landscape' : 'portrait' }
         };
     }
@@ -630,28 +707,50 @@
                 return;
             }
             var host = document.createElement('div');
+            host.className = 'page';
             host.setAttribute('data-arq-pdf-host', '1');
             var hostW = (window.PageGeometry && window.PageGeometry.width) || 794;
-            host.style.cssText = 'position:fixed;left:-14000px;top:0;width:' + hostW + 'px;background:#fff;color:#1a1a1a;font-family:Calibri,Segoe UI,sans-serif;padding:8px;';
+            host.style.cssText = 'position:fixed;left:0;top:0;width:' + hostW + 'px;background:#fff;color:#1a1a1a;font-family:Calibri,Segoe UI,sans-serif;padding:12px 16px;z-index:2147483002;box-sizing:border-box;opacity:1;';
             host.innerHTML = html || '<p></p>';
+            host.querySelectorAll('.abene-page-flow, .page-decoration, .page-header-zone, .page-footer-zone, .page-gap-band, .abene-obj-resize, .abene-tbox-bar').forEach(function (n) { n.remove(); });
+            if (window.ABENE && window.ABENE.Export && typeof window.ABENE.Export.flatten === 'function') {
+                window.ABENE.Export.flatten(host);
+            }
             document.body.appendChild(host);
-            var worker = window.html2pdf().set(pdfOptions()).from(host);
-            var done = function (blob) {
+            if (window.abeneHoldViewZoom) window.abeneHoldViewZoom();
+            var cleaned = false;
+            var cleanup = function () {
+                if (cleaned) return;
+                cleaned = true;
                 if (host.parentNode) host.parentNode.removeChild(host);
-                if (blob) resolve(blob);
-                else reject(new Error('empty'));
+                if (window.abeneReleaseViewZoom) window.abeneReleaseViewZoom();
+            };
+            var done = function (blob) {
+                cleanup();
+                if (!blob || blob.size < 5000) reject(new Error('empty'));
+                else resolve(blob);
             };
             var fail = function (err) {
-                if (host.parentNode) host.parentNode.removeChild(host);
-                reject(err);
+                cleanup();
+                reject(err || new Error('empty'));
             };
-            if (typeof worker.outputPdf === 'function') {
-                Promise.resolve(worker.outputPdf('blob')).then(done).catch(function () {
-                    worker.toPdf().get('pdf').then(function (pdf) { return pdf.output('blob'); }).then(done).catch(fail);
+            var capture = function () {
+                if (window.ABENE && window.ABENE.Export && typeof window.ABENE.Export.htmlElementToPdfBlob === 'function') {
+                    return window.ABENE.Export.htmlElementToPdfBlob(host);
+                }
+                var worker = window.html2pdf().set(pdfOptions()).from(host);
+                return worker.toPdf().get('pdf').then(function (pdf) { return pdf.output('blob'); });
+            };
+            var wait = (window.ABENE && window.ABENE.Export && typeof window.ABENE.Export.embedImages === 'function')
+                ? window.ABENE.Export.embedImages(host)
+                : Promise.resolve();
+            wait.then(function () {
+                return new Promise(function (ok) {
+                    requestAnimationFrame(function () {
+                        requestAnimationFrame(function () { setTimeout(ok, 140); });
+                    });
                 });
-            } else {
-                worker.toPdf().get('pdf').then(function (pdf) { return pdf.output('blob'); }).then(done).catch(fail);
-            }
+            }).then(capture).then(done).catch(fail);
         });
     }
     function partHasContent(html, etape) {
@@ -723,9 +822,32 @@
     function uid() {
         return 'arq-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8);
     }
-    function currentSnapshot() {
+    function cleanArchiveHtml(html) {
+        var d = parseHtml(html);
+        d.querySelectorAll('.abene-page-flow, .page-decoration, .page-header-zone, .page-footer-zone, .page-gap-band, .page-chrome, .abene-obj-resize, .abene-tbox-bar, .hf-tab, .hf-rule').forEach(function (n) { n.remove(); });
+        if (window.ABENE && window.ABENE.Export && typeof window.ABENE.Export.flatten === 'function') {
+            try { window.ABENE.Export.flatten(d); } catch (eFlat) {}
+        }
+        return d.innerHTML.trim() || '<p></p>';
+    }
+    function liveEditorHtml() {
         var editor = editorEl();
-        var html = editor ? editor.innerHTML : '';
+        if (typeof window.abeneGetCleanHtml === 'function' && editor) {
+            try {
+                var live = window.abeneGetCleanHtml(editor);
+                if (live) return cleanArchiveHtml(live);
+            } catch (e0) {}
+        }
+        if (typeof persistableEditorHtml === 'function') {
+            try {
+                var html = persistableEditorHtml();
+                if (html) return cleanArchiveHtml(html);
+            } catch (e1) {}
+        }
+        return cleanArchiveHtml(editor ? editor.innerHTML : '');
+    }
+    function currentSnapshot() {
+        var html = liveEditorHtml();
         var name = docState().name || localStorage.getItem('abeneDocName') || 'Documento1';
         var meta = detectMeta(html);
         return {
@@ -799,7 +921,12 @@
             if (state.type !== 'all' && e.type !== state.type) return false;
             if (folder === 'done' && !e.concluded) return false;
             if (folder.indexOf('type:') === 0 && e.type !== folder.slice(5)) return false;
-            if (folder.indexOf('client:') === 0 && (e.client || tr('noClient')) !== folder.slice(7)) return false;
+            if (folder.indexOf('clientpasta:') === 0) {
+                var cp = folder.slice(12).split('|');
+                if ((e.client || tr('noClient')) !== cp[0]) return false;
+                if ((e.pasta || tr('none')) !== (cp[1] || '')) return false;
+            }
+            if (folder.indexOf('client:') === 0 && folder.indexOf('clientpasta:') !== 0 && (e.client || tr('noClient')) !== folder.slice(7)) return false;
             if (folder.indexOf('pasta:') === 0 && (e.pasta || tr('none')) !== folder.slice(6)) return false;
             if (folder.indexOf('year:') === 0 && String(e.archivedAt || '').slice(0, 4) !== folder.slice(5)) return false;
             if (folder.indexOf('month:') === 0 && String(e.archivedAt || '').slice(0, 7) !== folder.slice(6)) return false;
@@ -821,9 +948,12 @@
     }
 
     function injectCss() {
-        if (document.getElementById('arq-css')) return;
-        var css = document.createElement('style');
-        css.id = 'arq-css';
+        var css = document.getElementById('arq-css');
+        if (!css) {
+            css = document.createElement('style');
+            css.id = 'arq-css';
+            document.head.appendChild(css);
+        }
         css.textContent =
             '#arqOverlay{position:fixed;inset:0;z-index:2600;display:none;flex-direction:column;background:#f3f4f6;color:#1a1a1a;font-family:Calibri,Segoe UI,sans-serif;}' +
             '#arqOverlay.open{display:flex;}' +
@@ -839,33 +969,257 @@
             '.arq-tools{display:flex;gap:8px;align-items:center;padding:8px 16px;background:#fff;border-bottom:1px solid #d9d9d9;flex-wrap:wrap;}' +
             '.arq-tools input,.arq-tools select{border:1px solid #c5c5c5;padding:6px 8px;font-size:12px;min-width:180px;}' +
             '.arq-tools label{font-size:12px;display:flex;align-items:center;gap:6px;}' +
-            '.arq-body{flex:1;display:grid;grid-template-columns:240px minmax(240px,1fr) minmax(280px,1.1fr);min-height:0;}' +
-            '.arq-col{overflow:auto;background:#fff;border-right:1px solid #e5e5e5;}' +
+            '.arq-archive-panel{display:none;grid-template-columns:1fr 1fr auto auto auto;gap:8px;align-items:end;padding:10px 16px;background:#fff8e8;border-bottom:1px solid ' + GOLD + ';}' +
+            '.arq-archive-panel.open{display:grid;}' +
+            '.arq-archive-panel label{font-size:12px;display:flex;flex-direction:column;gap:4px;}' +
+            '.arq-archive-panel input[type=text]{border:1px solid #c5c5c5;padding:6px 8px;}' +
+            '.arq-archive-panel .arq-check{flex-direction:row;align-items:center;gap:6px;}' +
+            '.arq-archive-panel .arq-panel-title{grid-column:1/-1;font-size:12px;font-weight:700;color:' + NAVY + ';}' +
+            '.arq-body{flex:1;display:grid;grid-template-columns:260px minmax(260px,1fr) minmax(340px,1.25fr);min-height:0;}' +
+            '.arq-col{overflow:auto;background:#fff;border-right:1px solid #e5e5e5;min-height:0;}' +
+            '.arq-col.arq-list-col{display:flex;flex-direction:column;}' +
+            '.arq-list{flex:1;overflow:auto;outline:none;}' +
+            '.arq-crumb{padding:0 12px 8px;font-size:12px;color:#64748b;background:#f8f8f8;border-bottom:1px solid #eee;}' +
+            '.arq-crumb button{border:0;background:none;color:' + NAVY + ';cursor:pointer;font-size:12px;padding:0 2px;text-decoration:underline;}' +
             '.arq-col h3{margin:0;padding:10px 12px;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:#64748b;background:#f8f8f8;border-bottom:1px solid #eee;}' +
             '.arq-tree button,.arq-list button.arq-row{display:block;width:100%;text-align:left;border:0;background:none;padding:7px 12px;font-size:12px;cursor:pointer;}' +
             '.arq-tree button:hover,.arq-list button.arq-row:hover{background:#e8f0fe;}' +
-            '.arq-tree button.on,.arq-list button.arq-row.on{background:#dbeafe;font-weight:600;}' +
-            '.arq-tree details{padding-left:8px;}' +
-            '.arq-tree summary{padding:6px 12px;font-size:12px;cursor:pointer;color:#334155;}' +
+            '.arq-tree button.on,.arq-list button.arq-row.on{background:#0B1223;color:#fff;font-weight:600;}' +
+            '.arq-tree button.on .arq-hint,.arq-list button.arq-row.on .arq-meta{color:#cbd5e1;}' +
+            '.arq-tree details{padding-left:4px;}' +
+            '.arq-tree summary{padding:6px 12px;font-size:12px;cursor:pointer;color:#334155;font-weight:600;}' +
+            '.arq-tree-sub{margin-left:14px;border-left:2px solid ' + GOLD + ';padding-left:4px;}' +
             '.arq-row .arq-meta{display:block;font-size:11px;color:#64748b;font-weight:400;}' +
             '.arq-badge{display:inline-block;font-size:10px;padding:1px 6px;border:1px solid #d1d5db;margin-right:4px;border-radius:2px;}' +
             '.arq-badge.done{border-color:#166534;color:#166534;}' +
-            '.arq-preview{padding:12px;display:flex;flex-direction:column;gap:8px;min-height:0;}' +
-            '.arq-preview iframe{flex:1;min-height:220px;border:1px solid #e5e5e5;background:#fff;width:100%;}' +
+            '.arq-row.on .arq-badge{border-color:#C9A84C;color:#C9A84C;}' +
+            '.arq-preview{padding:12px;display:flex;flex-direction:column;gap:8px;min-height:0;overflow:auto;}' +
+            '.arq-preview iframe{flex:1;min-height:240px;border:1px solid #e5e5e5;background:#fff;width:100%;}' +
             '.arq-preview .arq-actions{display:flex;flex-wrap:wrap;gap:6px;}' +
+            '.arq-preview-tabs{display:flex;gap:0;border-bottom:1px solid #e5e5e5;}' +
+            '.arq-preview-tabs button{border:0;background:transparent;padding:8px 14px;cursor:pointer;font-size:12px;color:#334155;}' +
+            '.arq-preview-tabs button.on{border-bottom:2px solid ' + GOLD + ';font-weight:700;color:' + NAVY + ';}' +
+            '#arqPdfFrame{width:100%;min-height:280px;border:1px solid #e5e5e5;background:#fff;display:none;}' +
+            '#arqPdfFrame.show{display:block;}' +
             '.arq-form{display:grid;gap:6px;font-size:12px;}' +
             '.arq-form input{border:1px solid #c5c5c5;padding:5px 7px;}' +
             '.arq-hint{font-size:11px;color:#64748b;}' +
             '.arq-pdf{border:1px solid #e5e5e5;padding:8px;background:#f8f8f8;}' +
             '.arq-pdf h4{margin:0 0 6px;font-size:12px;}' +
             '.arq-pdf-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:4px 0;border-top:1px solid #eee;font-size:12px;}' +
-            '@media(max-width:900px){.arq-body{grid-template-columns:1fr;}}';
-        document.head.appendChild(css);
+            '.arq-pdf-row.on{background:#fff;}' +
+            '@media(max-width:900px){.arq-body{grid-template-columns:1fr;}.arq-archive-panel{grid-template-columns:1fr;}}';
+    }
+    function archivePanelHtml() {
+        return '<div class="arq-archive-panel" id="arqArchivePanel">' +
+            '<div class="arq-panel-title" id="arqArchTitle"></div>' +
+            '<label><span id="arqArchClientLbl"></span><input type="text" id="arqArchClient" autocomplete="off" /></label>' +
+            '<label><span id="arqArchPastaLbl"></span><input type="text" id="arqArchPasta" autocomplete="off" /></label>' +
+            '<label class="arq-check"><input type="checkbox" id="arqArchDone" checked /> <span id="arqArchDoneLbl"></span></label>' +
+            '<button type="button" class="arq-btn gold" id="arqArchGo"></button>' +
+            '<button type="button" class="arq-btn" id="arqArchCancel"></button>' +
+            '</div>';
+    }
+    function folderPanelHtml() {
+        return '<div class="arq-archive-panel" id="arqFolderPanel">' +
+            '<div class="arq-panel-title" id="arqFoldTitle"></div>' +
+            '<label id="arqFoldClientWrap"><span id="arqFoldClientLbl"></span><input type="text" id="arqFoldClient" autocomplete="off" /></label>' +
+            '<label id="arqFoldPastaWrap"><span id="arqFoldPastaLbl"></span><input type="text" id="arqFoldPasta" autocomplete="off" /></label>' +
+            '<button type="button" class="arq-btn gold" id="arqFoldGo"></button>' +
+            '<button type="button" class="arq-btn" id="arqFoldCancel"></button>' +
+            '</div>';
+    }
+    function setPanelOpen(id, on) {
+        var el = document.getElementById(id);
+        if (el) el.classList.toggle('open', !!on);
+    }
+    function closeArchivePanel() {
+        setPanelOpen('arqArchivePanel', false);
+    }
+    function closeFolderPanel() {
+        setPanelOpen('arqFolderPanel', false);
+    }
+    function openArchivePanel() {
+        closeFolderPanel();
+        ensureDom();
+        fillChrome();
+        var snap = currentSnapshot();
+        var meta = detectMeta(snap.html);
+        var job = loadLastJob();
+        var client = String(snap.client || meta.client || job.client || '').trim();
+        var pasta = String(snap.pasta || meta.pasta || pastaHint(client) || job.pasta || '').trim();
+        var cEl = document.getElementById('arqArchClient');
+        var pEl = document.getElementById('arqArchPasta');
+        var dEl = document.getElementById('arqArchDone');
+        if (cEl) cEl.value = client;
+        if (pEl) pEl.value = pasta;
+        if (dEl) dEl.checked = true;
+        setPanelOpen('arqArchivePanel', true);
+        if (cEl) cEl.focus();
+    }
+    function commitArchivePanel() {
+        var client = String((document.getElementById('arqArchClient') || {}).value || '').trim();
+        var pasta = String((document.getElementById('arqArchPasta') || {}).value || '').trim();
+        var concluded = !!(document.getElementById('arqArchDone') || { checked: true }).checked;
+        closeArchivePanel();
+        archiveCurrent({ fromPanel: true, client: client, pasta: pasta, concluded: concluded });
+    }
+    function openFolderPanel(kind) {
+        closeArchivePanel();
+        ensureDom();
+        fillChrome();
+        var job = loadLastJob();
+        var pastaWrap = document.getElementById('arqFoldPastaWrap');
+        var cEl = document.getElementById('arqFoldClient');
+        var pEl = document.getElementById('arqFoldPasta');
+        var title = document.getElementById('arqFoldTitle');
+        if (title) title.textContent = kind === 'pasta' ? tr('newPasta') : tr('newClient');
+        if (cEl) cEl.value = kind === 'pasta' ? String(job.client || '').trim() : '';
+        if (pEl) pEl.value = '';
+        if (pastaWrap) pastaWrap.style.display = kind === 'pasta' ? '' : 'none';
+        document.getElementById('arqFolderPanel').setAttribute('data-kind', kind);
+        setPanelOpen('arqFolderPanel', true);
+        if (cEl) cEl.focus();
+    }
+    function commitFolderPanel() {
+        var panel = document.getElementById('arqFolderPanel');
+        var kind = panel ? panel.getAttribute('data-kind') : 'client';
+        var client = String((document.getElementById('arqFoldClient') || {}).value || '').trim();
+        var pasta = String((document.getElementById('arqFoldPasta') || {}).value || '').trim();
+        closeFolderPanel();
+        if (kind === 'pasta') {
+            if (!pasta) return;
+            if (client) rememberFolder('client', client, '');
+            rememberFolder('pasta', pasta, client);
+            state.folder = client ? ('clientpasta:' + client + '|' + pasta) : ('pasta:' + pasta);
+        } else {
+            if (!client) return;
+            rememberFolder('client', client, '');
+            state.folder = 'client:' + client;
+        }
+        toast(tr('folderOk'));
+        renderTree();
+        renderList();
+        renderPreview();
+    }
+    function bindArquivoEvents() {
+        if (state.eventsBound) return;
+        state.eventsBound = true;
+        document.getElementById('arqCloseBtn').onclick = closeArquivo;
+        document.getElementById('arqArchiveBtn').onclick = function () { openArchivePanel(); };
+        document.getElementById('arqSearch').oninput = function () {
+            state.query = this.value;
+            renderList();
+            renderPreview();
+        };
+        document.getElementById('arqType').onchange = function () {
+            state.type = this.value;
+            renderList();
+            renderPreview();
+        };
+        document.getElementById('arqDoneOnly').onchange = function () {
+            state.concludedOnly = this.checked;
+            renderList();
+            renderPreview();
+        };
+        document.getElementById('arqZipBtn').onclick = downloadSet;
+        document.getElementById('arqPackBtn').onclick = function (ev) {
+            if (ev && ev.shiftKey && typeof window.downloadPackContabilistaSelect === 'function') {
+                window.downloadPackContabilistaSelect();
+            } else if (typeof window.downloadPackContabilista === 'function') {
+                window.downloadPackContabilista();
+            } else toast(tr('packEmpty'));
+        };
+        document.getElementById('arqNewClientBtn').onclick = createClientFolder;
+        document.getElementById('arqNewPastaBtn').onclick = createPastaFolder;
+        document.getElementById('arqDriveBtn').onclick = openDriveRoot;
+        var archGo = document.getElementById('arqArchGo');
+        var archCancel = document.getElementById('arqArchCancel');
+        if (archGo) archGo.onclick = commitArchivePanel;
+        if (archCancel) archCancel.onclick = closeArchivePanel;
+        var foldGo = document.getElementById('arqFoldGo');
+        var foldCancel = document.getElementById('arqFoldCancel');
+        if (foldGo) foldGo.onclick = commitFolderPanel;
+        if (foldCancel) foldCancel.onclick = closeFolderPanel;
+        ['arqArchClient', 'arqArchPasta'].forEach(function (id) {
+            var el = document.getElementById(id);
+            if (el) el.addEventListener('keydown', function (e) {
+                if (e.key === 'Enter') { e.preventDefault(); commitArchivePanel(); }
+            });
+        });
+        ['arqFoldClient', 'arqFoldPasta'].forEach(function (id) {
+            var el = document.getElementById(id);
+            if (el) el.addEventListener('keydown', function (e) {
+                if (e.key === 'Enter') { e.preventDefault(); commitFolderPanel(); }
+            });
+        });
+        var list = document.getElementById('arqList');
+        if (list) {
+            list.addEventListener('keydown', function (e) {
+                if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp' && e.key !== 'Home' && e.key !== 'End') return;
+                var rows = visibleEntries();
+                if (!rows.length) return;
+                var i = -1;
+                rows.forEach(function (row, idx) { if (row.id === state.selectedId) i = idx; });
+                if (e.key === 'ArrowDown') i = Math.min(rows.length - 1, i + 1);
+                else if (e.key === 'ArrowUp') i = Math.max(0, i < 0 ? 0 : i - 1);
+                else if (e.key === 'Home') i = 0;
+                else if (e.key === 'End') i = rows.length - 1;
+                state.selectedId = rows[i].id;
+                state.previewTab = 'doc';
+                state.selectedPdfId = null;
+                renderList();
+                renderPreview();
+                e.preventDefault();
+            });
+        }
+        document.addEventListener('keydown', function (e) {
+            var wrap = document.getElementById('arqOverlay');
+            if (!wrap || !wrap.classList.contains('open')) return;
+            if (e.key !== 'Escape') return;
+            var ap = document.getElementById('arqArchivePanel');
+            var fp = document.getElementById('arqFolderPanel');
+            if (ap && ap.classList.contains('open')) {
+                closeArchivePanel();
+                e.preventDefault();
+                return;
+            }
+            if (fp && fp.classList.contains('open')) {
+                closeFolderPanel();
+                e.preventDefault();
+                return;
+            }
+            e.preventDefault();
+            closeArquivo();
+        });
+    }
+    function upgradeOverlay() {
+        var wrap = document.getElementById('arqOverlay');
+        if (!wrap) return;
+        var tools = wrap.querySelector('.arq-tools');
+        if (tools && !document.getElementById('arqArchivePanel')) {
+            tools.insertAdjacentHTML('afterend', archivePanelHtml() + folderPanelHtml());
+        }
+        var listCol = wrap.querySelector('.arq-body .arq-col:nth-child(2)');
+        if (listCol) {
+            listCol.classList.add('arq-list-col');
+            var h3 = listCol.querySelector('h3');
+            if (h3 && !document.getElementById('arqCrumb')) {
+                h3.insertAdjacentHTML('afterend', '<div class="arq-crumb" id="arqCrumb"></div>');
+            }
+            var list = document.getElementById('arqList');
+            if (list) list.setAttribute('tabindex', '0');
+        }
+        bindArquivoEvents();
     }
     function ensureDom() {
-        if (document.getElementById('arqOverlay')) return;
         injectCss();
-        var wrap = document.createElement('div');
+        var wrap = document.getElementById('arqOverlay');
+        if (wrap) {
+            upgradeOverlay();
+            return;
+        }
+        wrap = document.createElement('div');
         wrap.id = 'arqOverlay';
         wrap.setAttribute('role', 'dialog');
         wrap.setAttribute('aria-modal', 'true');
@@ -887,44 +1241,19 @@
             '<button type="button" class="arq-btn" id="arqNewPastaBtn"></button>' +
             '<button type="button" class="arq-btn gold" id="arqDriveBtn"></button>' +
             '</div>' +
+            archivePanelHtml() +
+            folderPanelHtml() +
             '<div class="arq-body">' +
             '<div class="arq-col"><h3 id="arqFoldersTitle"></h3><div class="arq-tree" id="arqTree"></div></div>' +
-            '<div class="arq-col"><h3 id="arqListTitle"></h3><div class="arq-list" id="arqList"></div></div>' +
+            '<div class="arq-col arq-list-col"><h3 id="arqListTitle"></h3><div class="arq-crumb" id="arqCrumb"></div><div class="arq-list" id="arqList" tabindex="0"></div></div>' +
             '<div class="arq-col arq-preview" id="arqPreview"></div>' +
             '</div>';
         document.body.appendChild(wrap);
-        document.getElementById('arqCloseBtn').onclick = closeArquivo;
-        document.getElementById('arqArchiveBtn').onclick = archiveCurrent;
-        document.getElementById('arqSearch').oninput = function () {
-            state.query = this.value;
-            renderList();
-        };
-        document.getElementById('arqType').onchange = function () {
-            state.type = this.value;
-            renderList();
-        };
-        document.getElementById('arqDoneOnly').onchange = function () {
-            state.concludedOnly = this.checked;
-            renderList();
-        };
-        document.getElementById('arqZipBtn').onclick = downloadSet;
-        document.getElementById('arqPackBtn').onclick = function () {
-            if (typeof window.downloadPackContabilista === 'function') window.downloadPackContabilista();
-            else toast(tr('packEmpty'));
-        };
-        document.getElementById('arqNewClientBtn').onclick = createClientFolder;
-        document.getElementById('arqNewPastaBtn').onclick = createPastaFolder;
-        document.getElementById('arqDriveBtn').onclick = openDriveRoot;
-        document.addEventListener('keydown', function (e) {
-            if (e.key === 'Escape' && wrap.classList.contains('open')) {
-                e.preventDefault();
-                closeArquivo();
-            }
-        });
+        bindArquivoEvents();
     }
     function fillChrome() {
         document.getElementById('arqTitle').textContent = tr('title');
-        document.getElementById('arqSub').textContent = tr('subtitle');
+        document.getElementById('arqSub').textContent = tr('subtitle') + ' — ' + tr('navHint');
         document.getElementById('arqArchiveBtn').textContent = tr('archiveNow');
         document.getElementById('arqCloseBtn').textContent = tr('close');
         document.getElementById('arqSearch').placeholder = tr('search');
@@ -956,10 +1285,44 @@
             return '<option value="' + p[0] + '"' + (state.type === p[0] ? ' selected' : '') + '>' + esc(p[1]) + '</option>';
         }).join('');
         document.getElementById('arqDoneOnly').checked = state.concludedOnly;
+        var archTitle = document.getElementById('arqArchTitle');
+        if (archTitle) archTitle.textContent = tr('archivePanelTitle');
+        var acl = document.getElementById('arqArchClientLbl');
+        if (acl) acl.textContent = tr('client');
+        var apl = document.getElementById('arqArchPastaLbl');
+        if (apl) apl.textContent = tr('pasta');
+        var adl = document.getElementById('arqArchDoneLbl');
+        if (adl) adl.textContent = tr('markDone');
+        var ago = document.getElementById('arqArchGo');
+        if (ago) ago.textContent = tr('archiveGo');
+        var aca = document.getElementById('arqArchCancel');
+        if (aca) aca.textContent = tr('archiveCancel');
+        var fcl = document.getElementById('arqFoldClientLbl');
+        if (fcl) fcl.textContent = tr('client');
+        var fpl = document.getElementById('arqFoldPastaLbl');
+        if (fpl) fpl.textContent = tr('pasta');
+        var fgo = document.getElementById('arqFoldGo');
+        if (fgo) fgo.textContent = tr('createGo');
+        var fca = document.getElementById('arqFoldCancel');
+        if (fca) fca.textContent = tr('archiveCancel');
+        var ft = document.getElementById('arqFoldTitle');
+        if (ft && !ft.textContent) ft.textContent = tr('folderPanelTitle');
     }
     function treeBtn(id, label, extra) {
         var on = state.folder === id ? ' on' : '';
         return '<button type="button" class="' + on + '" data-folder="' + esc(id) + '">' + esc(label) + (extra ? ' <span class="arq-hint">(' + extra + ')</span>' : '') + '</button>';
+    }
+    function selectFolder(id) {
+        state.folder = id;
+        var still = visibleEntries().some(function (e) { return e.id === state.selectedId; });
+        if (!still) {
+            state.selectedId = null;
+            state.previewTab = 'doc';
+            state.selectedPdfId = null;
+        }
+        renderTree();
+        renderList();
+        renderPreview();
     }
     function renderTree() {
         var items = allEntries();
@@ -977,7 +1340,20 @@
         html += '</details>';
         html += '<details open><summary>' + esc(tr('byClient')) + '</summary>';
         if (!clients.length) html += '<p class="arq-hint" style="padding:6px 12px;">—</p>';
-        clients.forEach(function (c) { html += treeBtn('client:' + c, c); });
+        clients.forEach(function (c) {
+            var nAll = items.filter(function (e) { return (e.client || tr('noClient')) === c; }).length;
+            var sub = catalogPastasForClient(c);
+            html += '<details open><summary>' + esc(c) + ' <span class="arq-hint">(' + nAll + ')</span></summary>';
+            html += treeBtn('client:' + c, tr('all'), nAll);
+            html += '<div class="arq-tree-sub">';
+            sub.forEach(function (p) {
+                var nP = items.filter(function (e) {
+                    return (e.client || tr('noClient')) === c && (e.pasta || tr('none')) === p;
+                }).length;
+                html += treeBtn('clientpasta:' + c + '|' + p, p, nP);
+            });
+            html += '</div></details>';
+        });
         html += '</details>';
         html += '<details open><summary>' + esc(tr('byPasta')) + '</summary>';
         if (!pastas.length) html += '<p class="arq-hint" style="padding:6px 12px;">—</p>';
@@ -985,11 +1361,14 @@
         html += '</details>';
         html += '<details><summary>' + esc(tr('byYear')) + '</summary>';
         years.forEach(function (y) {
-            html += treeBtn('year:' + y, y);
-            unique(items.filter(function (e) { return String(e.archivedAt || '').slice(0, 4) === y; })
-                .map(function (e) { return String(e.archivedAt || '').slice(0, 7); })).forEach(function (m) {
-                html += treeBtn('month:' + m, '  ' + m);
+            var months = unique(items.filter(function (e) { return String(e.archivedAt || '').slice(0, 4) === y; })
+                .map(function (e) { return String(e.archivedAt || '').slice(0, 7); }));
+            html += '<details open><summary>' + esc(y) + '</summary>';
+            html += treeBtn('year:' + y, tr('all') + ' ' + y);
+            months.forEach(function (m) {
+                html += treeBtn('month:' + m, m);
             });
+            html += '</details>';
         });
         html += '</details>';
         html += '<details><summary>' + esc(tr('drafts')) + '</summary>';
@@ -999,18 +1378,47 @@
         var tree = document.getElementById('arqTree');
         tree.innerHTML = html;
         tree.querySelectorAll('button[data-folder]').forEach(function (btn) {
-            btn.onclick = function () {
-                state.folder = btn.getAttribute('data-folder');
-                state.selectedId = null;
-                renderTree();
-                renderList();
-                renderPreview();
-            };
+            btn.onclick = function () { selectFolder(btn.getAttribute('data-folder')); };
+        });
+    }
+    function renderCrumb() {
+        var el = document.getElementById('arqCrumb');
+        if (!el) return;
+        var parts = [{ id: 'all', label: tr('all') }];
+        var id = state.folder;
+        if (id.indexOf('clientpasta:') === 0) {
+            var cp = id.slice(12).split('|');
+            parts.push({ id: 'client:' + cp[0], label: cp[0] });
+            parts.push({ id: id, label: cp[1] || '' });
+        } else if (id.indexOf('client:') === 0) {
+            parts.push({ id: id, label: id.slice(7) });
+        } else if (id.indexOf('pasta:') === 0) {
+            parts.push({ id: id, label: id.slice(6) });
+        } else if (id.indexOf('month:') === 0) {
+            parts.push({ id: 'year:' + id.slice(6, 10), label: id.slice(6, 10) });
+            parts.push({ id: id, label: id.slice(6) });
+        } else if (id !== 'all') {
+            parts.push({ id: id, label: folderLabel(id) });
+        }
+        el.innerHTML = parts.map(function (p, i) {
+            if (i === parts.length - 1) return '<strong>' + esc(p.label) + '</strong>';
+            return '<button type="button" data-folder="' + esc(p.id) + '">' + esc(p.label) + '</button> / ';
+        }).join('');
+        el.querySelectorAll('button[data-folder]').forEach(function (btn) {
+            btn.onclick = function () { selectFolder(btn.getAttribute('data-folder')); };
         });
     }
     function renderList() {
         var list = visibleEntries();
-        document.getElementById('arqListTitle').textContent = list.length + ' — ' + (state.folder === 'all' ? tr('all') : state.folder.replace(/^[^:]+:/, ''));
+        if (list.length && !list.some(function (e) { return e.id === state.selectedId; })) {
+            state.selectedId = list[0].id;
+            state.previewTab = 'doc';
+            state.selectedPdfId = null;
+        }
+        if (!list.length) state.selectedId = null;
+        var titleEl = document.getElementById('arqListTitle');
+        if (titleEl) titleEl.textContent = list.length + ' — ' + folderLabel(state.folder);
+        renderCrumb();
         var box = document.getElementById('arqList');
         if (!list.length) {
             box.innerHTML = '<p class="arq-hint" style="padding:12px;">' + esc(tr('empty')) + '</p>';
@@ -1021,6 +1429,7 @@
             var date = e.archivedAt ? String(e.archivedAt).slice(0, 10) : '';
             return '<button type="button" class="arq-row' + on + '" data-id="' + esc(e.id) + '">' +
                 '<span class="arq-badge' + (e.concluded ? ' done' : '') + '">' + esc(e.concluded ? tr('concluded') : tr('notDone')) + '</span>' +
+                (e.sentToClient ? '<span class="arq-badge">' + esc(tr('sentBadge')) + '</span>' : '') +
                 '<span class="arq-badge">' + esc(typeLabel(e.type)) + '</span>' +
                 esc(e.name) +
                 '<span class="arq-meta">' + esc([e.client || tr('noClient'), e.pasta || tr('none'), date, e.number].filter(Boolean).join(' · ')) + '</span>' +
@@ -1029,10 +1438,14 @@
         box.querySelectorAll('button.arq-row').forEach(function (btn) {
             btn.onclick = function () {
                 state.selectedId = btn.getAttribute('data-id');
+                state.previewTab = 'doc';
+                state.selectedPdfId = null;
                 renderList();
                 renderPreview();
             };
         });
+        var on = box.querySelector('.arq-row.on');
+        if (on && typeof on.scrollIntoView === 'function') on.scrollIntoView({ block: 'nearest' });
     }
     function findSelected() {
         var id = state.selectedId;
@@ -1045,14 +1458,54 @@
     }
     function previewDoc(html) {
         return '<!DOCTYPE html><html><head><meta charset="utf-8"><style>' +
-            'body{font-family:Calibri,Segoe UI,sans-serif;padding:16px;color:#1a1a1a;}' +
-            'table{border-collapse:collapse;}img{max-width:100%;}' +
+            'body{font-family:Calibri,Segoe UI,sans-serif;padding:20px 24px;color:#1a1a1a;line-height:1.45;background:#fff;}' +
+            'h1,h2,h3{color:#0B1223;margin:0 0 10px;}' +
+            'table{border-collapse:collapse;width:100%;margin:8px 0;}' +
+            'td,th{border:1px solid #94a3b8;padding:6px 8px;font-size:14px;vertical-align:top;}' +
+            'th{background:#0B1223;color:#fff;font-weight:700;}' +
+            'img{max-width:100%;height:auto;}' +
+            'p{margin:0 0 8px;}' +
+            '.abene-page-flow,.page-decoration,.page-header-zone,.page-footer-zone,.page-gap-band,.abene-obj-resize,.abene-tbox-bar{display:none!important;}' +
             '</style></head><body>' + (html || '') + '</body></html>';
+    }
+    function syncPreviewTabs() {
+        var docBtn = document.getElementById('arqTabDoc');
+        var pdfBtn = document.getElementById('arqTabPdf');
+        var htmlFrame = document.getElementById('arqPreviewFrame');
+        var pdfFrame = document.getElementById('arqPdfFrame');
+        var pdfOn = state.previewTab === 'pdf';
+        if (docBtn) docBtn.classList.toggle('on', !pdfOn);
+        if (pdfBtn) pdfBtn.classList.toggle('on', pdfOn);
+        if (htmlFrame) htmlFrame.style.display = pdfOn ? 'none' : '';
+        if (pdfFrame) {
+            if (pdfOn && pdfPreviewUrl) pdfFrame.classList.add('show');
+            else pdfFrame.classList.remove('show');
+        }
+    }
+    function showPdfBlob(blob, pid) {
+        if (!blob) return;
+        revokePdfPreview();
+        pdfPreviewUrl = URL.createObjectURL(blob);
+        state.previewTab = 'pdf';
+        state.selectedPdfId = pid || state.selectedPdfId;
+        var frame = document.getElementById('arqPdfFrame');
+        if (frame) {
+            frame.removeAttribute('sandbox');
+            frame.src = pdfPreviewUrl;
+            frame.classList.add('show');
+        }
+        syncPreviewTabs();
+        var status = document.getElementById('arqPdfStatus');
+        if (status && pid) status.textContent = tr('pdfSavedView');
+        document.querySelectorAll('.arq-pdf-row').forEach(function (row) {
+            row.classList.toggle('on', row.getAttribute('data-pid') === (pid || ''));
+        });
     }
     function renderPreview() {
         var box = document.getElementById('arqPreview');
         var e = findSelected();
         revokePdfPreview();
+        state.selectedPdfId = null;
         if (!e) {
             box.innerHTML = '<h3>' + esc(tr('preview')) + '</h3><p class="arq-hint">' + esc(tr('noSel')) + '</p>';
             return;
@@ -1061,8 +1514,8 @@
         var canOrc = partHasContent(e.html, 'orcamento');
         var canRec = partHasContent(e.html, 'recibo');
         var actions = '<div class="arq-actions">' +
-            '<button type="button" class="arq-btn primary" data-act="open">' + esc(tr('open')) + '</button>' +
-            '<button type="button" class="arq-btn gold" data-act="copy">' + esc(tr('copyAll')) + '</button>' +
+            '<button type="button" class="arq-btn primary" data-act="open">' + esc(tr('openModify')) + '</button>' +
+            '<button type="button" class="arq-btn gold" data-act="copy">' + esc(tr('copyAsNew')) + '</button>' +
             (canRel ? '<button type="button" class="arq-btn" data-act="copy-rel">' + esc(tr('copyRel')) + '</button>' : '') +
             (canOrc ? '<button type="button" class="arq-btn" data-act="copy-orc">' + esc(tr('copyOrc')) + '</button>' : '') +
             (canRec ? '<button type="button" class="arq-btn" data-act="copy-rec">' + esc(tr('copyRec')) + '</button>' : '') +
@@ -1074,7 +1527,7 @@
             form = '<div class="arq-form">' +
                 '<label>' + esc(tr('client')) + '<input id="arqEditClient" value="' + esc(e.client) + '" /></label>' +
                 '<label>' + esc(tr('pasta')) + '<input id="arqEditPasta" value="' + esc(e.pasta) + '" /></label>' +
-                '<button type="button" class="arq-btn" data-act="meta">' + esc(tr('archived')) + '</button>' +
+                '<button type="button" class="arq-btn gold" data-act="meta">' + esc(tr('saveFicha')) + '</button>' +
                 '</div>';
         }
         var pdfBtns = '<div class="arq-actions">' +
@@ -1082,6 +1535,7 @@
             (canOrc ? '<button type="button" class="arq-btn gold" data-act="final-orcamento">' + esc(tr('pdfGravarOrc')) + '</button>' : '') +
             (canRec ? '<button type="button" class="arq-btn gold" data-act="final-recibo">' + esc(tr('pdfGravarRec')) + '</button>' : '') +
             '</div>';
+        var tab = state.previewTab === 'pdf' ? 'pdf' : 'doc';
         box.innerHTML = '<h3>' + esc(tr('preview')) + ' — ' + esc(e.name) + '</h3>' +
             '<p class="arq-hint">' + esc(typeLabel(e.type) + ' · ' + (e.client || tr('noClient')) + ' · ' + (e.pasta || tr('none'))) + '</p>' +
             actions + form +
@@ -1090,13 +1544,35 @@
             pdfBtns +
             '<div id="arqPdfStatus" class="arq-hint"></div>' +
             '<div id="arqPdfList"></div></div>' +
-            '<iframe sandbox="" title="preview" id="arqPreviewFrame"></iframe>';
+            '<div class="arq-preview-tabs">' +
+            '<button type="button" id="arqTabDoc" class="' + (tab === 'doc' ? 'on' : '') + '">' + esc(tr('tabDoc')) + '</button>' +
+            '<button type="button" id="arqTabPdf">' + esc(tr('tabPdf')) + '</button>' +
+            '</div>' +
+            '<iframe title="preview" id="arqPreviewFrame"></iframe>' +
+            '<iframe title="pdf" id="arqPdfFrame"></iframe>';
         var iframe = box.querySelector('#arqPreviewFrame');
-        iframe.srcdoc = previewDoc(e.html);
+        iframe.srcdoc = previewDoc(cleanArchiveHtml(e.html));
+        var tabDoc = document.getElementById('arqTabDoc');
+        var tabPdf = document.getElementById('arqTabPdf');
+        if (tabDoc) tabDoc.onclick = function () { state.previewTab = 'doc'; syncPreviewTabs(); };
+        if (tabPdf) tabPdf.onclick = function () {
+            state.previewTab = 'pdf';
+            syncPreviewTabs();
+            if (!pdfPreviewUrl) {
+                var firstView = document.querySelector('#arqPdfList [data-pdf="view"]');
+                if (firstView) firstView.click();
+            }
+        };
         box.querySelectorAll('[data-act]').forEach(function (btn) {
             btn.onclick = function () { runAction(btn.getAttribute('data-act'), e); };
         });
+        ['arqEditClient', 'arqEditPasta'].forEach(function (fid) {
+            var field = document.getElementById(fid);
+            if (!field) return;
+            field.addEventListener('change', function () { runAction('meta', e); });
+        });
         fillPdfList(e);
+        syncPreviewTabs();
     }
     function fillPdfList(entry) {
         var listEl = document.getElementById('arqPdfList');
@@ -1110,7 +1586,8 @@
             listEl.innerHTML = rows.map(function (r) {
                 var kb = Math.max(1, Math.round((r.bytes || 0) / 1024));
                 var when = String(r.createdAt || '').slice(0, 16).replace('T', ' ');
-                return '<div class="arq-pdf-row">' +
+                var on = state.selectedPdfId === r.id ? ' on' : '';
+                return '<div class="arq-pdf-row' + on + '" data-pid="' + esc(r.id) + '">' +
                     '<span>' + esc(etapeLabel(r.etape)) + ' v' + esc(String(r.rev)) +
                     (r.number ? ' · ' + esc(r.number) : '') +
                     ' · ' + esc(when) + ' · ' + esc(tr('pdfKb', { n: String(kb) })) + '</span>' +
@@ -1127,14 +1604,7 @@
         getFinal(pid).then(function (rec) {
             if (!rec || !rec.blob) return;
             if (kind === 'view') {
-                revokePdfPreview();
-                pdfPreviewUrl = URL.createObjectURL(rec.blob);
-                var iframe = document.getElementById('arqPreviewFrame');
-                if (iframe) {
-                    iframe.removeAttribute('sandbox');
-                    iframe.removeAttribute('srcdoc');
-                    iframe.src = pdfPreviewUrl;
-                }
+                showPdfBlob(rec.blob, rec.id);
                 return;
             }
             var a = document.createElement('a');
@@ -1167,9 +1637,6 @@
             var same = rows.filter(function (r) { return r.etape === etape; });
             var lastRev = same.length ? Math.max.apply(null, same.map(function (r) { return Number(r.rev) || 0; })) : 0;
             var next = lastRev + 1;
-            if (lastRev && !opts.silent && !confirm(tr('pdfConfirmV', { rev: String(lastRev), next: String(next) }))) {
-                return Promise.reject(new Error('cancel'));
-            }
             return htmlToPdfBlob(chunk).then(function (blob) {
                 var rec = {
                     id: ownerIdOf(entry) + ':' + etape + ':v' + next,
@@ -1194,9 +1661,10 @@
     function gravarFinal(entry, etape) {
         var status = document.getElementById('arqPdfStatus');
         if (status) status.textContent = tr('pdfBusy');
-        gravarEtape(etape, { entry: entry, silent: false }).then(function () {
-            if (status) status.textContent = '';
+        gravarEtape(etape, { entry: entry, silent: false }).then(function (rec) {
+            if (status) status.textContent = rec ? tr('pdfOk', { etape: etapeLabel(etape), rev: String(rec.rev) }) : '';
             fillPdfList(entry);
+            if (rec && rec.blob) showPdfBlob(rec.blob, rec.id);
         }).catch(function (err) {
             if (status) status.textContent = '';
             var msg = err && err.message;
@@ -1215,19 +1683,28 @@
             return el2 ? el2.outerHTML : '';
         }
         if (part === 'relatorio') {
-            d.querySelectorAll('[data-abene-block]').forEach(function (n) { n.remove(); });
-            var left = d.innerHTML.trim();
-            return left || '';
+            d.querySelectorAll('[data-abene-block="devis"], [data-abene-block="receipt"]').forEach(function (n) { n.remove(); });
+            var report = d.querySelector('[data-abene-block="report"]');
+            var left = (report ? report.outerHTML : d.innerHTML).trim();
+            return left || html || '';
         }
         return html;
     }
     function applyToEditor(html, name, asCopy) {
         var editor = editorEl();
         if (!editor) return false;
-        if (!confirm(asCopy ? tr('confirmCopy') : tr('confirmOpen'))) return false;
-        editor.innerHTML = html || '<p></p>';
+        try {
+            if (typeof saveDocument === 'function') saveDocument({ silent: true });
+        } catch (eSave) {}
+        editor.innerHTML = cleanArchiveHtml(html) || '<p></p>';
         if (typeof renameDocument === 'function') renameDocument(name);
-        if (docState()) docState().dirty = true;
+        if (docState()) {
+            docState().dirty = true;
+            if (asCopy) {
+                docState().sentToClient = false;
+                if (window.abeneGdocsForkOnCopy) window.abeneGdocsForkOnCopy();
+            }
+        }
         if (typeof saveUndoState === 'function') saveUndoState();
         if (typeof updateStats === 'function') updateStats();
         if (typeof updateNavigation === 'function') updateNavigation();
@@ -1238,7 +1715,7 @@
     }
     function downloadHtml(name, html) {
         var blob = new Blob(['<!DOCTYPE html><html><head><meta charset="utf-8"><title>' +
-            sanitizeName(name) + '</title></head><body>' + html + '</body></html>'], { type: 'text/html;charset=utf-8' });
+            sanitizeName(name) + '</title></head><body>' + cleanArchiveHtml(html) + '</body></html>'], { type: 'text/html;charset=utf-8' });
         var a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
         a.download = sanitizeName(name) + '.html';
@@ -1252,6 +1729,11 @@
     }
     function runAction(act, e) {
         if (act === 'open') {
+            if (e.concluded) {
+                if (!confirm(tr('confirmOpenFinal'))) return;
+                if (applyToEditor(e.html, e.name, false)) toast(tr('openedFinalHint'));
+                return;
+            }
             if (applyToEditor(e.html, e.name, false)) toast(tr('opened'));
             return;
         }
@@ -1358,15 +1840,14 @@
         if (opts.silent) {
             if (!pasta) pasta = String(snap.name || 'Documento').trim();
             concluded = opts.concluded !== false || meta.type === 'completo';
-        } else if (clientDef && pastaDef) {
-            if (!window.confirm(tr('archiveConfirm', { client: clientDef, pasta: pastaDef }))) return null;
+        } else if (opts.fromPanel) {
+            client = String(opts.client != null ? opts.client : clientDef).trim();
+            pasta = String(opts.pasta != null ? opts.pasta : pastaDef).trim();
+            if (!pasta) pasta = String(snap.name || 'Documento').trim();
             concluded = opts.concluded != null ? !!opts.concluded : true;
         } else {
-            client = window.prompt(tr('client'), clientDef);
-            if (client === null) return null;
-            pasta = window.prompt(tr('pasta'), pastaDef);
-            if (pasta === null) return null;
-            concluded = window.confirm(tr('markDone') + ' ?');
+            openArchivePanel();
+            return null;
         }
         var entry = {
             id: uid(),
@@ -1387,8 +1868,10 @@
         if (!upsertArchiveEntry(entry)) return null;
         saveLastJob({ client: entry.client, pasta: entry.pasta, nif: entry.nif });
         if (!opts.silent) {
-            state.folder = 'all';
-            toast(tr('archivedOk'));
+            var cLabel = entry.client || tr('noClient');
+            var pLabel = entry.pasta || tr('none');
+            state.folder = 'clientpasta:' + cLabel + '|' + pLabel;
+            toast(tr('archivedAuto', { client: cLabel, pasta: pLabel }));
         }
         refreshArquivoIfOpen();
         return state.selectedId;
@@ -1404,7 +1887,7 @@
         if (!window.JSZip) {
             toast(tr('noZip'));
             downloadHtml('indice-arquivo', '<pre>' + csv.replace(/^﻿/, '') + '</pre>');
-            list.forEach(function (e) { downloadHtml(e.name, e.html); });
+            downloadHtml(e.name, e.html);
             return;
         }
         var zip = new window.JSZip();
@@ -1413,7 +1896,7 @@
             var folder = [e.client || tr('noClient'), e.pasta || tr('none'), typeLabel(e.type)]
                 .map(sanitizeName).join('/');
             zip.file(folder + '/' + sanitizeName(e.name) + '.html',
-                '<!DOCTYPE html><html><head><meta charset="utf-8"></head><body>' + e.html + '</body></html>');
+                '<!DOCTYPE html><html><head><meta charset="utf-8"></head><body>' + cleanArchiveHtml(e.html) + '</body></html>');
         });
         Promise.all(list.map(function (e) {
             var folder = [e.client || tr('noClient'), e.pasta || tr('none'), typeLabel(e.type)]
@@ -1443,11 +1926,60 @@
         renderTree();
         renderList();
         renderPreview();
+        var listEl = document.getElementById('arqList');
+        if (listEl) listEl.focus();
     }
     function closeArquivo() {
         revokePdfPreview();
         var el = document.getElementById('arqOverlay');
         if (el) el.classList.remove('open');
+    }
+
+    function markSentToClient(meta) {
+        meta = meta || {};
+        var list = loadStore();
+        var touched = false;
+        var num = String(meta.number || '').trim();
+        var client = String(meta.client || '').trim().toLowerCase();
+        list.forEach(function (item) {
+            if (item.concluded) return;
+            var matchNum = num && String(item.number || '') === num;
+            var matchClient = client && String(item.client || '').toLowerCase() === client;
+            if (matchNum || (matchClient && !num)) {
+                item.sentToClient = true;
+                item.sentAt = new Date().toISOString();
+                touched = true;
+            }
+        });
+        var snap = currentSnapshot();
+        if (!touched) {
+            list.unshift({
+                id: 'sent-' + Date.now(),
+                name: (docState() && docState().name) || snap.name,
+                html: snap.html,
+                type: snap.type,
+                client: meta.client || snap.client,
+                pasta: snap.pasta,
+                nif: snap.nif,
+                number: meta.number || snap.number,
+                total: snap.total,
+                concluded: false,
+                sentToClient: true,
+                sentAt: new Date().toISOString(),
+                archivedAt: new Date().toISOString(),
+                hasDevis: snap.hasDevis,
+                hasReceipt: snap.hasReceipt,
+                hasReport: snap.hasReport
+            });
+            touched = true;
+        }
+        if (touched && saveStore(list)) {
+            toast(tr('sentMarked'));
+            try {
+                if (docState()) docState().sentToClient = true;
+            } catch (eD) {}
+        }
+        return touched;
     }
 
     window.openArquivoWindow = openArquivo;
@@ -1465,6 +1997,7 @@
         rememberFolder: rememberFolder,
         archiveCurrent: archiveCurrent,
         lastJob: loadLastJob,
-        saveLastJob: saveLastJob
+        saveLastJob: saveLastJob,
+        markSentToClient: markSentToClient
     };
 })();

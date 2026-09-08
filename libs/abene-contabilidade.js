@@ -934,21 +934,137 @@
         if (typeof showToast === 'function') showToast(tt('toastAcctOk', 'CSV de contabilidade PT descarregado.'));
     }
 
-    function downloadPackContabilista() {
+    function downloadPackContabilista(opts) {
+        opts = opts || {};
         var src = collectPackSources();
         if (!src.papers.length) {
             if (typeof showToast === 'function') showToast(tt('packEmpty', 'Não há orçamento nem recibo nesta vista para o contabilista.'));
             else alert(tt('packEmpty', 'Não há orçamento nem recibo nesta vista para o contabilista.'));
             return;
         }
+        /* Comportamento antigo (1 clique) por defeito; seleção só se opts.select === true */
+        if (opts.select === true && typeof window.openGenericModal === 'function') {
+            openPackChooser(src);
+            return;
+        }
+        runPackDownload(src, {
+            skipChooser: true,
+            includeCsv: opts.includeCsv !== false,
+            includePdf: opts.includePdf !== false
+        });
+    }
+
+    window.downloadPackContabilistaSelect = function () {
+        downloadPackContabilista({ select: true });
+    };
+
+    function openPackChooser(src) {
+        var finalsOnly = false;
+        var body = '<p style="font-size:12px;color:#555;margin:0 0 10px;">' +
+            tt('packChooserHint', 'Escolha o que incluir no pack contabilista PT.') + '</p>' +
+            '<label style="display:flex;gap:8px;align-items:center;margin:6px 0;"><input type="checkbox" id="packAllDocs" checked> ' +
+            tt('packAllDocs', 'Todos os documentos desta vista') + ' (' + src.papers.length + ')</label>' +
+            '<label style="display:flex;gap:8px;align-items:center;margin:6px 0;"><input type="checkbox" id="packFinalsOnly"> ' +
+            tt('packFinalsOnly', 'Só versões finais / concluídos') + '</label>' +
+            '<label style="display:flex;gap:8px;align-items:center;margin:6px 0;"><input type="checkbox" id="packIncludeCsv" checked> ' +
+            tt('packIncludeCsv', 'CSV / pack PT (Moloni, ERP, TOConline)') + '</label>' +
+            '<label style="display:flex;gap:8px;align-items:center;margin:6px 0;"><input type="checkbox" id="packIncludePdf" checked> ' +
+            tt('packIncludePdf', 'PDFs finais gravados no Arquivo') + '</label>' +
+            '<div id="packDocList" style="max-height:220px;overflow:auto;border:1px solid #ddd;margin-top:8px;padding:6px;"></div>';
+
+        function paperLabel(p, i) {
+            return (p.numero || ('#' + (i + 1))) + ' — ' + (p.cliente || '') + ' — ' + (p.tipo || '');
+        }
+        function renderDocs() {
+            var box = document.getElementById('packDocList');
+            if (!box) return;
+            finalsOnly = !!(document.getElementById('packFinalsOnly') || {}).checked;
+            var entries = src.entries || [];
+            var papers = src.papers || [];
+            if (finalsOnly) {
+                papers = papers.filter(function (p) {
+                    return entries.some(function (e) {
+                        return e.concluded && String(e.number || '') === String(p.numero || '');
+                    }) || p.final === true || p.status === 'final';
+                });
+                if (!papers.length) {
+                    papers = (src.papers || []).filter(function () { return false; });
+                    entries.filter(function (e) { return e.concluded; }).forEach(function (e) {
+                        papersFromHtml(e.html || '', e).forEach(function (p) { papers.push(p); });
+                    });
+                }
+            }
+            box._papers = papers;
+            box.innerHTML = papers.map(function (p, i) {
+                return '<label style="display:flex;gap:8px;align-items:flex-start;margin:4px 0;font-size:12px;">' +
+                    '<input type="checkbox" class="pack-doc-cb" data-i="' + i + '" checked> ' +
+                    '<span>' + String(paperLabel(p, i)).replace(/</g, '&lt;') + '</span></label>';
+            }).join('') || ('<p style="padding:8px;font-size:12px;">' + tt('packEmpty', 'Nada a incluir.') + '</p>');
+        }
+
+        if (typeof window.openGenericModal === 'function') {
+            window.openGenericModal(
+                tt('packChooserTitle', 'Pack contabilista — seleção'),
+                body,
+                '<button class="btn-secondary" onclick="closeModal(\'genericModal\')">' + tt('cancel', 'Cancelar') + '</button>' +
+                '<button class="btn-primary" id="packGoBtn">' + tt('packDownload', 'Descarregar pack') + '</button>'
+            );
+            setTimeout(function () {
+                renderDocs();
+                var all = document.getElementById('packAllDocs');
+                var fin = document.getElementById('packFinalsOnly');
+                if (fin) fin.onchange = function () {
+                    if (fin.checked && all) all.checked = false;
+                    renderDocs();
+                };
+                if (all) all.onchange = function () {
+                    if (all.checked && fin) fin.checked = false;
+                    renderDocs();
+                };
+                var go = document.getElementById('packGoBtn');
+                if (go) go.onclick = function () {
+                    var box = document.getElementById('packDocList');
+                    var papers = (box && box._papers) || src.papers;
+                    var selected = [];
+                    document.querySelectorAll('.pack-doc-cb').forEach(function (cb) {
+                        if (cb.checked) {
+                            var i = Number(cb.getAttribute('data-i'));
+                            if (papers[i]) selected.push(papers[i]);
+                        }
+                    });
+                    if (!selected.length) {
+                        if (typeof showToast === 'function') showToast(tt('packEmpty', 'Selecione pelo menos um documento.'));
+                        return;
+                    }
+                    var includeCsv = !!(document.getElementById('packIncludeCsv') || { checked: true }).checked;
+                    var includePdf = !!(document.getElementById('packIncludePdf') || { checked: true }).checked;
+                    if (typeof closeModal === 'function') closeModal('genericModal');
+                    runPackDownload({ papers: selected, entries: src.entries }, {
+                        skipChooser: true,
+                        includeCsv: includeCsv,
+                        includePdf: includePdf
+                    });
+                };
+            }, 40);
+        } else {
+            runPackDownload(src, { skipChooser: true });
+        }
+    }
+
+    function runPackDownload(src, opts) {
+        opts = opts || {};
         var stamp = new Date().toISOString().slice(0, 10);
+        var includeCsv = opts.includeCsv !== false;
+        var includePdf = opts.includePdf !== false;
         if (!window.JSZip) {
-            downloadBlob('01_clientes_moloni.csv', '\uFEFF' + buildClientsCsv(src.papers), 'text/csv;charset=utf-8');
+            if (includeCsv) downloadBlob('01_clientes_moloni.csv', '\uFEFF' + buildClientsCsv(src.papers), 'text/csv;charset=utf-8');
             return;
         }
         var zip = new JSZip();
-        fillZipCore(zip, src.papers);
-        attachFinalPdfs(zip, src.entries).then(function () {
+        if (includeCsv) fillZipCore(zip, src.papers);
+        else zip.file('LEIA-ME.txt', 'Pack parcial — só PDFs selecionados.\n');
+        var pdfPromise = includePdf ? attachFinalPdfs(zip, src.entries) : Promise.resolve();
+        pdfPromise.then(function () {
             return zip.generateAsync({ type: 'blob' });
         }).then(function (blob) {
             downloadBlob('Pacote_Contabilista_PT_' + stamp + '.zip', blob, 'application/zip');
@@ -1000,6 +1116,9 @@
     window.insertWorksTable = function () { insertQuoteTable('works'); };
     window.exportAccountingPt = exportAccounting;
     window.downloadPackContabilista = downloadPackContabilista;
+    window.downloadPackContabilistaSelect = function () {
+        downloadPackContabilista({ select: true });
+    };
     window.importQuoteTableToModal = function () {
         var n = fillDevisFromTables(true);
         if (typeof showToast === 'function') {
@@ -1016,6 +1135,7 @@
         refreshQuoteTableTotals: refreshQuoteTableTotals,
         journalPush: journalPush,
         exportAccounting: exportAccounting,
-        downloadPackContabilista: downloadPackContabilista
+        downloadPackContabilista: downloadPackContabilista,
+        downloadPackContabilistaSelect: function () { downloadPackContabilista({ select: true }); }
     };
 })();

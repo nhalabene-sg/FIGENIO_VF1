@@ -1750,6 +1750,27 @@
         }
     }
 
+    function mergeContinuedContainers(root) {
+        if (!root || !root.querySelectorAll) return;
+        var list = Array.prototype.slice.call(root.querySelectorAll('[data-abene-cont="block"]'));
+        var i;
+        for (i = list.length - 1; i >= 0; i--) {
+            var t = list[i];
+            if (!t.parentNode) continue;
+            var prev = t.previousElementSibling;
+            while (prev && prev.classList && prev.classList.contains('abene-page-flow')) prev = prev.previousElementSibling;
+            if (!prev || prev.tagName !== t.tagName) {
+                var orphanKind = t.getAttribute('data-abene-origin-block');
+                if (orphanKind) t.setAttribute('data-abene-block', orphanKind);
+                t.removeAttribute('data-abene-cont');
+                t.removeAttribute('data-abene-origin-block');
+                continue;
+            }
+            while (t.firstChild) prev.appendChild(t.firstChild);
+            t.parentNode.removeChild(t);
+        }
+    }
+
     function clampOverflowMedia(editor, writeH) {
         editor.querySelectorAll('img, video, canvas, svg').forEach(function (el) {
             if (el.closest && el.closest('.page-chrome, .hf-brand')) return;
@@ -1941,9 +1962,86 @@
         }
     }
 
+    function canSplitContainerBlock(el) {
+        if (!el || el.nodeType !== 1) return false;
+        if (!/^(DIV|SECTION|ARTICLE|MAIN)$/.test(el.tagName)) return false;
+        if (el.classList.contains('abene-page-flow') || el.classList.contains('page-chrome')) return false;
+        if (el.getAttribute('data-abene-keep') === '1') return false;
+        var kind = el.getAttribute('data-abene-block') || el.getAttribute('data-abene-origin-block') || '';
+        if (/^(cover|titlepage|body-logo|signs)$/i.test(kind)) return false;
+        if (el.closest && (el.closest('.gr-sign-block') || el.closest('.gr-letterhead'))) return false;
+        var cs = window.getComputedStyle ? window.getComputedStyle(el) : null;
+        if (cs && /^(flex|inline-flex|grid|inline-grid|table)$/.test(cs.display)) return false;
+        return true;
+    }
+
+    function hasMeaningfulContainerContent(el) {
+        if (!el) return false;
+        if ((el.textContent || '').replace(/[\u200b\s]/g, '').length) return true;
+        return !!(el.querySelector && el.querySelector('br, img, video, canvas, svg, table'));
+    }
+
+    function trySplitContainerBlock(container, limit, editor) {
+        if (!canSplitContainerBlock(container)) return false;
+        var children = Array.prototype.slice.call(container.children || []).filter(function (child) {
+            if (!child || child.offsetHeight <= 0) return false;
+            if (child.classList && (child.classList.contains('page-chrome') || child.classList.contains('abene-page-flow'))) return false;
+            var cs = window.getComputedStyle ? window.getComputedStyle(child) : null;
+            return !cs || (cs.display !== 'none' && cs.position !== 'absolute' && cs.position !== 'fixed');
+        });
+        if (!children.length) return false;
+
+        var splitAt = null;
+        var i;
+        for (i = 0; i < children.length; i++) {
+            var child = children[i];
+            var top = yInEditor(child, editor);
+            var bottom = top + child.offsetHeight;
+            if (bottom <= limit + 1) continue;
+            splitAt = child;
+            if (top < limit - 18) {
+                var didInnerSplit = false;
+                if (child.tagName === 'TABLE') didInnerSplit = trySplitTable(child, limit, editor);
+                else if (canSplitBlock(child)) didInnerSplit = trySplitBlock(child, limit, editor);
+                else if (canSplitContainerBlock(child)) didInnerSplit = trySplitContainerBlock(child, limit, editor);
+                if (didInnerSplit) splitAt = child.nextSibling;
+            }
+            break;
+        }
+        if (!splitAt || !splitAt.parentNode) return false;
+
+        var before = container.cloneNode(false);
+        var node = container.firstChild;
+        while (node && node !== splitAt) {
+            before.appendChild(node.cloneNode(true));
+            node = node.nextSibling;
+        }
+        if (!hasMeaningfulContainerContent(before)) return false;
+
+        var clone = container.cloneNode(false);
+        var originKind = container.getAttribute('data-abene-block') || container.getAttribute('data-abene-origin-block') || '';
+        clone.setAttribute('data-abene-cont', 'block');
+        if (originKind) clone.setAttribute('data-abene-origin-block', originKind);
+        clone.removeAttribute('data-abene-block');
+        clone.removeAttribute('id');
+        while (splitAt) {
+            var next = splitAt.nextSibling;
+            clone.appendChild(splitAt);
+            splitAt = next;
+        }
+        if (!hasMeaningfulContainerContent(clone)) {
+            while (clone.firstChild) container.appendChild(clone.firstChild);
+            return false;
+        }
+        if (container.nextSibling) container.parentNode.insertBefore(clone, container.nextSibling);
+        else container.parentNode.appendChild(clone);
+        return true;
+    }
+
     window.abeneStripPageFlow = function (root) {
         if (!root || !root.querySelectorAll) return;
         root.querySelectorAll('.abene-page-flow').forEach(function (el) { el.remove(); });
+        mergeContinuedContainers(root);
         mergeContinuedTables(root);
         mergeContinuedBlocks(root);
     };
@@ -2096,6 +2194,13 @@
                     break;
                 }
                 if (el.offsetHeight > writeH + 4) {
+                    var containerSplit = false;
+                    try { containerSplit = trySplitContainerBlock(el, limit, editor); }
+                    catch (errContainerSplit) {}
+                    if (containerSplit) {
+                        didSplit = true;
+                        break;
+                    }
                     var innerTbl = el.tagName !== 'TABLE' ? el.querySelector && el.querySelector('table') : null;
                     if (innerTbl && remain > 36 && trySplitTable(innerTbl, limit, editor)) {
                         didSplit = true;

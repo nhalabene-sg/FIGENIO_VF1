@@ -922,8 +922,8 @@
             border: 0;
             pointer-events: none;
             user-select: none;
-            background: #808080;
-            box-shadow: inset 0 10px 12px -8px rgba(0,0,0,.4), inset 0 -10px 12px -8px rgba(0,0,0,.28);
+            background: transparent;
+            box-shadow: none;
         }
         /* Word: trait + onglet seulement en mode édition (double-clic / Inserir) */
         .hf-rule {
@@ -1750,6 +1750,7 @@
         .page table.gr-signs,
         .page table.abene-quote-table,
         .page [data-abene-block] table,
+        .page [data-abene-cont="block"] table,
         .paper-preview-sheet table {
             border: none;
             margin: 0;
@@ -1776,6 +1777,8 @@
         .page table.abene-quote-table th,
         .page [data-abene-block] table td,
         .page [data-abene-block] table th,
+        .page [data-abene-cont="block"] table td,
+        .page [data-abene-cont="block"] table th,
         .paper-preview-sheet table td,
         .paper-preview-sheet table th {
             border: none;
@@ -1788,6 +1791,7 @@
             font-weight: inherit;
         }
         .page [data-abene-block] p,
+        .page [data-abene-cont="block"] p,
         .page .gr-letterhead p,
         .paper-preview-sheet [data-abene-block] p {
             margin: 0;
@@ -2348,6 +2352,375 @@
             -webkit-line-clamp: 3;
             color: inherit;
         }
+
+        /* Modelo — présentation professionnelle, sans modifier les fonctions existantes. */
+        .abene-cover,
+        .abene-titlepage {
+            --mdl-ink: #0b1223;
+            --mdl-accent: #c9a84c;
+            --mdl-muted: #5b7aa8;
+            --mdl-soft: #f7f4ea;
+            --mdl-font: Calibri, 'Segoe UI', sans-serif;
+            font-family: var(--mdl-font);
+        }
+        .abene-cover.estilo-tecnico,
+        .abene-titlepage.estilo-tecnico {
+            --mdl-ink: #243746;
+            --mdl-accent: #4f7888;
+            --mdl-muted: #5f7280;
+            --mdl-soft: #eef3f5;
+            --mdl-font: Cambria, Georgia, serif;
+        }
+        .abene-cover.estilo-inspecao,
+        .abene-titlepage.estilo-inspecao {
+            --mdl-ink: #153f63;
+            --mdl-accent: #2d6f9f;
+            --mdl-muted: #527793;
+            --mdl-soft: #edf5fa;
+        }
+        .abene-cover.estilo-carta,
+        .abene-titlepage.estilo-carta {
+            --mdl-ink: #44332d;
+            --mdl-accent: #9a7546;
+            --mdl-muted: #76645c;
+            --mdl-soft: #f7f2ea;
+            --mdl-font: Georgia, 'Times New Roman', serif;
+        }
+        .abene-cover.estilo-simples,
+        .abene-titlepage.estilo-simples {
+            --mdl-ink: #252a31;
+            --mdl-accent: #68707a;
+            --mdl-muted: #68707a;
+            --mdl-soft: #f3f4f5;
+        }
+        .abene-cover {
+            position: relative;
+            padding: 20px 10px 18px 24px;
+            border-top: 6px solid var(--mdl-ink);
+            color: var(--mdl-ink);
+        }
+        .abene-cover::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 9px;
+            height: 34%;
+            background: var(--mdl-accent);
+        }
+        .abene-cover.estilo-simples { border-top-width: 2px; }
+        .abene-cover.estilo-simples::after { display: none; }
+        .abene-cover-top { align-items: center; gap: 24px; }
+        .abene-cover-brand {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            text-align: left;
+            min-width: 0;
+        }
+        .abene-cover-brand-copy { min-width: 0; }
+        .abene-cover-logo {
+            width: 68px;
+            height: 68px;
+            border-radius: 10px;
+            box-shadow: 0 7px 20px rgba(11, 18, 35, .16);
+        }
+        .abene-cover-name {
+            margin-top: 0;
+            font-size: 17pt;
+            font-weight: 800;
+            letter-spacing: .15px;
+            color: var(--mdl-ink);
+        }
+        .abene-cover-legal {
+            margin-top: 3px;
+            font-size: 8.5pt;
+            color: var(--mdl-muted);
+            letter-spacing: .25px;
+        }
+        .abene-cover-kicker {
+            padding: 7px 10px;
+            border: 1px solid #d8d0b8;
+            border-radius: 999px;
+            background: var(--mdl-soft);
+            color: var(--mdl-ink);
+            font-size: 7.8pt;
+            letter-spacing: 1.45px;
+            white-space: nowrap;
+        }
+        .abene-cover-mid {
+            position: relative;
+            text-align: left;
+            justify-content: center;
+            padding: 42px 42px 34px 34px;
+        }
+        .abene-cover-accent {
+            width: 58px;
+            height: 5px;
+            margin-bottom: 18px;
+            background: var(--mdl-accent);
+        }
+        .abene-cover-kind {
+            font-size: 34pt;
+            font-weight: 800;
+            color: var(--mdl-ink);
+            letter-spacing: 1.2px;
+            line-height: 1.02;
+        }
+        .abene-cover-work {
+            max-width: 92%;
+            margin-top: 14px;
+            font-size: 19pt;
+            font-weight: 500;
+            line-height: 1.25;
+            color: var(--mdl-ink);
+        }
+        .abene-cover-meta {
+            display: grid;
+            grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr) minmax(70px, .55fr);
+            gap: 12px;
+            max-width: 92%;
+            margin-top: 34px;
+        }
+        .abene-cover-meta > div {
+            min-width: 0;
+            padding: 10px 12px;
+            border-left: 3px solid var(--mdl-accent);
+            background: var(--mdl-soft);
+        }
+        .abene-cover-meta span {
+            display: block;
+            margin-bottom: 3px;
+            font-size: 7.5pt;
+            font-weight: 800;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            color: var(--mdl-muted);
+        }
+        .abene-cover-meta strong {
+            display: block;
+            overflow-wrap: anywhere;
+            font-size: 10.5pt;
+            font-weight: 700;
+            color: var(--mdl-ink);
+        }
+        .abene-cover-gold {
+            height: 3px;
+            background: var(--mdl-accent);
+        }
+        .abene-cover-footline {
+            display: flex;
+            align-items: flex-end;
+            justify-content: space-between;
+            gap: 18px;
+        }
+        .abene-cover-slogan { color: var(--mdl-accent); }
+        .abene-cover-addr { color: var(--mdl-muted); }
+        .abene-cover-docmark {
+            font-size: 7.5pt;
+            font-weight: 800;
+            letter-spacing: 1.5px;
+            color: var(--mdl-muted);
+            text-transform: uppercase;
+            white-space: nowrap;
+        }
+        .abene-cover.estilo-tecnico .abene-cover-kind { font-size: 32pt; }
+        .abene-cover.estilo-carta .abene-cover-kind { font-size: 30pt; letter-spacing: 1.6px; }
+        .abene-cover.estilo-simples .abene-cover-kind { font-size: 30pt; font-weight: 600; }
+        .abene-cover.estilo-simples .abene-cover-accent { width: 36px; height: 2px; }
+
+        .abene-titlepage {
+            position: relative;
+            padding: 18px 0 14px;
+            border-top: 5px solid var(--mdl-ink);
+            color: var(--mdl-ink);
+        }
+        .abene-tp-brand {
+            margin-bottom: 34px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid #d8dde3;
+        }
+        .abene-tp-logo { box-shadow: 0 5px 14px rgba(11, 18, 35, .14); }
+        .abene-tp-name { color: var(--mdl-ink); }
+        .abene-tp-slogan { color: var(--mdl-accent); }
+        .abene-tp-heading-row {
+            display: flex;
+            align-items: flex-end;
+            justify-content: space-between;
+            gap: 20px;
+        }
+        .abene-tp-heading {
+            margin: 0 0 8px;
+            color: var(--mdl-muted);
+            font-size: 9pt;
+            letter-spacing: 1.8px;
+        }
+        .abene-tp-doc-type {
+            margin-bottom: 8px;
+            font-size: 18pt;
+            font-weight: 800;
+            letter-spacing: .8px;
+            color: var(--mdl-ink);
+        }
+        .abene-tp-work {
+            margin: 28px 0 24px;
+            max-width: 90%;
+            font-size: 24pt;
+            font-weight: 600;
+            line-height: 1.18;
+            color: var(--mdl-ink);
+        }
+        .abene-tp-table-wrap {
+            overflow: hidden;
+            border: 1px solid #d8dde3;
+            border-radius: 6px;
+        }
+        .abene-tp-table { margin: 0; }
+        .abene-tp-table th {
+            width: 31%;
+            padding: 8px 12px;
+            border-right: 1px solid #e3e6e9;
+            border-bottom: 1px solid #e3e6e9;
+            background: var(--mdl-soft);
+            color: var(--mdl-muted);
+            font-size: 8.5pt;
+            letter-spacing: .25px;
+        }
+        .abene-tp-table td {
+            padding: 8px 12px;
+            border-bottom: 1px solid #e3e6e9;
+            color: var(--mdl-ink);
+            font-size: 10.5pt;
+            font-weight: 600;
+        }
+        .abene-tp-table tr:last-child th,
+        .abene-tp-table tr:last-child td { border-bottom: 0; }
+        .abene-tp-note {
+            margin-top: 12px;
+            color: var(--mdl-muted);
+            font-size: 8.5pt;
+        }
+        .abene-conf-banner {
+            border: 0;
+            border-left: 4px solid #c9a84c;
+            background: #fbf8ef;
+            text-align: left;
+        }
+        .abene-signs {
+            padding-top: 18px;
+            border-top: 1px solid #d8dce2;
+        }
+        .abene-toc > h1,
+        .abene-annex > h1 {
+            padding-bottom: 10px;
+            border-bottom: 3px solid #c9a84c;
+        }
+
+        #tab-modelo.ribbon-content { gap: 4px; padding-left: 6px; padding-right: 6px; }
+        #tab-modelo .modelo-group { padding-right: 6px; }
+        #tab-modelo .modelo-group--styles .ribbon-group-content { gap: 4px; }
+        .modelo-style-card {
+            position: relative;
+            width: 60px;
+            padding: 4px;
+            border-color: #aeb6c1;
+            border-radius: 6px;
+            transition: border-color .15s ease, box-shadow .15s ease, transform .15s ease;
+        }
+        .modelo-style-card:hover {
+            border-color: #2b579a;
+            box-shadow: 0 3px 10px rgba(43, 87, 154, .14);
+            transform: translateY(-1px);
+        }
+        .modelo-style-card:focus-visible { outline: 2px solid #2b579a; outline-offset: 2px; }
+        .modelo-style-card.on::after {
+            content: '✓';
+            position: absolute;
+            top: 2px;
+            right: 3px;
+            display: grid;
+            place-items: center;
+            width: 15px;
+            height: 15px;
+            border-radius: 50%;
+            background: #2b579a;
+            color: #fff;
+            font-size: 9px;
+            font-weight: 800;
+        }
+        .modelo-mini {
+            position: relative;
+            height: 48px;
+            overflow: hidden;
+            border-radius: 4px;
+            padding: 6px 6px 4px 9px;
+        }
+        .modelo-mini::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 3px;
+            background: #c9a84c;
+        }
+        .modelo-mini::after {
+            content: '';
+            position: absolute;
+            left: 9px;
+            right: 6px;
+            bottom: 6px;
+            height: 1px;
+            background: #d6dae0;
+            box-shadow: 0 -4px 0 #e2e5e9, 0 -8px 0 #eceef1;
+        }
+        .modelo-style-card[data-style="tecnico"] .modelo-mini::before { background: #4f7888; }
+        .modelo-style-card[data-style="inspecao"] .modelo-mini::before { background: #2d6f9f; }
+        .modelo-style-card[data-style="carta"] .modelo-mini::before { background: #9a7546; }
+        .modelo-style-card[data-style="simples"] .modelo-mini::before { background: #68707a; }
+        .modelo-style-card span { font-size: 8.8px; text-align: center; }
+        #tab-modelo .modelo-group--pages .modelo-checks {
+            min-width: 164px;
+            max-width: 164px;
+            gap: 4px 5px;
+            padding-left: 3px;
+            padding-right: 3px;
+        }
+        #tab-modelo .modelo-group--identity .modelo-checks {
+            min-width: 146px;
+            max-width: 146px;
+            padding-left: 3px;
+            padding-right: 3px;
+        }
+        #tab-modelo .modelo-checks label { gap: 4px; font-size: 9.4px; line-height: 1.15; }
+        #tab-modelo .modelo-group--actions .ribbon-group-content {
+            display: grid;
+            grid-template-columns: repeat(5, 48px);
+            gap: 2px;
+            align-items: stretch;
+        }
+        #tab-modelo .modelo-group--actions .ribbon-btn {
+            width: 48px;
+            min-width: 48px;
+            padding: 4px 3px;
+        }
+        #tab-modelo .modelo-group--actions .ribbon-btn > span:not(.icon) {
+            max-width: 45px;
+            font-size: 8.8px;
+            line-height: 1.12;
+        }
+        .modelo-meta-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px 14px;
+        }
+        .modelo-meta-grid .form-group:first-child,
+        .modelo-meta-grid .form-group:nth-child(5) { grid-column: 1 / -1; }
+        @media (max-width: 760px) {
+            .abene-cover-meta { grid-template-columns: 1fr; }
+            .modelo-meta-grid { grid-template-columns: 1fr; }
+            .modelo-meta-grid .form-group { grid-column: auto !important; }
+        }
         .acct-legal-note {
             font-size: 11px; color: #5b4a1e; background: #f8f6f0; border-left: 4px solid #c9a84c;
             padding: 8px 10px; margin: 0 0 14px; line-height: 1.4;
@@ -2844,6 +3217,11 @@
         .html2pdf__overlay,
         .html2pdf__container {
             overflow: visible !important;
+        }
+        .html2pdf__container {
+            left: 0 !important;
+            right: auto !important;
+            margin: 0 !important;
         }
         .abene-export-root .abene-page-flow,
         .abene-export-root .page-break-marker,
@@ -3946,10 +4324,13 @@
             color: #0b1223;
         }
         body.dark-mode .page-gap-band,
-        body.dark-mode .v-ruler-gap,
-        body.dark-mode .abene-page-flow {
+        body.dark-mode .v-ruler-gap {
             background: var(--abene-d-canvas);
             box-shadow: 0 -8px 14px -6px rgba(0,0,0,.65), 0 8px 14px -6px rgba(0,0,0,.5);
+        }
+        body.dark-mode .abene-page-flow {
+            background: transparent;
+            box-shadow: none;
         }
         body.dark-mode .ruler-area {
             background: var(--abene-d-chrome);
@@ -4935,6 +5316,14 @@
                         <span class="icon">🔗</span>
                         <span data-i18n="collabShare">Partilhar</span>
                     </button>
+                    <button type="button" class="ribbon-btn" onclick="abeneOpenInGoogleDocs && abeneOpenInGoogleDocs()" data-i18n-title="gdocsOpenHint" title="Enviar o documento para o Google Drive e abrir no Google Docs">
+                        <span class="icon">📄</span>
+                        <span data-i18n="gdocsOpen">Google Docs</span>
+                    </button>
+                    <button type="button" class="ribbon-btn" id="btnGdocsPull" onclick="abenePullFromGoogleDocs && abenePullFromGoogleDocs()" data-i18n-title="gdocsPullHint" title="Atualizar o Word a partir do Google Docs ligado">
+                        <span class="icon">↻</span>
+                        <span data-i18n="gdocsPull">Atualizar Docs</span>
+                    </button>
                 </div>
                 <div class="ribbon-group-label" data-i18n="groupCollab">Colaboração</div>
             </div>
@@ -5023,7 +5412,7 @@
 
         <!-- MODELO TAB — capa, folha de rosto, cabeçalho, logótipo -->
         <div class="ribbon-content ribbon-tab-content" id="tab-modelo">
-            <div class="ribbon-group">
+            <div class="ribbon-group modelo-group modelo-group--styles">
                 <div class="ribbon-group-content">
                     <button type="button" class="modelo-style-card on" data-style="gr" onclick="selectModeloStyle('gr', event)">
                         <div class="modelo-mini"><div class="l">GR</div><div class="r">RELATÓRIO</div></div>
@@ -5048,7 +5437,7 @@
                 </div>
                 <div class="ribbon-group-label" data-i18n="mdlGroupStyle">Estilo do relatório</div>
             </div>
-            <div class="ribbon-group">
+            <div class="ribbon-group modelo-group modelo-group--pages">
                 <div class="ribbon-group-content">
                     <div class="modelo-checks modelo-checks--pages">
                         <label><input type="checkbox" id="mdlCover" checked onchange="onModeloCheck('cover')"> <span data-i18n="mdlCover">Capa</span></label>
@@ -5061,7 +5450,7 @@
                 </div>
                 <div class="ribbon-group-label" data-i18n="mdlGroupPages">Páginas preliminares</div>
             </div>
-            <div class="ribbon-group">
+            <div class="ribbon-group modelo-group modelo-group--identity">
                 <div class="ribbon-group-content">
                     <div class="modelo-checks modelo-checks--id">
                         <label><input type="checkbox" id="mdlHeader" checked onchange="onModeloCheck('header')"> <span data-i18n="mdlHeader">Cabeçalho (logo + RELATÓRIO)</span></label>
@@ -5072,8 +5461,8 @@
                 </div>
                 <div class="ribbon-group-label" data-i18n="mdlGroupId">Identidade</div>
             </div>
-            <div class="ribbon-group">
-                <div class="ribbon-group-content">
+            <div class="ribbon-group modelo-group modelo-group--actions">
+                <div class="ribbon-group-content modelo-actions">
                     <button class="ribbon-btn" onclick="applyReportModel()">
                         <span class="icon">☑</span>
                         <span data-i18n="mdlApply">Aplicar modelo</span>
@@ -5488,6 +5877,8 @@
             <span class="status-page-jump" onclick="jumpToPageFromStatus()" data-i18n-title="gotoPage" title="Ir para a página"><span data-i18n="statusPage">Página</span> <span id="pageNum">1</span> <span data-i18n="statusOf">de</span> <span id="totalPages">1</span></span>
             <span id="sheetsSyncStatus" onclick="openCompanySettings()" style="cursor:pointer;font-size:11px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>
             <button type="button" onclick="abeneSheetsRefresh && abeneSheetsRefresh().catch(function(){})" style="border:0;background:rgba(255,255,255,.15);color:inherit;cursor:pointer;font-size:11px;padding:1px 8px;border-radius:3px;" data-i18n="sheetsRefresh" data-i18n-title="sheetsRefreshTitle" title="Atualizar da folha">↻ Atualizar</button>
+            <span id="gdocsLinkStatus" onclick="var u=this.getAttribute('data-url'); if(u) window.open(u,'_blank','noopener,noreferrer');" style="display:none;cursor:pointer;font-size:11px;color:#7dcea0;" data-i18n-title="gdocsOpenHint" title=""></span>
+            <button type="button" id="gdocsPullBtn" onclick="abenePullFromGoogleDocs && abenePullFromGoogleDocs()" style="display:none;border:0;background:rgba(255,255,255,.15);color:inherit;cursor:pointer;font-size:11px;padding:1px 8px;border-radius:3px;" data-i18n="gdocsPullShort" data-i18n-title="gdocsPullHint" title="Atualizar desde Google Docs">↻ Docs</button>
             <span id="collabPresence" class="abene-collab-presence" data-i18n-title="collabPeers" title=""></span>
             <span id="saveStatus">Modificado</span>
             <span><span id="wordCountStatus">0</span> <span data-i18n="statusWords">palavras</span></span>
@@ -5539,6 +5930,8 @@
         <div class="dropdown-item" onclick="openExportModal()">💾 <span data-i18n="exportDoc">Exportar documento</span></div>
         <div class="dropdown-item" onclick="exportPDF()">📥 <span data-i18n="filePdf">Exportar PDF</span></div>
         <div class="dropdown-item" onclick="exportDocx()">📘 <span data-i18n="fileDocx">Exportar DOCX</span></div>
+        <div class="dropdown-item" onclick="abeneOpenInGoogleDocs && abeneOpenInGoogleDocs()">☁ <span data-i18n="fileGdocs">Abrir no Google Docs</span></div>
+        <div class="dropdown-item" onclick="abenePullFromGoogleDocs && abenePullFromGoogleDocs()">↻ <span data-i18n="gdocsPull">Atualizar desde Google Docs</span></div>
         <div class="dropdown-item" onclick="exportWord()">📥 <span data-i18n="fileDoc">Exportar Word (.doc)</span></div>
         <div class="dropdown-item abene-excel-only" onclick="abeneExcelXlsxOut()">📗 <span data-i18n="xlSaveXlsx">Exportar Excel (.xlsx)</span></div>
         <div class="dropdown-item abene-excel-only" onclick="abeneExcelXlsxIn()">📂 <span data-i18n="xlOpen">Abrir Excel (.xlsx)</span></div>
@@ -5693,10 +6086,13 @@
                 </div>
 
                 <h4 style="margin: 16px 0 12px; color: #0b1223;" data-i18n="clientInfo">Informações do cliente</h4>
+                <div style="margin:0 0 10px;">
+                    <button type="button" class="btn-secondary" onclick="abenePickClient && abenePickClient('devis')" data-i18n="pickClient">Escolher cliente guardado…</button>
+                </div>
                 <div class="form-row">
                     <div class="form-group">
                         <label data-i18n="clientName">Nome do cliente</label>
-                        <input type="text" id="devisClient" value="">
+                        <input type="text" id="devisClient" value="" list="abeneClientNameList">
                     </div>
                     <div class="form-group">
                         <label data-i18n="clientNif">NIF do cliente</label>
@@ -5770,7 +6166,7 @@
                     <div class="form-row devis-item-row" style="align-items: end;">
                         <div class="form-group" style="flex: 3;">
                             <label data-i18n="description">Descrição</label>
-                            <input type="text" class="item-desc" value="">
+                            <input type="text" class="item-desc" value="" list="abeneArticleList">
                         </div>
                         <div class="form-group" style="flex: 0.7;">
                             <label data-i18n="unit">Un.</label>
@@ -5859,10 +6255,13 @@
                 </div>
 
                 <h4 style="margin: 16px 0 12px; color: #0b1223;" data-i18n="payerInfo">Informações do pagador</h4>
+                <div style="margin:0 0 10px;">
+                    <button type="button" class="btn-secondary" onclick="abenePickClient && abenePickClient('receipt')" data-i18n="pickClient">Escolher cliente guardado…</button>
+                </div>
                 <div class="form-row">
                     <div class="form-group">
                         <label data-i18n="name">Nome</label>
-                        <input type="text" id="receiptPayerName" value="">
+                        <input type="text" id="receiptPayerName" value="" list="abeneClientNameList">
                     </div>
                     <div class="form-group">
                         <label data-i18n="clientNif">NIF</label>
@@ -5983,7 +6382,7 @@
                     <button type="button" class="btn-secondary" onclick="closePaperPreview()" data-i18n="previewBack">Voltar a editar</button>
                     <button type="button" class="btn-secondary" onclick="printPaperPreview()" data-i18n="previewPrint">Imprimir esta vista</button>
                     <button type="button" class="btn-secondary" onclick="downloadPaperPreviewPdf()" data-i18n="previewPdf">Descarregar PDF</button>
-                    <button type="button" class="btn-secondary" onclick="emailPaperPreview()" data-i18n="previewEmail">Enviar e-mail</button>
+                    <button type="button" class="btn-secondary" onclick="emailPaperPreview()" data-i18n="previewEmail" data-i18n-title="previewEmailPdf" title="Enviar PDF ao cliente (anexo) — o e-mail continua a funcionar como antes">Enviar e-mail</button>
                     <button type="button" class="btn-secondary" id="paperPreviewDraftBtn" onclick="commitPaperPreview('draft')" data-i18n="previewDraft">Inserir rascunho</button>
                     <button type="button" class="btn-gold" id="paperPreviewFinalBtn" onclick="commitPaperPreview('final')" data-i18n="previewFinal">Confirmar versão definitiva</button>
                 </div>
@@ -6292,7 +6691,7 @@
         let savedFormat = null;
         let savedPainterRange = null;
         let footnoteCounter = 0;
-        let documentState = { name: 'Document1', dirty: true, protected: false, tracking: false, pagination: true };
+        let documentState = { name: 'Document1', dirty: true, protected: false, tracking: false, pagination: true, gdocsFileId: '', gdocsUrl: '', sentToClient: false };
         let documentVersions = JSON.parse(localStorage.getItem('abeneVersions') || '[]');
         let lastEditorHTML = '';
         let imageResize = null;
@@ -8879,7 +9278,10 @@
                 orientation: pageOrientation,
                 columns: pageColumns,
                 gutter: pageGutter,
-                colRule: pageColRule
+                colRule: pageColRule,
+                gdocsFileId: documentState.gdocsFileId || '',
+                gdocsUrl: documentState.gdocsUrl || '',
+                sentToClient: !!documentState.sentToClient
             });
         }
 
@@ -8887,6 +9289,12 @@
             try {
                 const settings = JSON.parse(serialized);
                 if (settings.name) documentState.name = settings.name;
+                if (settings.gdocsFileId) {
+                    documentState.gdocsFileId = String(settings.gdocsFileId);
+                    documentState.gdocsUrl = settings.gdocsUrl || ('https://docs.google.com/document/d/' + documentState.gdocsFileId + '/edit');
+                    if (window.abeneGdocsSetLink) window.abeneGdocsSetLink(documentState.gdocsFileId, documentState.gdocsUrl);
+                }
+                if (settings.sentToClient !== undefined) documentState.sentToClient = !!settings.sentToClient;
                 if (settings.language) { localStorage.setItem('abeneLanguage', settings.language); applyLanguage(settings.language); }
                 if (settings.company) { companyData = { ...defaultCompanyData, ...settings.company }; localStorage.setItem('abeneCompanyData', JSON.stringify(companyData)); }
                 if (settings.header !== undefined) { pageHeaderText = settings.header; localStorage.setItem('abeneHeader', pageHeaderText); }
@@ -9478,8 +9886,9 @@ table { border-collapse: collapse; }
             children.push(new Paragraph(para));
         }
 
-        async function exportDocx() {
-            if (!window.docx) { alert(t('aNoDocx')); return; }
+        /* Constrói o blob DOCX (reutilizado por exportar e Abrir no Google Docs). */
+        async function buildDocxBlob() {
+            if (!window.docx) { alert(t('aNoDocx')); return null; }
             if (window.abenePrepareForExport) window.abenePrepareForExport();
             const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, WidthType, HeadingLevel, Header, Footer, AlignmentType, PageNumber, PageOrientation, ImageRun, ShadingType, PageBreak, BorderStyle } = window.docx;
             const api = { Paragraph, TextRun, Table, TableRow, TableCell, WidthType, HeadingLevel, AlignmentType, ImageRun, ShadingType, PageBreak, BorderStyle };
@@ -9498,6 +9907,7 @@ table { border-collapse: collapse; }
             if (window.ABENE && window.ABENE.Export && typeof window.ABENE.Export.embedImages === 'function') {
                 try { await window.ABENE.Export.embedImages(docxSrc); } catch (eImg) {}
             }
+            var brandImg = docxSrc.querySelector('.gr-brand-mark, .abene-body-logo-img, .abene-cover-logo, .abene-tp-logo');
             docxSrc.childNodes.forEach(node => docxPushBlock(node, children, api));
             if (docxSrc.parentNode) docxSrc.parentNode.removeChild(docxSrc);
             if (!children.length) children.push(new Paragraph({ children: [new TextRun({ text: ' ', font: 'Calibri' })] }));
@@ -9506,7 +9916,6 @@ table { border-collapse: collapse; }
             const fields = pageHeaderFields || {};
             const coName = (companyData && companyData.name) || 'Genius Raros';
             var logoRun = null;
-            var brandImg = docxSrc.querySelector('.gr-brand-mark, .abene-body-logo-img, .abene-cover-logo, .abene-tp-logo');
             if (brandImg) logoRun = docxImageRun(brandImg, ImageRun);
             if (!logoRun && window.ABENE && window.ABENE.Export && typeof window.ABENE.Export.logoPng === 'function') {
                 try {
@@ -9584,6 +9993,13 @@ table { border-collapse: collapse; }
                 const doc = new Document({ sections: [{ children: children }] });
                 blob = await Packer.toBlob(doc);
             }
+            return blob;
+        }
+        window.buildDocxBlob = buildDocxBlob;
+
+        async function exportDocx() {
+            var blob = await buildDocxBlob();
+            if (!blob) return;
             downloadFile(blob, `${documentState.name || 'document'}.docx`, blob.type);
             closeAllDropdowns();
         }
@@ -10046,7 +10462,11 @@ table { border-collapse: collapse; }
 
         function showVersions() {
             const loc = localStorage.getItem('abeneLanguage') || 'pt-PT';
-            const body = documentVersions.length ? documentVersions.map((version, index) => `<div class="version-row"><span>${new Date(version.date).toLocaleString(loc)}<br><small>${version.name}</small></span><button class="btn-secondary" onclick="restoreVersion(${index})">${t('versionsRestore')}</button></div>`).join('') : '<p>' + t('versionsEmpty') + '</p>';
+            const body = documentVersions.length ? documentVersions.map((version, index) =>
+                `<div class="version-row"><span>${new Date(version.date).toLocaleString(loc)}<br><small>${version.name}</small></span>` +
+                `<button class="btn-secondary" onclick="restoreVersion(${index})">${t('versionsRestore')}</button>` +
+                `<button class="btn-secondary" onclick="copyVersionAsNew(${index})">${t('versionsCopy')}</button></div>`
+            ).join('') : '<p>' + t('versionsEmpty') + '</p>';
             openGenericModal(t('versionsTitle'), body, '<button class="btn-primary" onclick="closeModal(\'genericModal\')">' + t('close') + '</button>');
         }
 
@@ -10061,6 +10481,25 @@ table { border-collapse: collapse; }
             updateStats();
             updateAllFields();
             closeModal('genericModal');
+            showToast(t('versionsRestored') || 'Versão restaurada para modificar.');
+        }
+
+        function copyVersionAsNew(index) {
+            const version = documentVersions[index];
+            if (!version) return;
+            try { saveDocument({ silent: true }); } catch (e) {}
+            editor.innerHTML = version.html;
+            var prefix = (localStorage.getItem('abeneLanguage') || '').indexOf('fr') === 0 ? 'Copie — ' : 'Cópia — ';
+            documentState.name = prefix + (version.name || 'Documento');
+            documentState.dirty = true;
+            documentState.sentToClient = false;
+            if (window.abeneGdocsForkOnCopy) window.abeneGdocsForkOnCopy();
+            try { localStorage.setItem('abeneDocName', documentState.name); } catch (eN) {}
+            saveUndoState();
+            updateStats();
+            updateAllFields();
+            closeModal('genericModal');
+            showToast(t('versionsCopied') || 'Cópia criada como novo documento.');
         }
 
         function toggleProtection() {
@@ -10407,7 +10846,7 @@ table { border-collapse: collapse; }
             row.innerHTML = `
                 <div class="form-group" style="flex: 3;">
                     <label>${t('description')}</label>
-                    <input type="text" class="item-desc" value="">
+                    <input type="text" class="item-desc" value="" list="abeneArticleList">
                 </div>
                 <div class="form-group" style="flex: 1;">
                     <label>${t('qty')}</label>
@@ -10625,8 +11064,8 @@ table { border-collapse: collapse; }
             } catch (e) {}
         }, 12000);
     </script>
-    <script src="libs/abene-word-home.js"></script>
-    <script src="libs/abene-pagination-engine.js"></script>
+    <script src="libs/abene-word-home.js?v=20260908-layout-visibility-2"></script>
+    <script src="libs/abene-pagination-engine.js?v=20260908-layout-visibility-2"></script>
     <script src="libs/abene-sections.js"></script>
     <script src="libs/abene-toolbar.js"></script>
     <script src="libs/abene-commands.js"></script>
@@ -10636,7 +11075,7 @@ table { border-collapse: collapse; }
     <script src="libs/abene-tables.js"></script>
     <script src="libs/abene-document.js"></script>
     <script src="libs/abene-history.js"></script>
-    <script src="libs/abene-export.js"></script>
+    <script src="libs/abene-export.js?v=20260909-layout-visibility-4"></script>
     <script src="libs/abene-modelo.js"></script>
     <script src="libs/abene-comercial.js"></script>
     <script src="libs/abene-contabilidade.js"></script>
@@ -10646,6 +11085,8 @@ table { border-collapse: collapse; }
     <script src="libs/abene-excel.js"></script>
     <script src="libs/abene-sheets.js"></script>
     <script src="libs/abene-collab.js"></script>
+    <script src="libs/abene-gdocs.js"></script>
+    <script src="libs/abene-pickers.js"></script>
 
 </body>
 </html>
