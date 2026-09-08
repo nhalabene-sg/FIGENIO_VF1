@@ -1,0 +1,16 @@
+{
+  "name": "Genius Raros",
+  "short_name": "Genius Raros",
+  "description": "Editor Word, Excel e Arquivo da Genius Raros.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0B1223",
+  "theme_color": "#2b579a",
+  "lang": "pt-PT",
+  "icons": [
+    { "src": "branding/icon_48.svg", "sizes": "48x48", "type": "image/svg+xml" },
+    { "src": "branding/icon_96.svg", "sizes": "96x96", "type": "image/svg+xml" },
+    { "src": "branding/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

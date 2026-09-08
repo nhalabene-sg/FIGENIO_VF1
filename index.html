@@ -5,28 +5,60 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <script>
       (function () {
+        function dirOf(path) {
+          path = String(path || '').replace(/\?.*$/, '').replace(/#.*$/, '');
+          var i = path.lastIndexOf('/');
+          return i < 0 ? '' : path.slice(0, i + 1);
+        }
+        function githubCdnBase() {
+          var href = String(location.href || '');
+          var q = String(location.search || '').replace(/^\?/, '');
+          var m = href.match(/htmlpreview\.github\.io\/?\?(?:https?:\/\/)?github\.com\/([^\/]+)\/([^\/]+)\/(?:blob|raw)\/([^\/]+)\/(.+)/i)
+            || q.match(/(?:https?:\/\/)?github\.com\/([^\/]+)\/([^\/]+)\/(?:blob|raw)\/([^\/]+)\/(.+)/i)
+            || href.match(/rawcdn\.githack\.com\/([^\/]+)\/([^\/]+)\/([^\/]+)\/(.+)/i)
+            || href.match(/raw\.githack\.com\/([^\/]+)\/([^\/]+)\/([^\/]+)\/(.+)/i)
+            || href.match(/raw\.githubusercontent\.com\/([^\/]+)\/([^\/]+)\/([^\/]+)\/(.+)/i);
+          if (!m) return '';
+          return 'https://cdn.jsdelivr.net/gh/' + m[1] + '/' + m[2] + '@' + m[3] + '/' + dirOf(m[4]);
+        }
         try {
           var p = location.pathname || '';
           if (/github\.io$/i.test(location.hostname) && p && p.charAt(p.length - 1) !== '/' && !/\.[a-z0-9]+$/i.test(p)) {
             location.replace(p + '/' + (location.search || '') + (location.hash || ''));
+            return;
           }
         } catch (eSlash) {}
-      })();
-      window.abeneMissingLibs = [];
-      window.addEventListener('error', function (e) {
-        var el = e && e.target;
-        if (el && el.tagName === 'SCRIPT' && el.src && /\/libs\//.test(el.src)) {
-          window.abeneMissingLibs.push(el.src);
+        var cdn = '';
+        try { cdn = githubCdnBase(); } catch (eCdn) {}
+        if (cdn) {
+          var baseEl = document.createElement('base');
+          baseEl.href = cdn;
+          document.head.appendChild(baseEl);
         }
-      }, true);
-      window.addEventListener('DOMContentLoaded', function () {
-        if (!window.abeneMissingLibs || !window.abeneMissingLibs.length) return;
-        var b = document.createElement('div');
-        b.setAttribute('role', 'alert');
-        b.style.cssText = 'position:fixed;z-index:99999;left:0;right:0;top:0;padding:12px 16px;background:#8b1e1e;color:#fff;font:14px/1.45 Segoe UI,sans-serif;box-shadow:0 2px 8px rgba(0,0,0,.25);';
-        b.innerHTML = 'Ficheiros da aplicação em falta (pasta <b>libs/</b>). No GitHub isto não abre a app: vá a <b>Settings → Pages</b>, origem <b>Deploy from a branch</b>, ramo <b>main</b>, pasta <b>/</b>. Depois abra <b>https://SEU-UTILIZADOR.github.io/SEU-REPO/</b>. Envie também <b>.nojekyll</b>, <b>index.html</b>, <b>libs/</b> e <b>branding/</b> na raiz (não dentro de uma pasta ABENE).';
-        document.body.insertBefore(b, document.body.firstChild);
-      });
+        var OPTIONAL = /\/(jszip[^\/]*|html2pdf[^\/]*|docx[^\/]*)\.js(\?|#|$)/i;
+        window.abeneMissingLibs = [];
+        window.addEventListener('error', function (e) {
+          var el = e && e.target;
+          if (!el || el.tagName !== 'SCRIPT' || !el.src || !/\/libs\//.test(el.src)) return;
+          if (OPTIONAL.test(el.src)) return;
+          window.abeneMissingLibs.push(el.src);
+        }, true);
+        window.addEventListener('DOMContentLoaded', function () {
+          if (!window.abeneMissingLibs || !window.abeneMissingLibs.length) return;
+          var origin = location.origin || '';
+          var folder = (location.pathname || '').replace(/\/[^\/]*\.html$/i, '/');
+          var pagesUrl = origin + folder;
+          var b = document.createElement('div');
+          b.setAttribute('role', 'alert');
+          b.style.cssText = 'position:fixed;z-index:99999;left:0;right:0;top:0;padding:12px 16px;background:#8b1e1e;color:#fff;font:14px/1.45 Segoe UI,sans-serif;box-shadow:0 2px 8px rgba(0,0,0,.25);';
+          b.innerHTML = 'Não foi possível carregar os ficheiros em <b>libs/</b>.'
+            + ' No GitHub Pages abra <b>' + pagesUrl.replace(/&/g, '&amp;') + '</b>'
+            + ' (deve terminar em <b>/app/</b> se o repositório for a pasta 1.0), não a página github.com do repositório.'
+            + ' Na entrada do site: <b>…github.io/REPO/</b> → « Abrir a aplicação ».'
+            + ' A pasta <b>libs/</b> tem de estar <b>ao lado</b> deste index.html (envie a pasta <b>app/</b> completa).';
+          document.body.insertBefore(b, document.body.firstChild);
+        });
+      })();
     </script>
     <meta name="theme-color" content="#2b579a">
     <meta name="mobile-web-app-capable" content="yes">
@@ -45,11 +77,13 @@
     -->
     <script>
       // ▼▼▼ COLAR O URL AQUI — APENAS NESTA LINHA ▼▼▼
-      var API_URL = 'https://script.google.com/macros/s/AKfycbwUUlDftmNn7T1BLKmI0tdjI1NxWO8qt2yuzXKAITuQ4IiA1Wsi0PMadFkmKbSPrcBl/exec';
+      var API_URL = '';
       // ▲▲▲ NÃO ALTERAR MAIS NADA ▲▲▲
       window.API_URL = API_URL;
     </script>
     <link rel="icon" href="branding/favicon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="branding/icon_96.svg">
+    <link rel="manifest" href="manifest.webmanifest">
     <script src="libs/jszip.min.js" onerror="window.abeneLibraries={...(window.abeneLibraries||{}),jszip:false}"></script>
     <script src="libs/html2pdf.bundle.min.js" onerror="window.abeneLibraries={...(window.abeneLibraries||{}),pdf:false}"></script>
     <script src="libs/docx.umd.js" onerror="window.abeneLibraries={...(window.abeneLibraries||{}),docx:false}"></script>
@@ -1402,6 +1436,49 @@
         .modal-body {
             padding: 20px;
         }
+        .save-as-hint {
+            color: #4b5563;
+            margin: 0 0 14px;
+            font-size: 13px;
+            line-height: 1.45;
+        }
+        .save-as-choice {
+            display: block;
+            width: 100%;
+            text-align: left;
+            margin: 0 0 10px;
+            padding: 14px 16px;
+            border: 1px solid #c5d4ea;
+            border-radius: 8px;
+            background: #fff;
+            cursor: pointer;
+            font: inherit;
+        }
+        .save-as-choice:hover,
+        .save-as-choice:focus {
+            background: #eef4fb;
+            border-color: #2b579a;
+            outline: none;
+        }
+        .save-as-choice strong {
+            display: block;
+            font-size: 15px;
+            color: #1e4077;
+        }
+        .save-as-choice span {
+            display: block;
+            margin-top: 4px;
+            font-size: 12px;
+            color: #4b5563;
+            font-weight: 400;
+            line-height: 1.4;
+        }
+        .save-as-legal {
+            font-size: 11px;
+            color: #6b7280;
+            margin: 4px 0 0;
+            line-height: 1.45;
+        }
 
         .modal-footer {
             padding: 15px 20px;
@@ -1974,6 +2051,13 @@
             color: #333 !important;
             line-height: 1.4;
         }
+        .gr-signs, .gr-sign-block, .gr-doc-foot {
+            break-inside: avoid;
+            page-break-inside: avoid;
+        }
+        .gr-sign-block { width: 100%; }
+        .gr-signs, .gr-sign-block { break-after: avoid; page-break-after: avoid; }
+        .gr-doc-foot { break-before: avoid; page-break-before: avoid; }
         .gr-signs { width: 100%; margin: 36px 0 0 !important; border-collapse: collapse; }
         .gr-signs td { text-align: center; font-size: 9.5pt; color: #0b1223; padding: 0 8px !important; }
         .gr-sign-gap { width: 8%; }
@@ -2661,6 +2745,8 @@
             .page.pagination-active { background: #fff !important; }
             body:not(.abene-printing) .page-break-marker { break-after: page; page-break-after: always; }
             .gr-letterhead, .gr-letterhead img, .abene-cover img, .abene-titlepage img, .abene-body-logo img,
+            .gr-brand-mark, .hf-gr-logo, .abene-cover-logo, .abene-tp-logo, .abene-body-logo-img,
+            .page img, .abene-export-root img, .page-header-zone img, .page-footer-zone img,
             .gr-items th, .abene-quote-table th, .gr-totals .gr-tot-grand td, .gr-party-label, .gr-amount-box {
                 print-color-adjust: exact; -webkit-print-color-adjust: exact;
             }
@@ -2668,6 +2754,11 @@
             .gr-rule-navy { background: #0b1223 !important; }
             .main-area { overflow: visible !important; }
             body { overflow: visible !important; background: #fff !important; }
+            body.abene-printing {
+                height: auto !important;
+                min-height: 0 !important;
+                display: block !important;
+            }
             body.abene-printing > *:not(#abeneExportRoot):not(#abenePrintPageSize) { display: none !important; }
             body.abene-printing .abene-export-root .page-chrome {
                 display: block !important;
@@ -2685,9 +2776,15 @@
                 background: #fff !important;
             }
             body.abene-printing .abene-export-sheet {
+                width: var(--export-page-w) !important;
+                height: var(--export-page-h) !important;
+                min-height: var(--export-page-h) !important;
+                max-height: var(--export-page-h) !important;
+                overflow: hidden !important;
                 page-break-after: always;
                 break-after: page;
-                overflow: hidden !important;
+                page-break-inside: avoid;
+                break-inside: avoid;
                 box-shadow: none !important;
                 margin: 0 !important;
             }
@@ -2695,10 +2792,14 @@
                 page-break-after: auto;
                 break-after: auto;
             }
+            body.abene-printing .abene-export-clip {
+                overflow: hidden !important;
+            }
             body.abene-printing .abene-export-root .page {
                 width: var(--export-page-w) !important;
                 min-height: var(--export-page-h-total) !important;
-                height: auto !important;
+                height: var(--export-page-h-total) !important;
+                max-height: var(--export-page-h-total) !important;
                 margin: 0 !important;
                 box-shadow: none !important;
                 background: #fff !important;
@@ -2706,11 +2807,27 @@
             }
         }
         .abene-export-root {
+            --export-page-h: var(--page-h, 1123px);
             background: #fff;
             color: #000;
             position: fixed;
             left: -20000px;
             top: 0;
+        }
+        #abenePdfMount {
+            position: fixed;
+            left: 0;
+            top: 0;
+            overflow: hidden;
+            background: #fff;
+            pointer-events: none;
+            z-index: 1;
+        }
+        #abenePdfMount .abene-export-sheet {
+            margin: 0 !important;
+            box-shadow: none !important;
+            page-break-after: auto !important;
+            break-after: auto !important;
         }
         .abene-export-root .abene-page-flow,
         .abene-export-root .page-break-marker,
@@ -3400,6 +3517,19 @@
             .paper-preview-overlay { padding: 8px; }
             .paper-preview-toolbar { flex-wrap: wrap; }
             #arqOverlay { padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right); }
+            .ribbon-collapse-btn,
+            .menu-tabs button[data-tab="view"],
+            .menu-tabs button[data-tab="arquivo"],
+            .ribbon-launcher,
+            .ribbon-dlg,
+            #tab-view .ribbon-btn,
+            #tab-view button,
+            .status-bar button,
+            .view-modes button,
+            .page-view-btns button {
+                min-width: 44px;
+                min-height: 44px;
+            }
         }
 
         /* Excel workspace */
@@ -4168,7 +4298,7 @@
         <div class="left">
             <img class="gr-mark" src="branding/icon_48.svg" alt="Genius Raros" width="22" height="22" />
             <div class="quick-access">
-                <button onclick="saveDocument()" data-i18n-title="qatSave" title="Guardar">💾</button>
+                <button onclick="openSaveChooser()" data-i18n-title="qatSave" title="Guardar">💾</button>
                 <button onclick="undo()" data-i18n-title="undo" title="Anular">↶</button>
                 <button onclick="redo()" data-i18n-title="redo" title="Refazer">↷</button>
                 <button onclick="openCompanySettings()" data-i18n-title="companySettings" title="Definições da empresa">⚙</button>
@@ -5372,7 +5502,7 @@
         <div class="dropdown-item" onclick="newDocument()">📄 <span data-i18n="fileNew">Novo</span> <span class="shortcut" data-i18n-shortcut="scNew">Ctrl+O</span></div>
         <div class="dropdown-item" onclick="openFile()">📂 <span data-i18n="fileOpen">Abrir</span> <span class="shortcut" data-i18n-shortcut="scOpen">Ctrl+A</span></div>
         <div class="dropdown-divider"></div>
-        <div class="dropdown-item" onclick="saveDocument()">💾 <span data-i18n="fileSave">Guardar</span> <span class="shortcut" data-i18n-shortcut="scSave">Ctrl+B</span></div>
+        <div class="dropdown-item" onclick="openSaveChooser()">💾 <span data-i18n="fileSave">Guardar</span> <span class="shortcut" data-i18n-shortcut="scSave">Ctrl+B</span></div>
         <div class="dropdown-item" onclick="abeneSheetsPush && abeneSheetsPush('manual').then(function(){ if(typeof showToast==='function') showToast(typeof t==='function'?t('sheetsPushed'):'Sincronizado.'); }).catch(function(){})">☁ <span data-i18n="sheetsPush">Sincronizar Google Sheets</span></div>
         <div class="dropdown-item" onclick="abeneSheetsPull && abeneSheetsPull().catch(function(){})">☁ <span data-i18n="sheetsPull">Restaurar do Google Sheets</span></div>
         <div class="dropdown-item" onclick="abeneSheetsRefresh && abeneSheetsRefresh().catch(function(){})">↻ <span data-i18n="sheetsRefresh">Atualizar da folha</span></div>
@@ -6177,7 +6307,9 @@
             installerEmail: '',
             googleOwnerEmail: '',
             databaseEnabled: true,
-            excelEnabled: true
+            excelEnabled: true,
+            tocDiario: 'VEN',
+            tocTipoDoc: 'RG'
         };
         let companyData = { ...defaultCompanyData, ...JSON.parse(localStorage.getItem('abeneCompanyData') || '{}') };
         delete companyData.brandName;
@@ -6857,7 +6989,11 @@
         // ========== EXEC COMMAND ==========
         function execCmd(cmd, value) {
             editor.focus();
-            document.execCommand(cmd, false, value || null);
+            if (window.EditorCommands && window.EditorCommands.useEngine && typeof window.EditorCommands.exec === 'function') {
+                window.EditorCommands.exec(cmd, value);
+            } else {
+                try { document.execCommand(cmd, false, value || null); } catch (eExec) {}
+            }
             updateStats();
             saveUndoState();
         }
@@ -8649,7 +8785,8 @@
             return clone.innerHTML;
         }
 
-        function saveDocument() {
+        function saveDocument(opts) {
+            opts = opts || {};
             const html = persistableEditorHtml();
             localStorage.setItem('docContent', html);
             localStorage.setItem('abeneAutosave', html);
@@ -8660,9 +8797,38 @@
             localStorage.setItem('abeneVersions', JSON.stringify(documentVersions));
             documentState.dirty = false;
             updateSaveStatus();
-            showToast(t('toastSaved'));
+            if (!opts.silent) showToast(t('toastSaved'));
             closeAllDropdowns();
             if (typeof window.abeneSheetsPush === 'function') window.abeneSheetsPush('save').catch(function () {});
+        }
+
+        function saveForAccountant() {
+            try { saveDocument({ silent: true }); } catch (e) {}
+            if (typeof window.downloadPackContabilista === 'function') window.downloadPackContabilista();
+            else if (typeof window.exportAccountingPt === 'function') window.exportAccountingPt();
+            closeAllDropdowns();
+        }
+
+        function openSaveChooser() {
+            try { saveDocument({ silent: true }); } catch (e) {}
+            closeAllDropdowns();
+            if (typeof openGenericModal !== 'function') {
+                if (typeof exportPDF === 'function') exportPDF();
+                return;
+            }
+            function choice(fn, title, hint) {
+                return '<button type="button" class="save-as-choice" onclick="closeModal(\'genericModal\');' + fn + '()">' +
+                    '<strong>' + title + '</strong><span>' + hint + '</span></button>';
+            }
+            openGenericModal(
+                t('saveAsTitle'),
+                '<p class="save-as-hint">' + t('saveAsHint') + '</p>' +
+                choice('exportDocx', t('saveAsWord'), t('saveAsWordHint')) +
+                choice('exportPDF', t('saveAsPdf'), t('saveAsPdfHint')) +
+                choice('saveForAccountant', t('saveAsAcct'), t('saveAsAcctHint')) +
+                '<p class="save-as-legal">' + t('saveAsLegal') + '</p>',
+                '<button class="btn-secondary" onclick="closeModal(\'genericModal\')">' + (t('close') || t('cancel')) + '</button>'
+            );
         }
 
         function projectSettings() {
@@ -8772,7 +8938,7 @@
                     margin: 0,
                     filename: (documentState.name || 'document') + '.pdf',
                     image: { type: 'jpeg', quality: 0.98 },
-                    html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff', width: geo.w, windowWidth: geo.w },
+                    html2canvas: { scale: 2, useCORS: true, allowTaint: true, backgroundColor: '#ffffff', width: geo.w, windowWidth: geo.w, imageTimeout: 4000 },
                     jsPDF: { unit: 'mm', format: [geo.wmm, geo.hmm], orientation: pageOrientation === 'landscape' ? 'landscape' : 'portrait' },
                     pagebreak: { mode: ['css'], after: '.abene-export-sheet' }
                 }).from(root);
@@ -8795,7 +8961,7 @@
                 margin: [pageMargins.top * 0.26458, pageMargins.right * 0.26458, pageMargins.bottom * 0.26458, pageMargins.left * 0.26458],
                 filename: (documentState.name || 'document') + '.pdf',
                 image: { type: 'jpeg', quality: 0.98 },
-                html2canvas: { scale: 2, useCORS: true },
+                html2canvas: { scale: 2, useCORS: true, allowTaint: true, imageTimeout: 4000 },
                 jsPDF: { unit: 'mm', format: 'a4', orientation: pageOrientation === 'landscape' ? 'landscape' : 'portrait' }
             }).from(clone).save();
             showToast(t('toastPdf'));
@@ -8993,16 +9159,17 @@ p { margin: 0 0 8pt 0; }
         }
 
         function docxImageRun(img, ImageRun) {
-            if (!img || !img.src || !ImageRun) return null;
-            const src = img.src;
-            if (!/^data:image\//i.test(src) && !/^https?:/i.test(src)) return null;
-            if (!/^data:image\//i.test(src)) return null;
-            const w = Math.min(500, img.naturalWidth || img.offsetWidth || 320);
-            const h = img.naturalHeight && img.naturalWidth
+            if (!img || !ImageRun) return null;
+            const src = img.src || img.getAttribute('src') || '';
+            if (!/^data:image\/(png|jpe?g|gif|webp)/i.test(src)) return null;
+            const wAttr = parseFloat(img.getAttribute('width')) || 0;
+            const hAttr = parseFloat(img.getAttribute('height')) || 0;
+            const w = Math.min(520, wAttr || img.offsetWidth || img.naturalWidth || 320);
+            const h = (img.naturalHeight && img.naturalWidth)
                 ? Math.round(w * img.naturalHeight / img.naturalWidth)
-                : Math.min(400, img.offsetHeight || 240);
+                : Math.min(420, hAttr || img.offsetHeight || 240);
             try {
-                return new ImageRun({ data: src, transformation: { width: w, height: Math.max(24, h) } });
+                return new ImageRun({ data: src, transformation: { width: Math.max(16, w), height: Math.max(16, h) } });
             } catch (e) { return null; }
         }
 
@@ -9121,12 +9288,33 @@ p { margin: 0 0 8pt 0; }
             else {
                 Array.from(editor.childNodes).forEach(function (n) { docxSrc.appendChild(n.cloneNode(true)); });
             }
+            if (window.ABENE && window.ABENE.Export && typeof window.ABENE.Export.embedImages === 'function') {
+                try { await window.ABENE.Export.embedImages(docxSrc); } catch (eImg) {}
+            }
             docxSrc.childNodes.forEach(node => docxPushBlock(node, children, api));
             if (!children.length) children.push(new Paragraph({ children: [new TextRun({ text: ' ', font: 'Calibri' })] }));
             const headerChildren = [];
             const tpl = pageHeaderTemplate || (pageHeaderText ? 'text' : 'blank');
             const fields = pageHeaderFields || {};
             const coName = (companyData && companyData.name) || 'Genius Raros';
+            var logoRun = null;
+            var brandImg = docxSrc.querySelector('.gr-brand-mark, .abene-body-logo-img, .abene-cover-logo, .abene-tp-logo');
+            if (brandImg) logoRun = docxImageRun(brandImg, ImageRun);
+            if (!logoRun && window.ABENE && window.ABENE.Export && typeof window.ABENE.Export.logoPng === 'function') {
+                try {
+                    var png = await window.ABENE.Export.logoPng();
+                    if (png) {
+                        var tmpLogo = document.createElement('img');
+                        tmpLogo.src = png;
+                        tmpLogo.setAttribute('width', '36');
+                        tmpLogo.setAttribute('height', '36');
+                        logoRun = docxImageRun(tmpLogo, ImageRun);
+                    }
+                } catch (eLogo) {}
+            }
+            var headerLeft = [];
+            if (logoRun) headerLeft.push(new Paragraph({ children: [logoRun] }));
+            headerLeft.push(new Paragraph({ children: [new TextRun({ text: coName, bold: true, font: 'Calibri', size: 22 })] }));
             if (tpl === 'gr-report' || tpl === 'gr-letter' || tpl === 'triple') {
                 headerChildren.push(new Table({
                     width: { size: 100, type: WidthType.PERCENTAGE },
@@ -9134,7 +9322,7 @@ p { margin: 0 0 8pt 0; }
                         children: [
                             new TableCell({
                                 width: { size: 50, type: WidthType.PERCENTAGE },
-                                children: [new Paragraph({ children: [new TextRun({ text: coName, bold: true, font: 'Calibri', size: 22 })] })]
+                                children: headerLeft
                             }),
                             new TableCell({
                                 width: { size: 50, type: WidthType.PERCENTAGE },
@@ -9696,6 +9884,7 @@ p { margin: 0 0 8pt 0; }
         function printDocument() {
             if (window.abeneBuildPagedExport) {
                 window.abeneRemoveExportRoot && window.abeneRemoveExportRoot();
+                if (typeof refreshPagination === 'function') refreshPagination();
                 const root = window.abeneBuildPagedExport();
                 if (!root) { window.print(); closeAllDropdowns(); return; }
                 if (window.abeneInjectPrintPageSize) window.abeneInjectPrintPageSize();
@@ -9709,8 +9898,20 @@ p { margin: 0 0 8pt 0; }
                     if (window.abeneRemoveExportRoot) window.abeneRemoveExportRoot();
                 };
                 window.addEventListener('afterprint', cleanup);
-                window.print();
-                setTimeout(cleanup, 120000);
+                var startPrint = function () {
+                    requestAnimationFrame(function () {
+                        requestAnimationFrame(function () {
+                            setTimeout(function () {
+                                window.print();
+                                setTimeout(cleanup, 120000);
+                            }, 50);
+                        });
+                    });
+                };
+                var embed = window.ABENE && window.ABENE.Export && typeof window.ABENE.Export.embedImages === 'function'
+                    ? window.ABENE.Export.embedImages(root)
+                    : Promise.resolve();
+                Promise.resolve(embed).then(startPrint).catch(startPrint);
                 closeAllDropdowns();
                 return;
             }
@@ -9910,7 +10111,10 @@ p { margin: 0 0 8pt 0; }
                 <p style="font-size:11px;color:#666;margin-top:8px;">${companyData.sheetsLastSync ? (t('sheetsLast') + ' ' + companyData.sheetsLastSync) : t('sheetsNever')}</p>
                 <h4 style="color:#2b579a;margin-top:18px;">${t('xlModuleTitle')}</h4>
                 <p style="font-size:12px;color:#666;margin-bottom:8px;">${t('xlEnableHint')}</p>
-                <label style="display:block;"><input id="excelEnabled" type="checkbox" ${companyData.excelEnabled !== false ? 'checked' : ''}> ${t('xlEnable')}</label>`;
+                <label style="display:block;"><input id="excelEnabled" type="checkbox" ${companyData.excelEnabled !== false ? 'checked' : ''}> ${t('xlEnable')}</label>
+                <h4 style="color:#2b579a;margin-top:18px;">${t('tocCodesTitle')}</h4>
+                <p style="font-size:12px;color:#666;line-height:1.45;margin-bottom:8px;">${t('tocCodesHint')}</p>
+                <div class="form-row">${field('tocDiario', t('tocDiario'), companyData.tocDiario || 'VEN')}${field('tocTipoDoc', t('tocTipoDoc'), companyData.tocTipoDoc || 'RG')}</div>`;
             openGenericModal(t('companySettings'), body, '<button class="btn-secondary" onclick="closeModal(\'genericModal\')">' + t('cancel') + '</button><button class="btn-primary" onclick="saveCompanySettings()">' + t('saveSettings') + '</button>');
         }
 
@@ -9942,7 +10146,9 @@ p { margin: 0 0 8pt 0; }
                 installerEmail: value('installerEmail') || companyData.installerEmail || '',
                 googleOwnerEmail: companyData.googleOwnerEmail || '',
                 databaseEnabled: dbOn,
-                excelEnabled: Boolean(document.getElementById('excelEnabled')?.checked)
+                excelEnabled: Boolean(document.getElementById('excelEnabled')?.checked),
+                tocDiario: (value('tocDiario') || 'VEN').toUpperCase(),
+                tocTipoDoc: (value('tocTipoDoc') || 'RG').toUpperCase()
             };
             localStorage.setItem('abeneCompanyData', JSON.stringify(companyData));
             if (!keepOpen) closeModal('genericModal');
