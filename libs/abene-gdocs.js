@@ -50,10 +50,6 @@
                 url: st.gdocsUrl || ('https://docs.google.com/document/d/' + st.gdocsFileId + '/edit')
             };
         }
-        var map = readLinkStore();
-        var key = docName();
-        var hit = map[key];
-        if (hit && hit.id) return { id: String(hit.id), url: hit.url || '' };
         return null;
     }
     function setLink(id, url) {
@@ -76,12 +72,16 @@
     }
     function clearLink() {
         var st = docState();
+        var oldId = st && st.gdocsFileId ? String(st.gdocsFileId) : '';
         if (st) {
             st.gdocsFileId = '';
             st.gdocsUrl = '';
         }
         var map = readLinkStore();
-        delete map[docName()];
+        Object.keys(map).forEach(function (key) {
+            var hit = map[key] || {};
+            if (key === docName() || (oldId && String(hit.id || '') === oldId)) delete map[key];
+        });
         writeLinkStore(map);
         try {
             localStorage.removeItem('abeneGdocsFileId');
@@ -111,6 +111,9 @@
         }
     }
     function sanitizeImportedHtml(html) {
+        if (typeof root.abeneSanitizeHtml === 'function') {
+            return root.abeneSanitizeHtml(String(html || ''));
+        }
         var wrap = document.createElement('div');
         wrap.innerHTML = String(html || '');
         wrap.querySelectorAll('script, noscript, iframe, object, embed, link, meta, style').forEach(function (n) {
@@ -122,6 +125,16 @@
         out.innerHTML = inner;
         out.querySelectorAll('[contenteditable]').forEach(function (n) {
             n.removeAttribute('contenteditable');
+        });
+        out.querySelectorAll('*').forEach(function (n) {
+            Array.from(n.attributes || []).forEach(function (attr) {
+                var key = String(attr.name || '').toLowerCase();
+                var val = String(attr.value || '');
+                if (key.indexOf('on') === 0 || key === 'srcdoc' ||
+                    (/^(href|src|xlink:href)$/i.test(key) && /^\s*(javascript|vbscript|data:text\/html)/i.test(val))) {
+                    n.removeAttribute(attr.name);
+                }
+            });
         });
         return out.innerHTML || '<p></p>';
     }
@@ -154,8 +167,10 @@
             el.textContent = '';
             el.removeAttribute('data-url');
         }
-        var pullBtn = document.getElementById('gdocsPullBtn');
-        if (pullBtn) pullBtn.style.display = (link && link.id) ? '' : 'none';
+        ['gdocsPullBtn', 'btnGdocsPull'].forEach(function (id) {
+            var pullBtn = document.getElementById(id);
+            if (pullBtn) pullBtn.style.display = (link && link.id) ? '' : 'none';
+        });
     }
     function openInGoogleDocs() {
         if (busy) return;

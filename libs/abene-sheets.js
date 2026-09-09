@@ -1,6 +1,5 @@
 /* Genius Raros — synchronisation Google Sheets via Apps Script Web App (/exec). */
 (function () {
-    var DEFAULT_TOKEN = 'abene-genius-raros-2026';
     var timer = null;
     var lastStatus = '';
     var lastKind = 'idle';
@@ -75,13 +74,13 @@
     function enabled() {
         var c = company();
         if (!execUrl()) return false;
+        if (!String(c.syncToken || '').trim()) return false;
         if (c.databaseEnabled === false || c.databaseEnabled === 'false') return false;
         return true;
     }
     function token() {
         var c = company();
-        if (c.syncToken) return c.syncToken;
-        return DEFAULT_TOKEN;
+        return String(c.syncToken || '').trim();
     }
     function setStatus(text, ok) {
         lastStatus = text;
@@ -475,7 +474,6 @@
                 if (json.driveFolderUrl) c.driveFolderUrl = json.driveFolderUrl;
                 if (json.driveFolderId) c.driveFolderId = json.driveFolderId;
                 if (json.ownerEmail) c.googleOwnerEmail = json.ownerEmail;
-                if (!c.syncToken) c.syncToken = DEFAULT_TOKEN;
                 saveCompany(c);
             }
             markSynced(json.at, json.spreadsheetId, json);
@@ -565,7 +563,7 @@
             return Promise.reject(new Error('offline'));
         }
         payload = payload || {};
-        return callApi('SEND_EMAIL', {
+        return callApi('SEND_CLIENT_PDF', {
             to: payload.to || '',
             cc: payload.cc || '',
             bcc: payload.bcc || '',
@@ -574,7 +572,8 @@
             body: payload.body || payload.plainBody || '',
             html: payload.html || payload.htmlBody || '',
             name: payload.name || (company().name || ''),
-            attachments: payload.attachments || []
+            attachments: payload.attachments || [],
+            pdfOnly: true
         });
     }
 

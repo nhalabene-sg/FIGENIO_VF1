@@ -3798,6 +3798,13 @@
         root.style.setProperty('--write-h', Math.max(80, h - m.top - m.bottom) + 'px');
         var pad = editor.style.padding || (m.top + 'px ' + m.right + 'px ' + m.bottom + 'px ' + m.left + 'px');
         var bg = editor.style.backgroundColor || '#fff';
+        var sourceChildren = Array.prototype.slice.call(editor.children || []);
+        function sourcePageIndex(node) {
+            if (!node || (node.classList && (node.classList.contains('abene-page-flow') || node.classList.contains('page-gap-band')))) return -1;
+            var top = Number(node.offsetTop);
+            if (!isFinite(top)) top = 0;
+            return Math.max(0, Math.min(pages - 1, Math.floor((top + 1) / h)));
+        }
         var i;
         for (i = 0; i < pages; i++) {
             var sheet = document.createElement('div');
@@ -3805,7 +3812,7 @@
             sheet.style.cssText = 'width:' + w + 'px;height:' + h + 'px;position:relative;overflow:hidden;background:#fff;margin:0;padding:0;border:0;box-sizing:border-box;page-break-inside:avoid;break-inside:avoid;';
             var inner = document.createElement('div');
             inner.className = 'abene-export-clip';
-            inner.style.cssText = 'position:absolute;left:0;top:' + (-i * h) + 'px;width:' + w + 'px;height:' + totalH + 'px;';
+            inner.style.cssText = 'position:absolute;left:0;top:0;width:' + w + 'px;height:' + h + 'px;overflow:hidden;';
             var edClone = editor.cloneNode(true);
             edClone.removeAttribute('id');
             edClone.removeAttribute('contenteditable');
@@ -3816,8 +3823,10 @@
             edClone.style.boxShadow = 'none';
             edClone.style.position = 'relative';
             edClone.style.width = w + 'px';
-            edClone.style.setProperty('height', totalH + 'px', 'important');
-            edClone.style.setProperty('min-height', totalH + 'px', 'important');
+            edClone.style.setProperty('height', h + 'px', 'important');
+            edClone.style.setProperty('min-height', h + 'px', 'important');
+            edClone.style.setProperty('max-height', h + 'px', 'important');
+            edClone.style.overflow = 'hidden';
             edClone.style.backgroundColor = bg;
             edClone.style.padding = pad;
             edClone.style.setProperty('--page-w', w + 'px');
@@ -3827,6 +3836,10 @@
             edClone.style.setProperty('--pad-bottom', m.bottom + 'px');
             edClone.style.setProperty('--pad-left', m.left + 'px');
             edClone.style.setProperty('--write-h', Math.max(80, h - m.top - m.bottom) + 'px');
+            Array.prototype.slice.call(edClone.children || []).forEach(function (child, childIndex) {
+                var source = sourceChildren[childIndex];
+                if (!source || sourcePageIndex(source) !== i) child.remove();
+            });
             edClone.querySelectorAll('.abene-page-flow').forEach(function (sp) {
                 var hh = sp.style.getPropertyValue('--flow-h') || sp.style.height || (sp.offsetHeight + 'px');
                 if (hh) sp.style.setProperty('height', hh, 'important');
@@ -3841,13 +3854,21 @@
                 chClone.querySelectorAll('.hf-tab, .hf-rule, .page-gap-band, .hf-close').forEach(function (n) { n.remove(); });
                 chClone.querySelectorAll('[contenteditable]').forEach(function (el) { el.contentEditable = 'false'; });
                 chClone.querySelectorAll('.page-header-zone').forEach(function (zone) {
+                    if (Number(zone.getAttribute('data-page') || '1') !== i + 1) {
+                        zone.remove();
+                        return;
+                    }
+                    zone.style.top = '0px';
                     zone.style.background = '#fff';
                     zone.style.zIndex = '12';
                 });
                 chClone.querySelectorAll('.page-footer-zone').forEach(function (zone) {
-                    var pg = Math.max(0, Number(zone.getAttribute('data-page') || '1') - 1);
+                    if (Number(zone.getAttribute('data-page') || '1') !== i + 1) {
+                        zone.remove();
+                        return;
+                    }
                     zone.style.height = m.bottom + 'px';
-                    zone.style.top = (pg * h + h - m.bottom) + 'px';
+                    zone.style.top = (h - m.bottom) + 'px';
                     zone.style.setProperty('--hf-seam', '0px');
                     zone.style.background = '#fff';
                     zone.style.zIndex = '12';
@@ -3856,7 +3877,7 @@
                 chClone.style.top = '0';
                 chClone.style.left = '0';
                 chClone.style.width = w + 'px';
-                chClone.style.height = totalH + 'px';
+                chClone.style.height = h + 'px';
                 chClone.style.pointerEvents = 'none';
                 inner.appendChild(chClone);
             }

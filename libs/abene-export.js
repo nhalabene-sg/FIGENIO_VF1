@@ -377,61 +377,64 @@
         return c;
     }
 
-    function bandInk(canvas, topPx, heightPx, g) {
+    function releaseCanvas(canvas) {
         try {
-            if (!canvas || !heightPx) return 0;
-            var scale = canvas.width / Math.max(1, g.w);
-            var y0 = Math.max(0, Math.round(topPx * scale));
-            var h = Math.max(1, Math.min(canvas.height - y0, Math.round(heightPx * scale)));
-            var ctx = canvas.getContext('2d');
-            var data = ctx.getImageData(0, y0, canvas.width, h).data;
-            var ink = 0;
-            for (var i = 0; i < data.length; i += 16) {
-                if (data[i] < 242 || data[i + 1] < 242 || data[i + 2] < 242) ink++;
+            if (canvas) {
+                canvas.width = 1;
+                canvas.height = 1;
             }
-            return ink;
+        } catch (e) {}
+    }
+
+    function canvasInkScore(canvas) {
+        try {
+            if (!canvas || canvas.width < 8 || canvas.height < 8) return -1;
+            var data = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
+            var score = 0;
+            for (var i = 0; i < data.length; i += 32) {
+                if (data[i] < 245 || data[i + 1] < 245 || data[i + 2] < 245) score++;
+            }
+            return score;
         } catch (e) {
-            return 0;
+            return -1;
         }
     }
 
-    function pageCaptureScore(canvas, sheet, pageIndex, g) {
-        var pageNo = String(pageIndex + 1);
-        var header = sheet.querySelector('.page-header-zone[data-page="' + pageNo + '"]');
-        var footer = sheet.querySelector('.page-footer-zone[data-page="' + pageNo + '"]');
-        var topH = header ? Math.max(1, Math.round(header.getBoundingClientRect().height || header.offsetHeight || 96)) : 96;
-        var bottomH = footer ? Math.max(1, Math.round(footer.getBoundingClientRect().height || footer.offsetHeight || 96)) : 96;
-        var headerExpected = !!(header && ((header.textContent || '').trim() || header.querySelector('img,svg,canvas')));
-        var footerExpected = !!(footer && ((footer.textContent || '').trim() || footer.querySelector('img,svg,canvas')));
-        var topInk = bandInk(canvas, 0, topH, g);
-        var bottomInk = bandInk(canvas, Math.max(0, g.h - bottomH), bottomH, g);
-        return (headerExpected ? topInk : -topInk) + (footerExpected ? bottomInk : -bottomInk);
-    }
-
-    function captureBestSheetCanvas(sheet, pageIndex, g) {
-        var first;
-        return grabCanvas(sheet, g, g.h).then(function (canvas) {
-            first = cropCanvas(canvas, g);
-            return afterLayout();
-        }).then(function () {
-            return grabCanvas(sheet, g, g.h);
-        }).then(function (canvas) {
-            var second = cropCanvas(canvas, g);
-            return pageCaptureScore(second, sheet, pageIndex, g) >= pageCaptureScore(first, sheet, pageIndex, g) ? second : first;
+    function captureBestSheetImage(sheet, g) {
+        var bestImage = '';
+        var bestScore = -1;
+        var seq = Promise.resolve();
+        [0, 1, 2].forEach(function () {
+            seq = seq.then(afterLayout).then(function () {
+                return grabCanvas(sheet, g, g.h);
+            }).then(function (canvas) {
+                var pageCanvas = cropCanvas(canvas, g);
+                var score = canvasInkScore(pageCanvas);
+                if (score > bestScore) {
+                    bestImage = pageCanvas.toDataURL('image/jpeg', 0.94);
+                    bestScore = score;
+                }
+                releaseCanvas(pageCanvas);
+            });
+        });
+        return seq.then(function () {
+            if (!bestImage) throw new Error('blank-page');
+            return bestImage;
         });
     }
 
-    function stampCanvas(pdf, canvas, g) {
+    function stampCanvas(pdf, canvasOrImage, g) {
         try {
-            pdf.addImage(canvas, 'JPEG', 0, 0, g.wmm, g.hmm, undefined, 'FAST');
+            var image = typeof canvasOrImage === 'string' ? canvasOrImage : canvasOrImage.toDataURL('image/jpeg', 0.94);
+            pdf.addImage(image, 'JPEG', 0, 0, g.wmm, g.hmm, undefined, 'NONE');
             return true;
         } catch (e1) {
             try {
-                pdf.addImage(canvas.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, g.wmm, g.hmm);
+                pdf.addImage(canvasOrImage, 'JPEG', 0, 0, g.wmm, g.hmm);
                 return true;
             } catch (e2) {
                 try {
-                    pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, g.wmm, g.hmm);
+                    pdf.addImage(canvasOrImage, 'PNG', 0, 0, g.wmm, g.hmm);
                     return true;
                 } catch (e3) {
                     return false;
@@ -475,11 +478,10 @@
                 });
                 tree.style.height = g.h + 'px';
                 return afterLayout().then(function () {
-                    /* html2canvas peut rater ponctuellement une bande de page. Deux
-                       captures permettent de garder automatiquement la plus complète. */
-                    return captureBestSheetCanvas(sheet, i, g);
-                }).then(function (c) {
-                    acc.push(c);
+                    return captureBestSheetImage(sheet, g);
+                }).then(function (pageImage) {
+                    /* L'image choisie est déjà figée avant la page suivante. */
+                    acc.push(pageImage);
                     return acc;
                 });
             });
@@ -499,7 +501,7 @@
         return afterLayout().then(function () {
             return captureSheets(tree, g);
         }).then(function (canvases) {
-            if (!canvases.length || canvases.every(canvasLooksEmpty)) throw new Error('blank-canvas');
+            if (!canvases.length) throw new Error('blank-canvas');
             return createJsPdf(g).then(function (pdf) {
                 var stamped = 0;
                 canvases.forEach(function (c, i) {

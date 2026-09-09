@@ -253,7 +253,8 @@
                     var when = v.updatedAt ? new Date(v.updatedAt).toLocaleString(loc) : '';
                     var id = String(v.driveFileId || '').replace(/[^a-zA-Z0-9_-]/g, '');
                     return '<div class="version-row"><span>' + esc(when) + '<br><small>' + esc(v.name || '') + ' · ' + esc(v.author || '') + '</small></span>'
-                        + '<button type="button" class="btn-secondary" onclick="ABENE.Collab.restoreCloud(\'' + id + '\')">' + esc(tt('versionsRestore', 'Restaurar')) + '</button></div>';
+                        + '<button type="button" class="btn-secondary" onclick="ABENE.Collab.restoreCloud(\'' + id + '\')">' + esc(tt('versionsRestore', 'Restaurar')) + '</button>'
+                        + '<button type="button" class="btn-secondary" onclick="ABENE.Collab.copyCloud(\'' + id + '\')">' + esc(tt('versionsCopy', 'Copiar como novo')) + '</button></div>';
                 }).join('');
             var empty = body.querySelector('p');
             if (empty && !body.querySelector('.version-row')) empty.remove();
@@ -262,23 +263,44 @@
             body.appendChild(wrap);
         }).catch(function () {});
     }
-    function restoreCloud(driveFileId) {
+    function applyCloudVersion(driveFileId, asCopy) {
         if (!driveFileId) return;
         try { if (typeof root.saveDocument === 'function') root.saveDocument({ silent: true }); } catch (e) {}
         call('COLLAB_GET_VERSION', { driveFileId: driveFileId }).then(function (json) {
             if (!json || !json.html) return;
             var ed = (root.abene && root.abene.editor) || document.getElementById('editor');
             if (!ed) return;
-            ed.innerHTML = json.html;
-            if (A().documentState) A().documentState.dirty = true;
+            var safe = typeof root.abeneSanitizeHtml === 'function' ? root.abeneSanitizeHtml(json.html) : json.html;
+            ed.innerHTML = asCopy && typeof root.abenePrepareCopyAsNewHtml === 'function'
+                ? root.abenePrepareCopyAsNewHtml(safe)
+                : safe;
+            if (A().documentState) {
+                A().documentState.dirty = true;
+                if (asCopy) {
+                    A().documentState.sentToClient = false;
+                    A().documentState.protected = false;
+                    A().documentState.pdfOwnerId = '';
+                    ed.contentEditable = 'true';
+                    if (root.abeneGdocsForkOnCopy) root.abeneGdocsForkOnCopy();
+                    var rawName = String(json.name || 'Documento').replace(/\.html$/i, '');
+                    var prefix = String(localStorage.getItem('abeneLanguage') || '').indexOf('fr') === 0 ? 'Copie — ' : 'Cópia — ';
+                    if (typeof root.renameDocument === 'function') root.renameDocument(prefix + rawName);
+                } else {
+                    var hasFinal = !!ed.querySelector('[data-abene-status="final"]');
+                    A().documentState.protected = hasFinal;
+                    ed.contentEditable = hasFinal ? 'false' : 'true';
+                }
+            }
             if (typeof root.saveUndoState === 'function') root.saveUndoState();
             if (typeof root.updateStats === 'function') root.updateStats();
             if (typeof root.updateAllFields === 'function') root.updateAllFields();
             if (typeof root.refreshPagination === 'function') root.refreshPagination();
             if (typeof root.closeModal === 'function') root.closeModal('genericModal');
-            toast(tt('versionsRestore', 'Restaurar'));
+            toast(asCopy ? tt('versionsCopied', 'Cópia criada como novo documento.') : tt('versionsRestore', 'Restaurar'));
         }).catch(function () {});
     }
+    function restoreCloud(driveFileId) { applyCloudVersion(driveFileId, false); }
+    function copyCloud(driveFileId) { applyCloudVersion(driveFileId, true); }
     function wrapFns() {
         var origSave = root.saveDocument;
         if (typeof origSave === 'function' && !origSave._abeneCollab) {
@@ -327,6 +349,7 @@
         shareDialog: shareDialog,
         shareSubmit: shareSubmit,
         restoreCloud: restoreCloud,
+        copyCloud: copyCloud,
         ping: ping
     };
     root.toggleCollabMode = toggleMode;

@@ -1367,6 +1367,11 @@
             display: flex;
         }
 
+        /* Les sélecteurs génériques ouverts depuis l'Arquivo doivent rester cliquables. */
+        #genericModal {
+            z-index: 3000;
+        }
+
         .modal-overlay.abene-win-moved {
             background: transparent;
         }
@@ -6386,7 +6391,7 @@
                     <button type="button" class="btn-secondary" onclick="closePaperPreview()" data-i18n="previewBack">Voltar a editar</button>
                     <button type="button" class="btn-secondary" onclick="printPaperPreview()" data-i18n="previewPrint">Imprimir esta vista</button>
                     <button type="button" class="btn-secondary" onclick="downloadPaperPreviewPdf()" data-i18n="previewPdf">Descarregar PDF</button>
-                    <button type="button" class="btn-secondary" onclick="emailPaperPreview()" data-i18n="previewEmail" data-i18n-title="previewEmailPdf" title="Enviar PDF ao cliente (anexo) — o e-mail continua a funcionar como antes">Enviar e-mail</button>
+                    <button type="button" class="btn-secondary" onclick="emailPaperPreview()" data-i18n="previewEmailPdf" data-i18n-title="previewEmailPdf" title="Enviar PDF ao cliente">Enviar PDF ao cliente</button>
                     <button type="button" class="btn-secondary" id="paperPreviewDraftBtn" onclick="commitPaperPreview('draft')" data-i18n="previewDraft">Inserir rascunho</button>
                     <button type="button" class="btn-gold" id="paperPreviewFinalBtn" onclick="commitPaperPreview('final')" data-i18n="previewFinal">Confirmar versão definitiva</button>
                 </div>
@@ -6664,7 +6669,7 @@
     <input type="file" id="imageInput" style="display:none" accept="image/*" multiple onchange="handleImageUpload(event)">
     <input type="file" id="excelFileInput" style="display:none" accept=".xlsx,.csv,.txt">
 
-    <script src="libs/abene-i18n.js"></script>
+    <script src="libs/abene-i18n.js?v=20260909-p0p5-final"></script>
     <script src="libs/abene-tips.js"></script>
     <script src="libs/abene-page-geometry.js"></script>
     <script>
@@ -6695,7 +6700,7 @@
         let savedFormat = null;
         let savedPainterRange = null;
         let footnoteCounter = 0;
-        let documentState = { name: 'Document1', dirty: true, protected: false, tracking: false, pagination: true, gdocsFileId: '', gdocsUrl: '', sentToClient: false };
+        let documentState = { name: 'Document1', dirty: true, protected: false, tracking: false, pagination: true, gdocsFileId: '', gdocsUrl: '', sentToClient: false, pdfOwnerId: '' };
         let documentVersions = JSON.parse(localStorage.getItem('abeneVersions') || '[]');
         let lastEditorHTML = '';
         let imageResize = null;
@@ -6754,12 +6759,10 @@
         if (!companyData.appsScriptUrl && typeof API_URL === 'string' && API_URL) {
             companyData.appsScriptUrl = API_URL;
             if (companyData.databaseEnabled !== false) companyData.databaseEnabled = true;
-            if (!companyData.syncToken) companyData.syncToken = 'abene-genius-raros-2026';
             try { localStorage.setItem('abeneCompanyData', JSON.stringify(companyData)); } catch (eFill) {}
         }
         if (!localStorage.getItem('abeneSheetsV2')) {
             if (companyData.appsScriptUrl) companyData.databaseEnabled = true;
-            if (!companyData.syncToken) companyData.syncToken = 'abene-genius-raros-2026';
             try {
                 localStorage.setItem('abeneCompanyData', JSON.stringify(companyData));
                 localStorage.setItem('abeneSheetsV2', '1');
@@ -9112,30 +9115,77 @@
         function injectImportedDocumentStyles(doc) {
             const old = document.getElementById('abene-imported-styles');
             if (old) old.remove();
-            const cssParts = [];
+            const scopedRules = [];
             doc.querySelectorAll('style').forEach(function(styleEl) {
-                const css = (styleEl.textContent || '').trim();
-                if (css) cssParts.push(css);
+                const css = String(styleEl.textContent || '')
+                    .replace(/@import[^;]+;/gi, '')
+                    .replace(/url\s*\([^)]*\)/gi, 'none')
+                    .replace(/expression\s*\([^)]*\)/gi, '');
+                try {
+                    const sheet = new CSSStyleSheet();
+                    sheet.replaceSync(css);
+                    Array.from(sheet.cssRules || []).forEach(function(rule) {
+                        if (!rule.selectorText || !rule.style) return;
+                        const selectors = String(rule.selectorText).split(',').map(function(sel) {
+                            sel = sel.trim().replace(/^html\b/i, '').replace(/^body\b/i, '').trim();
+                            return sel.indexOf('#editor') === 0 ? sel : ('#editor ' + (sel || '*'));
+                        });
+                        scopedRules.push(selectors.join(', ') + '{' + rule.style.cssText + '}');
+                    });
+                } catch (eCss) {}
             });
-            if (!cssParts.length) return;
-            // Scope body/html rules to #editor so le document original garde son look
-            const scoped = cssParts.join('\n')
-                .replace(/(^|})\s*html\b/gi, '$1 #editor')
-                .replace(/(^|})\s*body\b/gi, '$1 #editor')
-                .replace(/#editor\s+#editor/g, '#editor');
+            if (!scopedRules.length) return;
             const style = document.createElement('style');
             style.id = 'abene-imported-styles';
-            style.textContent = scoped;
+            style.textContent = scopedRules.join('\n');
             document.head.appendChild(style);
         }
 
         function sanitizeImportedEditorHTML(html) {
             const wrap = document.createElement('div');
             wrap.innerHTML = html || '';
-            wrap.querySelectorAll('script, noscript, iframe, object, embed, link[rel="stylesheet"]').forEach(function(n) { n.remove(); });
+            wrap.querySelectorAll('script, noscript, iframe, object, embed, link, meta, base, form, style').forEach(function(n) { n.remove(); });
+            wrap.querySelectorAll('*').forEach(function(n) {
+                Array.from(n.attributes || []).forEach(function(attr) {
+                    const key = String(attr.name || '').toLowerCase();
+                    const val = String(attr.value || '');
+                    if (key.indexOf('on') === 0 || key === 'srcdoc') {
+                        n.removeAttribute(attr.name);
+                        return;
+                    }
+                    if (/^(href|src|xlink:href|action|formaction)$/i.test(key) && /^\s*(javascript|vbscript|data:text\/html)/i.test(val)) {
+                        n.removeAttribute(attr.name);
+                        return;
+                    }
+                    if (key === 'style' && /(expression\s*\(|url\s*\(\s*['"]?\s*(?:javascript|vbscript|data:text\/html))/i.test(val)) {
+                        n.removeAttribute(attr.name);
+                    }
+                });
+            });
             wrap.querySelectorAll('.page-decoration, .page-header-zone, .page-footer-zone, .header-badge, .footer-badge, .abene-page-flow').forEach(function(n) { n.remove(); });
             return wrap.innerHTML.trim() || '<p></p>';
         }
+
+        function prepareCopyAsNewHtml(html) {
+            const wrap = document.createElement('div');
+            wrap.innerHTML = sanitizeImportedEditorHTML(html);
+            wrap.querySelectorAll('[data-abene-status="final"]').forEach(function(block) {
+                block.setAttribute('data-abene-status', 'draft');
+                block.setAttribute('contenteditable', 'true');
+                block.classList.remove('abene-paper-locked');
+                block.classList.add('abene-not-final');
+                block.querySelectorAll('.abene-status-final, .abene-wm').forEach(function(n) { n.remove(); });
+                const banner = block.querySelector('.abene-status-banner');
+                if (banner) {
+                    banner.classList.remove('abene-status-final');
+                    banner.classList.add('abene-status-draft');
+                    banner.textContent = 'RASCUNHO — cópia de trabalho, não constitui versão definitiva.';
+                }
+            });
+            return wrap.innerHTML.trim() || '<p></p>';
+        }
+        window.abeneSanitizeHtml = sanitizeImportedEditorHTML;
+        window.abenePrepareCopyAsNewHtml = prepareCopyAsNewHtml;
 
         function htmlFromPlainText(text) {
             const lines = String(text || '').replace(/\r\n/g, '\n').split('\n');
@@ -9153,6 +9203,13 @@
             try { saveDocument({ silent: true }); } catch (e) {}
             resetEditorToOriginal();
             editor.innerHTML = '<p></p>';
+            documentState.gdocsFileId = '';
+            documentState.gdocsUrl = '';
+            documentState.sentToClient = false;
+            documentState.pdfOwnerId = '';
+            documentState.protected = false;
+            editor.contentEditable = 'true';
+            if (window.abeneGdocsClearLink) window.abeneGdocsClearLink();
             renameDocument((localStorage.getItem('abeneLanguage') || 'pt-PT') === 'pt-PT' ? 'Documento1' : 'Document1');
             documentState.dirty = false;
             saveUndoState();
@@ -9187,6 +9244,11 @@
             reader.onload = function(e) {
                 const raw = e.target.result;
                 const lower = file.name.toLowerCase();
+                documentState.gdocsFileId = '';
+                documentState.gdocsUrl = '';
+                documentState.sentToClient = false;
+                documentState.pdfOwnerId = '';
+                if (window.abeneGdocsClearLink) window.abeneGdocsClearLink();
                 resetEditorToOriginal();
                 if (lower.endsWith('.html') || lower.endsWith('.htm')) {
                     const documentFile = new DOMParser().parseFromString(raw, 'text/html');
@@ -9239,7 +9301,8 @@
 
         function saveForAccountant() {
             try { saveDocument({ silent: true }); } catch (e) {}
-            if (typeof window.downloadPackContabilista === 'function') window.downloadPackContabilista();
+            if (typeof window.downloadPackContabilistaSelect === 'function') window.downloadPackContabilistaSelect();
+            else if (typeof window.downloadPackContabilista === 'function') window.downloadPackContabilista({ select: true });
             else if (typeof window.exportAccountingPt === 'function') window.exportAccountingPt();
             closeAllDropdowns();
         }
@@ -9285,7 +9348,8 @@
                 colRule: pageColRule,
                 gdocsFileId: documentState.gdocsFileId || '',
                 gdocsUrl: documentState.gdocsUrl || '',
-                sentToClient: !!documentState.sentToClient
+                sentToClient: !!documentState.sentToClient,
+                pdfOwnerId: documentState.pdfOwnerId || ''
             });
         }
 
@@ -9293,12 +9357,15 @@
             try {
                 const settings = JSON.parse(serialized);
                 if (settings.name) documentState.name = settings.name;
-                if (settings.gdocsFileId) {
-                    documentState.gdocsFileId = String(settings.gdocsFileId);
-                    documentState.gdocsUrl = settings.gdocsUrl || ('https://docs.google.com/document/d/' + documentState.gdocsFileId + '/edit');
+                documentState.gdocsFileId = settings.gdocsFileId ? String(settings.gdocsFileId) : '';
+                documentState.gdocsUrl = documentState.gdocsFileId
+                    ? (settings.gdocsUrl || ('https://docs.google.com/document/d/' + documentState.gdocsFileId + '/edit'))
+                    : '';
+                if (documentState.gdocsFileId) {
                     if (window.abeneGdocsSetLink) window.abeneGdocsSetLink(documentState.gdocsFileId, documentState.gdocsUrl);
-                }
-                if (settings.sentToClient !== undefined) documentState.sentToClient = !!settings.sentToClient;
+                } else if (window.abeneGdocsClearLink) window.abeneGdocsClearLink();
+                documentState.sentToClient = !!settings.sentToClient;
+                documentState.pdfOwnerId = settings.pdfOwnerId ? String(settings.pdfOwnerId) : '';
                 if (settings.language) { localStorage.setItem('abeneLanguage', settings.language); applyLanguage(settings.language); }
                 if (settings.company) { companyData = { ...defaultCompanyData, ...settings.company }; localStorage.setItem('abeneCompanyData', JSON.stringify(companyData)); }
                 if (settings.header !== undefined) { pageHeaderText = settings.header; localStorage.setItem('abeneHeader', pageHeaderText); }
@@ -10294,6 +10361,11 @@ table { border-collapse: collapse; }
                     editor.style.fontFamily = defaultFont + ', Calibri, sans-serif';
                 }
 
+                documentState.gdocsFileId = '';
+                documentState.gdocsUrl = '';
+                documentState.sentToClient = false;
+                documentState.pdfOwnerId = '';
+                if (window.abeneGdocsClearLink) window.abeneGdocsClearLink();
                 editor.innerHTML = parts.join('') || '<p></p>';
                 finishOpenedDocument(file.name, t('docxImportOk') || 'DOCX aberto com formatação original');
 
@@ -10478,9 +10550,12 @@ table { border-collapse: collapse; }
             const version = documentVersions[index];
             if (!version) return;
             try { saveDocument({ silent: true }); } catch (e) {}
-            editor.innerHTML = version.html;
+            editor.innerHTML = sanitizeImportedEditorHTML(version.html);
             documentState.name = version.name;
             documentState.dirty = true;
+            const hasFinalPaper = !!editor.querySelector('[data-abene-status="final"]');
+            documentState.protected = hasFinalPaper;
+            editor.contentEditable = hasFinalPaper ? 'false' : 'true';
             saveUndoState();
             updateStats();
             updateAllFields();
@@ -10492,11 +10567,14 @@ table { border-collapse: collapse; }
             const version = documentVersions[index];
             if (!version) return;
             try { saveDocument({ silent: true }); } catch (e) {}
-            editor.innerHTML = version.html;
+            editor.innerHTML = prepareCopyAsNewHtml(version.html);
             var prefix = (localStorage.getItem('abeneLanguage') || '').indexOf('fr') === 0 ? 'Copie — ' : 'Cópia — ';
             documentState.name = prefix + (version.name || 'Documento');
             documentState.dirty = true;
             documentState.sentToClient = false;
+            documentState.pdfOwnerId = '';
+            documentState.protected = false;
+            editor.contentEditable = 'true';
             if (window.abeneGdocsForkOnCopy) window.abeneGdocsForkOnCopy();
             try { localStorage.setItem('abeneDocName', documentState.name); } catch (eN) {}
             saveUndoState();
@@ -10756,6 +10834,8 @@ table { border-collapse: collapse; }
                         (ok ? '<br><span style="word-break:break-all;color:#555;">' + String(shown).replace(/</g, '') + '</span>' : '') +
                         '</p>';
                 })()}
+                ${field('syncToken', t('sheetsToken'), companyData.syncToken || '', 'password')}
+                <p style="font-size:12px;color:#666;line-height:1.45;margin:4px 0 8px;">${t('sheetsTokenHint')}</p>
                 ${companyData.googleSheetsUrl && !/script.google.com\/macros/.test(companyData.googleSheetsUrl) ? '<p style="font-size:12px;margin:6px 0;"><a href="' + String(companyData.googleSheetsUrl).replace(/"/g, '') + '" target="_blank" rel="noopener">' + t('sheetsUrl') + '</a></p>' : ''}
                 ${field('installerEmail', t('installerEmail'), companyData.installerEmail, 'email')}
                 <p style="font-size:12px;color:#666;line-height:1.45;margin:4px 0 8px;">${t('installerEmailHint')}</p>
@@ -10801,7 +10881,7 @@ table { border-collapse: collapse; }
                 vatRegime: value('companyVatRegime') || 'normal',
                 iban: value('companyIban'), bic: value('companyBic'), slogan: value('companySlogan') || companyData.slogan,
                 googleSheetsUrl: sheetsUrl, appsScriptUrl: appsUrl,
-                spreadsheetId: sheetId, syncToken: companyData.syncToken || 'abene-genius-raros-2026',
+                spreadsheetId: sheetId, syncToken: value('syncToken'),
                 driveFolderUrl: companyData.driveFolderUrl || '',
                 driveFolderId: companyData.driveFolderId || '',
                 installerEmail: value('installerEmail') || companyData.installerEmail || '',
@@ -11068,7 +11148,7 @@ table { border-collapse: collapse; }
             } catch (e) {}
         }, 12000);
     </script>
-    <script src="libs/abene-word-home.js?v=20260908-layout-visibility-2"></script>
+    <script src="libs/abene-word-home.js?v=20260909-layout-visibility-3"></script>
     <script src="libs/abene-pagination-engine.js?v=20260908-layout-visibility-2"></script>
     <script src="libs/abene-sections.js"></script>
     <script src="libs/abene-toolbar.js"></script>
@@ -11079,17 +11159,17 @@ table { border-collapse: collapse; }
     <script src="libs/abene-tables.js"></script>
     <script src="libs/abene-document.js"></script>
     <script src="libs/abene-history.js"></script>
-    <script src="libs/abene-export.js?v=20260909-layout-visibility-4"></script>
+    <script src="libs/abene-export.js?v=20260909-layout-visibility-10"></script>
     <script src="libs/abene-modelo.js"></script>
-    <script src="libs/abene-comercial.js"></script>
-    <script src="libs/abene-contabilidade.js"></script>
-    <script src="libs/abene-arquivo.js"></script>
+    <script src="libs/abene-comercial.js?v=20260909-p0p5-final-3"></script>
+    <script src="libs/abene-contabilidade.js?v=20260909-p0p5-final-3"></script>
+    <script src="libs/abene-arquivo.js?v=20260909-p0p5-final-3"></script>
     <script src="libs/abene-phone.js"></script>
     <script src="libs/abene-excel-engine.js"></script>
     <script src="libs/abene-excel.js"></script>
-    <script src="libs/abene-sheets.js"></script>
-    <script src="libs/abene-collab.js"></script>
-    <script src="libs/abene-gdocs.js"></script>
+    <script src="libs/abene-sheets.js?v=20260909-p0p5-final"></script>
+    <script src="libs/abene-collab.js?v=20260909-p0p5-final-3"></script>
+    <script src="libs/abene-gdocs.js?v=20260909-p0p5-final-3"></script>
     <script src="libs/abene-pickers.js"></script>
 
 </body>

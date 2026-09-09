@@ -88,6 +88,7 @@
     }
     function csvEsc(v) {
         var s = String(v == null ? '' : v);
+        if (/^[\t\r ]*[=+\-@]/.test(s)) s = "'" + s;
         if (/[;"\n\r]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
         return s;
     }
@@ -371,14 +372,14 @@
         }
         return { morada: s, cp: '', local: '' };
     }
-    function papersFromHtml(html, entry) {
+    function papersFromHtml(html, entry, includeDrafts) {
         var out = [];
         if (!html) return out;
         var wrap = document.createElement('div');
         wrap.innerHTML = html;
         wrap.querySelectorAll('[data-abene-block="devis"]').forEach(function (el) {
             var st = el.getAttribute('data-abene-status') || 'final';
-            if (st === 'draft' || st === 'preview') return;
+            if (!includeDrafts && (st === 'draft' || st === 'preview')) return;
             var pay = decodePayload(el) || {};
             var vat = pay.tva != null ? Number(pay.tva) : parseFloat(el.getAttribute('data-abene-vat') || '23');
             if (isNaN(vat)) vat = 23;
@@ -427,12 +428,14 @@
                 pasta: (entry && entry.pasta) || '',
                 arquivoNome: (entry && entry.name) || '',
                 ownerId: entry ? (window.abeneArquivoApi && window.abeneArquivoApi.ownerIdOf(entry)) : '',
+                status: (st === 'final' || (entry && entry.concluded)) ? 'final' : st,
+                final: st === 'final' || !!(entry && entry.concluded),
                 hasPdf: false
             });
         });
         wrap.querySelectorAll('[data-abene-block="receipt"]').forEach(function (el) {
             var st = el.getAttribute('data-abene-status') || 'final';
-            if (st === 'draft' || st === 'preview') return;
+            if (!includeDrafts && (st === 'draft' || st === 'preview')) return;
             var pay = decodePayload(el) || {};
             var amt = Number(pay.amount != null ? pay.amount : el.getAttribute('data-abene-total')) || 0;
             var recVat = pay.vatRate != null ? Number(pay.vatRate) : 0;
@@ -472,6 +475,8 @@
                 pasta: (entry && entry.pasta) || '',
                 arquivoNome: (entry && entry.name) || '',
                 ownerId: entry ? (window.abeneArquivoApi && window.abeneArquivoApi.ownerIdOf(entry)) : '',
+                status: (st === 'final' || (entry && entry.concluded)) ? 'final' : st,
+                final: st === 'final' || !!(entry && entry.concluded),
                 hasPdf: false
             });
         });
@@ -480,24 +485,41 @@
     function collectPackSources() {
         var api = window.abeneArquivoApi;
         var entries = [];
-        if (api && typeof api.visibleEntries === 'function') {
+        var archiveOpen = !!document.querySelector('#arqOverlay.open');
+        if (archiveOpen && api && typeof api.visibleEntries === 'function') {
             entries = api.visibleEntries() || [];
         }
-        if (!entries.length && api && typeof api.allEntries === 'function') {
+        if (!archiveOpen && api && typeof api.allEntries === 'function') {
+            entries = (api.allEntries() || []).slice();
+            if (typeof api.currentSnapshot === 'function') entries.unshift(api.currentSnapshot());
+        }
+        if (!entries.length && !archiveOpen && api && typeof api.allEntries === 'function') {
             entries = (api.allEntries() || []).slice();
             if (typeof api.currentSnapshot === 'function') entries.unshift(api.currentSnapshot());
         }
         var papers = [];
         var seen = {};
         entries.forEach(function (e) {
-            papersFromHtml(e.html || '', e).forEach(function (p) {
+            papersFromHtml(e.html || '', e, true).forEach(function (p) {
                 var key = (p.codigoSAFT || '') + '|' + (p.numero || '') + '|' + (p.cliente || '');
                 if (seen[key]) return;
                 seen[key] = true;
                 papers.push(p);
             });
         });
-        if (!papers.length) papers = currentPapers();
+        if (!papers.length && !archiveOpen && api && typeof api.allEntries === 'function') {
+            (api.allEntries() || []).forEach(function (e) {
+                papersFromHtml(e.html || '', e, true).forEach(function (p) {
+                    var key = (p.codigoSAFT || '') + '|' + (p.numero || '') + '|' + (p.cliente || '');
+                    if (!seen[key]) { seen[key] = true; papers.push(p); }
+                });
+            });
+        }
+        if (!papers.length && !archiveOpen && api && typeof api.currentSnapshot === 'function') {
+            var snap = api.currentSnapshot();
+            papers = papersFromHtml(snap.html || '', snap, true);
+            if (!entries.length) entries = [snap];
+        }
         return { papers: papers, entries: entries };
     }
 
@@ -899,14 +921,16 @@
         var api = window.abeneArquivoApi;
         if (!api || !entries || !entries.length) return Promise.resolve();
         var san = api.sanitizeName || function (s) { return String(s || 'doc').replace(/[\\/:*?"<>|]/g, '-'); };
+        var fileBase = api.archiveFileBase || function (e) { return san(e && e.name || 'documento'); };
         return Promise.all(entries.map(function (e) {
             var owner = api.ownerIdOf ? api.ownerIdOf(e) : e.id;
             if (!owner || typeof api.listFinals !== 'function') return Promise.resolve();
             return api.listFinals(owner).then(function (rows) {
                 (rows || []).forEach(function (r) {
                     if (!r.blob) return;
-                    var folder = ['PDF', san(e.client || 'Cliente'), san(e.name || 'documento')].join('/');
-                    zip.file(folder + '/' + san(e.name) + '_' + r.etape + '_v' + r.rev + '.pdf', r.blob);
+                    var base = fileBase(e);
+                    var folder = ['PDF', san(e.client || 'Cliente'), base].join('/');
+                    zip.file(folder + '/' + base + '_' + r.etape + '_v' + r.rev + '.pdf', r.blob);
                 });
             });
         }));
@@ -942,8 +966,7 @@
             else alert(tt('packEmpty', 'Não há orçamento nem recibo nesta vista para o contabilista.'));
             return;
         }
-        /* Comportamento antigo (1 clique) por defeito; seleção só se opts.select === true */
-        if (opts.select === true && typeof window.openGenericModal === 'function') {
+        if (opts.skipChooser !== true && typeof window.openGenericModal === 'function') {
             openPackChooser(src);
             return;
         }
@@ -990,7 +1013,7 @@
                 if (!papers.length) {
                     papers = (src.papers || []).filter(function () { return false; });
                     entries.filter(function (e) { return e.concluded; }).forEach(function (e) {
-                        papersFromHtml(e.html || '', e).forEach(function (p) { papers.push(p); });
+                        papersFromHtml(e.html || '', e, true).forEach(function (p) { papers.push(p); });
                     });
                 }
             }
@@ -1038,8 +1061,16 @@
                     }
                     var includeCsv = !!(document.getElementById('packIncludeCsv') || { checked: true }).checked;
                     var includePdf = !!(document.getElementById('packIncludePdf') || { checked: true }).checked;
+                    var api = window.abeneArquivoApi;
+                    var selectedEntries = (src.entries || []).filter(function (entry) {
+                        var owner = api && api.ownerIdOf ? api.ownerIdOf(entry) : entry.id;
+                        return selected.some(function (paper) {
+                            if (paper.ownerId && owner) return String(paper.ownerId) === String(owner);
+                            return paper.numero && String(entry.number || '') === String(paper.numero);
+                        });
+                    });
                     if (typeof closeModal === 'function') closeModal('genericModal');
-                    runPackDownload({ papers: selected, entries: src.entries }, {
+                    runPackDownload({ papers: selected, entries: selectedEntries }, {
                         skipChooser: true,
                         includeCsv: includeCsv,
                         includePdf: includePdf
@@ -1074,6 +1105,8 @@
                 msg = 'Pack descarregado. Ver 00_controlo.csv: NIF da empresa em falta ou inválido.';
             }
             if (typeof showToast === 'function') showToast(msg);
+        }).catch(function () {
+            if (typeof showToast === 'function') showToast(tt('packFail', 'Não foi possível criar o pack. Tente novamente.'));
         });
     }
 
