@@ -1810,6 +1810,55 @@
         return out;
     }
 
+    function trySplitList(list, limit, editor) {
+        if (!list || (list.tagName !== 'UL' && list.tagName !== 'OL')) return false;
+        var items = [];
+        var node = list.firstElementChild;
+        while (node) {
+            if (node.tagName === 'LI') items.push(node);
+            node = node.nextElementSibling;
+        }
+        if (items.length < 2) return false;
+        var splitAt = -1;
+        var i;
+        for (i = 0; i < items.length; i++) {
+            var li = items[i];
+            var top = yInEditor(li, editor);
+            var bottom = top + li.offsetHeight;
+            if (bottom <= limit + 1) continue;
+            if (i === 0) {
+                var nested = null;
+                var child = li.firstElementChild;
+                while (child) {
+                    if (child.tagName === 'UL' || child.tagName === 'OL') nested = child;
+                    child = child.nextElementSibling;
+                }
+                if (nested && trySplitList(nested, limit, editor)) return true;
+                return false;
+            }
+            splitAt = i;
+            break;
+        }
+        if (splitAt < 1) return false;
+        var clone = list.cloneNode(false);
+        clone.removeAttribute('id');
+        clone.setAttribute('data-abene-cont', 'list');
+        if (list.tagName === 'OL') {
+            var start = Number(list.getAttribute('start') || list.start || 1) || 1;
+            clone.setAttribute('start', String(start + splitAt));
+            try { clone.start = start + splitAt; } catch (errStart) {}
+        }
+        for (i = splitAt; i < items.length; i++) clone.appendChild(items[i]);
+        if (!clone.children.length) return false;
+        if (list.nextSibling) list.parentNode.insertBefore(clone, list.nextSibling);
+        else list.parentNode.appendChild(clone);
+        if (!list.querySelector('li')) {
+            if (clone.parentNode) clone.parentNode.removeChild(clone);
+            return false;
+        }
+        return true;
+    }
+
     function isUnsplittableTable(table) {
         if (!table) return false;
         var cn = ' ' + (table.className || '') + ' ';
@@ -2002,6 +2051,7 @@
             if (top < limit - 18) {
                 var didInnerSplit = false;
                 if (child.tagName === 'TABLE') didInnerSplit = trySplitTable(child, limit, editor);
+                else if (child.tagName === 'UL' || child.tagName === 'OL') didInnerSplit = trySplitList(child, limit, editor);
                 else if (canSplitBlock(child)) didInnerSplit = trySplitBlock(child, limit, editor);
                 else if (canSplitContainerBlock(child)) didInnerSplit = trySplitContainerBlock(child, limit, editor);
                 if (didInnerSplit) splitAt = child.nextSibling;
@@ -2189,6 +2239,10 @@
                     didSplit = true;
                     break;
                 }
+                if ((el.tagName === 'UL' || el.tagName === 'OL') && remain > 28 && trySplitList(el, limit, editor)) {
+                    didSplit = true;
+                    break;
+                }
                 if (remain > 18 && trySplitBlock(el, limit, editor)) {
                     didSplit = true;
                     break;
@@ -2203,6 +2257,11 @@
                     }
                     var innerTbl = el.tagName !== 'TABLE' ? el.querySelector && el.querySelector('table') : null;
                     if (innerTbl && remain > 36 && trySplitTable(innerTbl, limit, editor)) {
+                        didSplit = true;
+                        break;
+                    }
+                    var innerList = (el.tagName !== 'UL' && el.tagName !== 'OL') ? el.querySelector && el.querySelector('ul, ol') : null;
+                    if (innerList && remain > 28 && trySplitList(innerList, limit, editor)) {
                         didSplit = true;
                         break;
                     }

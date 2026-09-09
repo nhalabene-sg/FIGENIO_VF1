@@ -908,8 +908,8 @@
             position: absolute;
             left: 0;
             width: 100%;
-            background: #6e6e6e;
-            box-shadow: 0 -8px 14px -6px rgba(0,0,0,.5), 0 8px 14px -6px rgba(0,0,0,.38);
+            background: #fff;
+            box-shadow: inset 0 1px 0 #e4e4e4, inset 0 -1px 0 #e4e4e4;
             pointer-events: none;
             cursor: default;
             user-select: none;
@@ -922,7 +922,7 @@
             border: 0;
             pointer-events: none;
             user-select: none;
-            background: transparent;
+            background: #fff;
             box-shadow: none;
         }
         /* Word: trait + onglet seulement en mode édition (double-clic / Inserir) */
@@ -4325,11 +4325,15 @@
         }
         body.dark-mode .page-gap-band,
         body.dark-mode .v-ruler-gap {
-            background: var(--abene-d-canvas);
-            box-shadow: 0 -8px 14px -6px rgba(0,0,0,.65), 0 8px 14px -6px rgba(0,0,0,.5);
+            background: #fff;
+            box-shadow: inset 0 1px 0 #e4e4e4, inset 0 -1px 0 #e4e4e4;
+        }
+        body.dark-mode .v-ruler-gap {
+            background: #808080;
+            box-shadow: none;
         }
         body.dark-mode .abene-page-flow {
-            background: transparent;
+            background: #fff;
             box-shadow: none;
         }
         body.dark-mode .ruler-area {
