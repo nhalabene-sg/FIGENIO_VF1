@@ -61,6 +61,7 @@
         return text.length > 30;
     }
     function finishInsert() {
+        relabelWorkSite();
         if (typeof saveUndoState === 'function') saveUndoState();
         if (typeof updateStats === 'function') updateStats();
         if (typeof refreshPagination === 'function') refreshPagination();
@@ -434,7 +435,7 @@
         var ivaNote = ivaMention(data.tva, data.ivaRegime);
         var factRows = [];
         if (data.object) factRows.push(['Objeto', esc(data.object)]);
-        if (data.site) factRows.push(['Local da obra', esc(data.site)]);
+        if (data.site) factRows.push(['Local da obra/Serviço', esc(data.site)]);
         if (data.payTerms) factRows.push(['Prazo de pagamento', esc(data.payTerms)]);
         var linkReport = editorHasContent()
             ? '<p class="gr-iva-note">O relatório precedente faz parte integrante deste orçamento.</p>'
@@ -505,12 +506,14 @@
             (ivaNote ? '<p class="gr-iva-note">' + ivaNote + '</p>' : '') +
             (pay.length ? '<div class="gr-pay"><strong>Pagamento</strong><br/>' + pay.join(' · ') + '</div>' : '') +
             (data.notes ? '<div class="gr-note"><strong>Condições</strong><br/>' + esc(data.notes).replace(/\n/g, '<br/>') + '</div>' : '') +
+            '<div class="gr-sign-block abene-keep-together">' +
             '<table class="gr-signs"><tr>' +
             '<td><div class="gr-sign-line">Assinatura do emitente</div></td>' +
             '<td class="gr-sign-gap"></td>' +
             '<td><p class="gr-sign-hint">Bom para acordo (data e assinatura)</p><div class="gr-sign-line">Assinatura do cliente</div></td>' +
             '</tr></table>' +
             legalFooter() +
+            '</div>' +
             '</div>';
     }
 
@@ -592,12 +595,14 @@
                 .concat(data.payRef ? [['Referência', esc(data.payRef)]] : [])
                 .concat([['Data do pagamento', formatDate(data.date)]])) +
             (data.notes ? '<div class="gr-note"><strong>Notas</strong><br/>' + esc(data.notes).replace(/\n/g, '<br/>') + '</div>' : '') +
+            '<div class="gr-sign-block abene-keep-together">' +
             '<table class="gr-signs"><tr>' +
             '<td><span class="gr-stamp">' + (data.partial ? 'PARCIAL' : 'LIQUIDADO') + '</span></td>' +
             '<td class="gr-sign-gap"></td>' +
             '<td><p class="gr-sign-hint">Carimbo e assinatura</p><div class="gr-sign-line">' + esc(company().name || 'Genius Raros') + '</div></td>' +
             '</tr></table>' +
             legalFooter() +
+            '</div>' +
             '</div>';
     }
 
@@ -665,7 +670,7 @@
             row.style.alignItems = 'end';
             var lineVat = it.vat != null ? it.vat : vat;
             row.innerHTML =
-                '<div class="form-group" style="flex:3;"><label>' + labelDesc + '</label><input type="text" class="item-desc" value="' + esc(it.desc || '') + '"></div>' +
+                '<div class="form-group" style="flex:3;"><label>' + labelDesc + '</label><input type="text" class="item-desc" list="abeneArticleList" value="' + esc(it.desc || '') + '"></div>' +
                 '<div class="form-group" style="flex:0.7;"><label>Un.</label><input type="text" class="item-unit" value="' + esc(it.unit || 'un') + '"></div>' +
                 '<div class="form-group" style="flex:0.7;"><label>' + labelQty + '</label><input type="number" class="item-qty" value="' + (it.qty || 0) + '"></div>' +
                 '<div class="form-group" style="flex:1;"><label>' + labelPrice + '</label><input type="number" class="item-price" value="' + (it.price || 0) + '" step="0.01"></div>' +
@@ -760,9 +765,18 @@
         }
     }
 
+    function relabelWorkSite(root) {
+        var box = root || ed();
+        if (!box || !box.querySelectorAll) return;
+        box.querySelectorAll('.gr-kv th').forEach(function (th) {
+            if ((th.textContent || '').trim() === 'Local da obra') th.textContent = 'Local da obra/Serviço';
+        });
+    }
+
     function refreshLetterheads() {
         var editor = ed();
         if (!editor) return;
+        relabelWorkSite(editor);
         editor.querySelectorAll('[data-abene-block]').forEach(function (block) {
             var titleEl = block.querySelector('.gr-doc-title');
             var kickEl = block.querySelector('.gr-doc-kicker');
@@ -803,6 +817,11 @@
 
     window.openDevisModal = function () {
         if (typeof applyCompanyDefaults === 'function') applyCompanyDefaults();
+        var finalDevis = ed() && ed().querySelector('[data-abene-block="devis"][data-abene-status="final"]');
+        if (finalDevis) {
+            toastMsg('previewEditFinalWarn', 'Este orçamento é definitivo. Use « Copiar como novo » no Arquivo ou nas Versões para o modificar.');
+            return;
+        }
         var num = document.getElementById('devisNumber');
         if (num) num.value = nextNumber('ORC', 'abeneOrcCounter', false);
         var notes = document.getElementById('devisNotes');
@@ -817,10 +836,6 @@
         ensurePaperLetterhead();
         prefillFromDocument('devis');
         hydrateFromEditor('devis');
-        var existDevis = ed() && ed().querySelector('[data-abene-block="devis"]');
-        if (existDevis && paperStatusOf(existDevis) === 'final') {
-            toastMsg('previewEditFinalWarn', 'Este orçamento já é versão definitiva. Alterar e confirmar grava uma nova revisão PDF.');
-        }
         var dateEl = document.getElementById('devisDate');
         if (dateEl && !dateEl.value) dateEl.value = todayIso();
         if (window.abeneContabilidade && window.abeneContabilidade.fillDevisFromTables) {
@@ -832,6 +847,11 @@
 
     window.openReceiptModal = function () {
         if (typeof applyCompanyDefaults === 'function') applyCompanyDefaults();
+        var finalReceipt = ed() && ed().querySelector('[data-abene-block="receipt"][data-abene-status="final"]');
+        if (finalReceipt) {
+            toastMsg('previewEditFinalWarn', 'Este recibo é definitivo. Use « Copiar como novo » no Arquivo ou nas Versões para o modificar.');
+            return;
+        }
         var num = document.getElementById('receiptNumber');
         if (num) num.value = nextNumber('REC', 'abeneRecCounter', false);
         var notes = document.getElementById('receiptNotes');
@@ -846,10 +866,6 @@
         ensurePaperLetterhead();
         prefillFromDocument('receipt');
         hydrateFromEditor('receipt');
-        var existRec = ed() && ed().querySelector('[data-abene-block="receipt"]');
-        if (existRec && paperStatusOf(existRec) === 'final') {
-            toastMsg('previewEditFinalWarn', 'Este recibo já é versão definitiva. Alterar e confirmar grava uma nova revisão PDF.');
-        }
         var rDate = document.getElementById('receiptDate');
         if (rDate && !rDate.value) rDate.value = todayIso();
         document.getElementById('receiptModal').classList.add('visible');
@@ -862,7 +878,7 @@
         row.style.alignItems = 'end';
         var vat = (company().vatRate != null ? company().vatRate : 23);
         row.innerHTML =
-            '<div class="form-group" style="flex:3;"><label>' + (typeof t === 'function' ? t('description') : 'Descrição') + '</label><input type="text" class="item-desc" value=""></div>' +
+            '<div class="form-group" style="flex:3;"><label>' + (typeof t === 'function' ? t('description') : 'Descrição') + '</label><input type="text" class="item-desc" list="abeneArticleList" value=""></div>' +
             '<div class="form-group" style="flex:0.7;"><label>Un.</label><input type="text" class="item-unit" value="un"></div>' +
             '<div class="form-group" style="flex:0.7;"><label>' + (typeof t === 'function' ? t('qty') : 'Qtd') + '</label><input type="number" class="item-qty" value="1"></div>' +
             '<div class="form-group" style="flex:1;"><label>' + (typeof t === 'function' ? t('unitPrice') : 'Preço unit.') + '</label><input type="number" class="item-price" value="0" step="0.01"></div>' +
@@ -1108,7 +1124,7 @@
         if (err) {
             if (typeof showToast === 'function') showToast(err);
             else alert(err);
-            return false;
+            return null;
         }
         var radio = isQuote ? 'devisInsertMode' : 'receiptInsertMode';
         var prefix = isQuote ? 'ORC' : 'REC';
@@ -1117,55 +1133,84 @@
         if (isQuote) setField('devisNumber', data.number);
         else setField('receiptNumber', data.number);
         var mode = chosenMode(radio);
-        if (mode === 'replace-doc' && editorHasContent() && !confirm(ui('cReplaceDoc', 'Substituir o documento atual?'))) return false;
+        if (mode === 'replace-doc' && editorHasContent() && !confirm(ui('cReplaceDoc', 'Substituir o documento atual?'))) return null;
+        var editorBefore = ed();
+        var previousHtml = editorBefore ? editorBefore.innerHTML : '<p></p>';
         var html = isQuote ? buildQuoteHTML(data, { status: status }) : buildReceiptHTML(data, { status: status });
         composeDocument(kind, html, mode);
         rememberLastJob(data, isQuote ? 'devis' : 'receipt');
         persistLocal();
+        var pdfPromise = Promise.resolve(null);
+        var recordFinal = function () {};
         if (status === 'final') {
             try {
-                if (isQuote) {
-                    localStorage.setItem('abeneLastQuote', JSON.stringify({
-                        number: data.number, client: data.client, total: data.grand,
-                        nif: data.clientNif, items: data.items, date: data.date, object: data.object
-                    }));
-                }
-                if (window.abeneContabilidade && window.abeneContabilidade.journalPush) {
-                    if (isQuote) {
-                        window.abeneContabilidade.journalPush({
-                            tipo: 'ORCAMENTO', codigoSAFT: 'OR', label: 'Orçamento',
-                            numero: data.number, data: data.date, cliente: data.client,
-                            nifCliente: data.clientNif, morada: data.clientAddress, objeto: data.object,
-                            total: data.grand, items: data.items,
-                            discount: data.discount, ivaRegime: data.ivaRegime,
-                            postal: data.clientPostal, localidade: data.clientLocalidade,
-                            site: data.site, email: data.clientEmail, telefone: data.clientPhone
-                        });
-                    } else {
-                        window.abeneContabilidade.journalPush({
-                            tipo: 'RECIBO_COMERCIAL', codigoSAFT: 'RG', label: 'Recibo comercial',
-                            numero: data.number, data: data.date, cliente: data.payerName,
-                            nifCliente: data.payerNif, morada: data.payerAddress, objeto: data.object,
-                            pagamento: data.payMethod, referencia: data.payRef, origem: data.quoteRef,
-                            total: data.amount,
-                            email: data.payerEmail, postal: data.payerPostal, localidade: data.payerLocalidade,
-                            items: [{ desc: data.object || 'Pagamento', unit: 'un', qty: 1, price: data.amount, vat: data.vatRate || 0, total: data.amount }]
-                        });
-                    }
-                }
+                recordFinal = function () {
+                    try {
+                        if (isQuote) {
+                            localStorage.setItem('abeneLastQuote', JSON.stringify({
+                                number: data.number, client: data.client, total: data.grand,
+                                nif: data.clientNif, items: data.items, date: data.date, object: data.object
+                            }));
+                        }
+                        if (window.abeneContabilidade && window.abeneContabilidade.journalPush) {
+                            if (isQuote) {
+                                window.abeneContabilidade.journalPush({
+                                    tipo: 'ORCAMENTO', codigoSAFT: 'OR', label: 'Orçamento',
+                                    numero: data.number, data: data.date, cliente: data.client,
+                                    nifCliente: data.clientNif, morada: data.clientAddress, objeto: data.object,
+                                    total: data.grand, items: data.items,
+                                    discount: data.discount, ivaRegime: data.ivaRegime,
+                                    postal: data.clientPostal, localidade: data.clientLocalidade,
+                                    site: data.site, email: data.clientEmail, telefone: data.clientPhone
+                                });
+                            } else {
+                                window.abeneContabilidade.journalPush({
+                                    tipo: 'RECIBO_COMERCIAL', codigoSAFT: 'RG', label: 'Recibo comercial',
+                                    numero: data.number, data: data.date, cliente: data.payerName,
+                                    nifCliente: data.payerNif, morada: data.payerAddress, objeto: data.object,
+                                    pagamento: data.payMethod, referencia: data.payRef, origem: data.quoteRef,
+                                    total: data.amount,
+                                    email: data.payerEmail, postal: data.payerPostal, localidade: data.payerLocalidade,
+                                    items: [{ desc: data.object || 'Pagamento', unit: 'un', qty: 1, price: data.amount, vat: data.vatRate || 0, total: data.amount }]
+                                });
+                            }
+                        }
+                    } catch (eRecord) {}
+                };
                 var editorNow = ed();
                 if (window.abeneArquivoApi && typeof window.abeneArquivoApi.gravarEtape === 'function' && editorNow) {
-                    window.abeneArquivoApi.gravarEtape(isQuote ? 'orcamento' : 'recibo', {
+                    pdfPromise = window.abeneArquivoApi.gravarEtape(isQuote ? 'orcamento' : 'recibo', {
                         html: editorNow.innerHTML,
                         number: data.number,
+                        name: (window.abene && window.abene.documentState && window.abene.documentState.name) || '',
+                        client: isQuote ? data.client : data.payerName,
+                        pasta: (isQuote ? (data.site || data.object) : (data.object || '')) || '',
+                        nif: isQuote ? data.clientNif : data.payerNif,
+                        type: isQuote ? 'orcamento' : 'recibo',
                         silent: true
                     }).then(function (rec) {
                         if (rec && rec.rev) toastMsg('previewPdfFrozen', 'Versão definitiva gravada no Arquivo (PDF v' + rec.rev + ').');
-                    }).catch(function () {});
+                        if (!rec) throw new Error('pdf-not-saved');
+                        return rec;
+                    });
+                } else {
+                    pdfPromise = Promise.reject(new Error('pdf-unavailable'));
                 }
-            } catch (e) {}
+            } catch (e) { pdfPromise = Promise.reject(e); }
         }
-        return true;
+        return {
+            ok: true,
+            data: data,
+            pdfPromise: pdfPromise,
+            recordFinal: recordFinal,
+            rollback: function () {
+                var editorNow = ed();
+                if (editorNow) editorNow.innerHTML = previousHtml || '<p></p>';
+                persistLocal();
+                if (typeof updateStats === 'function') updateStats();
+                if (typeof refreshPagination === 'function') refreshPagination();
+            }
+        };
     }
 
     window.previewDevis = function () {
@@ -1231,7 +1276,7 @@
             return;
         }
         window.html2pdf().set({
-            margin: [10, 10, 12, 10],
+            margin: 0,
             filename: name,
             image: { type: 'jpeg', quality: 0.98 },
             html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
@@ -1264,53 +1309,66 @@
             'Este documento não constitui fatura certificada (AT).\n\n' +
             'Com os melhores cumprimentos,\n' + (co.name || 'Genius Raros');
         var sheet = document.getElementById('paperPreviewSheet');
-        var html = sheet ? sheet.innerHTML : '';
         var gmailOn = typeof window.abeneSendEmail === 'function' &&
             typeof window.abeneSheetsEnabled === 'function' &&
             window.abeneSheetsEnabled() &&
             navigator.onLine !== false;
 
-        function mailtoFallback() {
-            window.location.href = 'mailto:' + encodeURIComponent(to) +
-                '?subject=' + encodeURIComponent(subj) +
-                '&body=' + encodeURIComponent(body);
-        }
-
         function sendWith(atts) {
-            toastMsg('mailSending', 'A enviar pelo Gmail da conta Google ligada…');
+            var list = Array.isArray(atts) ? atts : [];
+            if (list.length !== 1 || list[0].mimeType !== 'application/pdf' || !list[0].data) {
+                toastMsg('mailFail', 'O PDF não pôde ser criado. Nada foi enviado.');
+                return;
+            }
+            toastMsg('mailSending', 'A enviar PDF pelo Gmail da conta Google ligada…');
             window.abeneSendEmail({
                 to: to,
                 subject: subj,
                 body: body,
-                html: html
-                    ? '<div style="font-family:Segoe UI,Arial,sans-serif">' + html + '</div>'
-                    : '',
+                html: '',
                 name: co.name || 'Genius Raros',
-                attachments: atts || []
+                attachments: list
             }).then(function (json) {
                 var from = (json && json.from) || co.googleOwnerEmail || '';
-                toastMsg('mailSent', from
-                    ? ('E-mail enviado por ' + from + '.')
-                    : 'E-mail enviado pelo Gmail da conta ligada.');
+                toastMsg('mailSentPdf', from
+                    ? ('PDF enviado por ' + from + ' (não definitivo).')
+                    : 'PDF enviado ao cliente (não definitivo).');
+                markSentToClient();
             }).catch(function () {
-                if (window.confirm(ui('mailFail', 'Falha no Gmail da conta ligada. Abrir o programa de e-mail deste computador?'))) {
-                    mailtoFallback();
-                }
+                toastMsg('mailFail', 'Falha no Gmail ligado. Nada foi enviado; verifique a ligação e tente novamente.');
             });
         }
 
+        function markSentToClient() {
+            try {
+                if (window.abene && window.abene.documentState) {
+                    window.abene.documentState.sentToClient = true;
+                }
+            } catch (e0) {}
+            try {
+                if (window.abeneArquivoApi && typeof window.abeneArquivoApi.markSentToClient === 'function') {
+                    var meta = previewState && previewState.data;
+                    window.abeneArquivoApi.markSentToClient({
+                        client: isQuote ? (meta && meta.client) : (meta && meta.payerName),
+                        number: meta && meta.number,
+                        kind: previewState && previewState.kind
+                    });
+                }
+            } catch (e1) {}
+        }
+
         if (!gmailOn) {
-            mailtoFallback();
+            toastMsg('mailFail', 'Ligue o Gmail/Apps Script nas Definições para enviar o PDF. Nada foi enviado.');
             return;
         }
 
         if (!window.html2pdf || !sheet) {
-            sendWith([]);
+            toastMsg('mailFail', 'O PDF não pôde ser criado. Nada foi enviado.');
             return;
         }
         try {
             var worker = window.html2pdf().set({
-                margin: [10, 10, 12, 10],
+                margin: 0,
                 filename: (num || 'papel') + '.pdf',
                 image: { type: 'jpeg', quality: 0.92 },
                 html2canvas: { scale: 1.6, useCORS: true, backgroundColor: '#ffffff' },
@@ -1323,11 +1381,11 @@
                     var i = s.indexOf(',');
                     var b64 = i >= 0 ? s.slice(i + 1) : '';
                     sendWith(b64 ? [{ name: (num || 'papel') + '.pdf', mimeType: 'application/pdf', data: b64 }] : []);
-                }).catch(function () { sendWith([]); });
+                }).catch(function () { toastMsg('mailFail', 'O PDF não pôde ser criado. Nada foi enviado.'); });
                 return;
             }
         } catch (ePdf) {}
-        sendWith([]);
+        toastMsg('mailFail', 'O PDF não pôde ser criado. Nada foi enviado.');
     };
     window.commitPaperPreview = function (status) {
         if (!previewState || previewState.kind === 'both') return;
@@ -1338,34 +1396,47 @@
             if (kind === 'devis') hydrateQuoteForm(previewState.data);
             else hydrateReceiptForm(previewState.data);
         }
-        var ok = insertCommercialPaper(kind, status);
-        if (!ok) return;
-        if (typeof closeModal === 'function') {
-            closeModal(kind === 'devis' ? 'devisModal' : 'receiptModal');
-        }
-        window.closePaperPreview();
+        var result = insertCommercialPaper(kind, status);
+        if (!result || !result.ok) return;
         if (status === 'draft') {
+            if (typeof closeModal === 'function') closeModal(kind === 'devis' ? 'devisModal' : 'receiptModal');
+            window.closePaperPreview();
             toastMsg(kind === 'devis' ? 'toastQuoteDraft' : 'toastReceiptDraft',
                 kind === 'devis'
                     ? 'Rascunho do orçamento inserido. Confirme a versão definitiva quando estiver pronto.'
                     : 'Rascunho do recibo inserido. Confirme a versão definitiva quando estiver pronto.');
         } else {
-            var data = kind === 'devis' ? collectQuote() : collectReceipt();
-            if (window.abeneArquivoApi && typeof window.abeneArquivoApi.archiveCurrent === 'function') {
-                window.abeneArquivoApi.archiveCurrent({
+            var data = result.data;
+            Promise.resolve(result.pdfPromise).then(function () {
+                if (!window.abeneArquivoApi || typeof window.abeneArquivoApi.archiveCurrent !== 'function') throw new Error('archive-unavailable');
+                var archiveId = window.abeneArquivoApi.archiveCurrent({
                     silent: true,
                     concluded: true,
                     client: kind === 'devis' ? data.client : data.payerName,
                     pasta: (kind === 'devis' ? (data.site || data.object) : (data.object || '')) || undefined,
                     nif: kind === 'devis' ? data.clientNif : data.payerNif
                 });
-            }
-            persistLocal();
-            if (typeof window.abeneSheetsPush === 'function') {
-                window.abeneSheetsPush('final').catch(function () {});
-            }
-            toastMsg(kind === 'devis' ? 'toastQuoteFinal' : 'toastReceiptFinal',
-                kind === 'devis' ? 'Orçamento confirmado (versão definitiva).' : 'Recibo confirmado (versão definitiva).');
+                if (!archiveId) throw new Error('archive-failed');
+                if (typeof window.abeneArquivoApi.waitForArchivePdfs === 'function') {
+                    return Promise.resolve(window.abeneArquivoApi.waitForArchivePdfs()).then(function () {
+                        return { archiveId: archiveId, data: data };
+                    });
+                }
+                return { archiveId: archiveId, data: data };
+            }).then(function () {
+                if (typeof result.recordFinal === 'function') result.recordFinal();
+                if (typeof closeModal === 'function') closeModal(kind === 'devis' ? 'devisModal' : 'receiptModal');
+                window.closePaperPreview();
+                persistLocal();
+                if (typeof window.abeneSheetsPush === 'function') window.abeneSheetsPush('final').catch(function () {});
+                toastMsg(kind === 'devis' ? 'toastQuoteFinal' : 'toastReceiptFinal',
+                    kind === 'devis' ? 'Orçamento confirmado, PDF final preservado no Arquivo.' : 'Recibo confirmado, PDF final preservado no Arquivo.');
+                setTimeout(function () { revealPaperInEditor(kind); }, 40);
+            }).catch(function () {
+                if (typeof result.rollback === 'function') result.rollback();
+                toastMsg('pdfFail', 'A finalização não foi concluída porque o PDF final não pôde ser preservado.');
+            });
+            return;
         }
         setTimeout(function () {
             revealPaperInEditor(kind);

@@ -51,6 +51,15 @@
         }
         return { nif: d, valido: nifIsValid(d) ? 'SIM' : 'NAO', consumidor: 'NAO', bruto: d };
     }
+    function issuerNifPack(raw) {
+        var d = onlyDigits(raw);
+        return { nif: d, valido: d && nifIsValid(d) ? 'SIM' : 'NAO', consumidor: 'NAO', bruto: d };
+    }
+    function saftCode(paper) {
+        if (!paper || paper.tipo === 'RELATORIO') return '';
+        if (paper.codigoSAFT) return paper.codigoSAFT;
+        return paper.tipo === 'RECIBO_COMERCIAL' ? 'RG' : 'OR';
+    }
     function isExemptRegime(regime) {
         return regime === 'autoliquidacao' || regime === 'art9' || regime === 'art53';
     }
@@ -88,6 +97,7 @@
     }
     function csvEsc(v) {
         var s = String(v == null ? '' : v);
+        if (/^[\t\r ]*[=+\-@]/.test(s)) s = "'" + s;
         if (/[;"\n\r]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
         return s;
     }
@@ -353,6 +363,42 @@
         return items;
     }
 
+    function harvestReportTables(report) {
+        var items = [];
+        if (!report) return items;
+        report.querySelectorAll('table[data-abene-quote-table]').forEach(function (table) {
+            if (table.closest('[data-abene-block="devis"], [data-abene-block="receipt"]')) return;
+            var kind = table.getAttribute('data-abene-quote-table') || 'quote';
+            table.querySelectorAll('tbody tr').forEach(function (tr) {
+                if (tr.getAttribute('data-abene-totals')) return;
+                var tds = tr.querySelectorAll('td');
+                if (!tds.length) return;
+                var desc = '', recommendation = '', unit = 'un', qty = 1, price = 0, vat = Number(company().vatRate) || 23;
+                if (kind === 'works') {
+                    if (tds.length < 8) return;
+                    desc = cellText(tds[1]);
+                    recommendation = cellText(tds[2]);
+                    unit = cellText(tds[3]) || 'un';
+                    qty = parsePtNumber(cellText(tds[4])) || 1;
+                    price = parsePtNumber(cellText(tds[5]));
+                    vat = parsePtNumber(cellText(tds[6]));
+                    if (recommendation) desc = desc ? (desc + ' — ' + recommendation) : recommendation;
+                } else {
+                    if (tds.length < 7) return;
+                    desc = cellText(tds[1]);
+                    unit = cellText(tds[2]) || 'un';
+                    qty = parsePtNumber(cellText(tds[3])) || 1;
+                    price = parsePtNumber(cellText(tds[4]));
+                    vat = parsePtNumber(cellText(tds[5]));
+                }
+                if (!desc) return;
+                if (isNaN(vat)) vat = Number(company().vatRate) || 23;
+                items.push({ desc: desc, unit: unit, qty: qty, price: price, vat: vat, total: qty * price });
+            });
+        });
+        return items;
+    }
+
     function decodePayload(el) {
         var b64 = el.getAttribute('data-abene-payload');
         if (!b64) return null;
@@ -371,14 +417,14 @@
         }
         return { morada: s, cp: '', local: '' };
     }
-    function papersFromHtml(html, entry) {
+    function papersFromHtml(html, entry, includeDrafts) {
         var out = [];
         if (!html) return out;
         var wrap = document.createElement('div');
         wrap.innerHTML = html;
         wrap.querySelectorAll('[data-abene-block="devis"]').forEach(function (el) {
             var st = el.getAttribute('data-abene-status') || 'final';
-            if (st === 'draft' || st === 'preview') return;
+            if (!includeDrafts && (st === 'draft' || st === 'preview')) return;
             var pay = decodePayload(el) || {};
             var vat = pay.tva != null ? Number(pay.tva) : parseFloat(el.getAttribute('data-abene-vat') || '23');
             if (isNaN(vat)) vat = 23;
@@ -404,7 +450,7 @@
                 naoEFatura: 'SIM',
                 label: 'Orcamento',
                 numero: pay.number || el.getAttribute('data-abene-number') || (entry && entry.number) || '',
-                data: isoDate(pay.date || el.getAttribute('data-abene-date') || (entry && entry.archivedAt)),
+                data: isoDate(pay.date || el.getAttribute('data-abene-date') || (entry && (entry.documentDate || entry.archivedAt))),
                 validity: pay.validity || 30,
                 cliente: pay.client || el.getAttribute('data-abene-client') || (entry && entry.client) || '',
                 nifCliente: pay.clientNif || el.getAttribute('data-abene-nif') || '',
@@ -427,12 +473,14 @@
                 pasta: (entry && entry.pasta) || '',
                 arquivoNome: (entry && entry.name) || '',
                 ownerId: entry ? (window.abeneArquivoApi && window.abeneArquivoApi.ownerIdOf(entry)) : '',
+                status: (st === 'final' || (entry && entry.concluded)) ? 'final' : st,
+                final: st === 'final' || !!(entry && entry.concluded),
                 hasPdf: false
             });
         });
         wrap.querySelectorAll('[data-abene-block="receipt"]').forEach(function (el) {
             var st = el.getAttribute('data-abene-status') || 'final';
-            if (st === 'draft' || st === 'preview') return;
+            if (!includeDrafts && (st === 'draft' || st === 'preview')) return;
             var pay = decodePayload(el) || {};
             var amt = Number(pay.amount != null ? pay.amount : el.getAttribute('data-abene-total')) || 0;
             var recVat = pay.vatRate != null ? Number(pay.vatRate) : 0;
@@ -446,7 +494,7 @@
                 naoEFatura: 'SIM',
                 label: 'Recibo comercial',
                 numero: pay.number || el.getAttribute('data-abene-number') || '',
-                data: isoDate(pay.date || el.getAttribute('data-abene-date') || (entry && entry.archivedAt)),
+                data: isoDate(pay.date || el.getAttribute('data-abene-date') || (entry && (entry.documentDate || entry.archivedAt))),
                 validity: 0,
                 cliente: pay.payerName || el.getAttribute('data-abene-client') || '',
                 nifCliente: pay.payerNif || el.getAttribute('data-abene-nif') || '',
@@ -472,32 +520,68 @@
                 pasta: (entry && entry.pasta) || '',
                 arquivoNome: (entry && entry.name) || '',
                 ownerId: entry ? (window.abeneArquivoApi && window.abeneArquivoApi.ownerIdOf(entry)) : '',
+                status: (st === 'final' || (entry && entry.concluded)) ? 'final' : st,
+                final: st === 'final' || !!(entry && entry.concluded),
+                hasPdf: false
+            });
+        });
+        wrap.querySelectorAll('[data-abene-block="report"]').forEach(function (el) {
+            var items = harvestReportTables(el);
+            var titleEl = el.querySelector('.gr-doc-title, h1, h2');
+            var title = cellText(titleEl) || (entry && entry.name) || 'Relatório técnico';
+            var owner = entry ? (window.abeneArquivoApi && window.abeneArquivoApi.ownerIdOf(entry)) : '';
+            out.push({
+                tipo: 'RELATORIO',
+                codigoSAFT: '',
+                familiaSAFT: 'support',
+                sugestaoAT: '',
+                naoEFatura: 'SIM',
+                label: 'Relatório técnico',
+                numero: (entry && entry.number) || '',
+                data: isoDate(entry && (entry.documentDate || entry.archivedAt)),
+                validity: 0,
+                cliente: (entry && entry.client) || '',
+                nifCliente: (entry && entry.nif) || '',
+                consumerFinal: false,
+                morada: '', postal: '', localidade: '', email: '', telefone: '', contacto: '',
+                objeto: title,
+                site: (entry && entry.pasta) || '',
+                payTerms: '', notes: '', discount: 0, discountAmount: 0,
+                ivaRegime: 'normal',
+                total: 0,
+                items: items,
+                pasta: (entry && entry.pasta) || '',
+                arquivoNome: (entry && entry.name) || title,
+                ownerId: owner || '',
+                status: entry && entry.concluded ? 'final' : 'draft',
+                final: !!(entry && entry.concluded),
                 hasPdf: false
             });
         });
         return out;
     }
-    function collectPackSources() {
+    function collectPackSources(entriesOverride, forceAllArchive) {
         var api = window.abeneArquivoApi;
-        var entries = [];
-        if (api && typeof api.visibleEntries === 'function') {
-            entries = api.visibleEntries() || [];
-        }
-        if (!entries.length && api && typeof api.allEntries === 'function') {
+        var limited = Array.isArray(entriesOverride);
+        var entries = limited ? entriesOverride.slice() : [];
+        var archiveOpen = !!document.querySelector('#arqOverlay.open');
+        if (!limited && forceAllArchive && api && typeof api.allEntries === 'function') {
             entries = (api.allEntries() || []).slice();
-            if (typeof api.currentSnapshot === 'function') entries.unshift(api.currentSnapshot());
+        } else if (!limited && archiveOpen && api && typeof api.visibleEntries === 'function') {
+            entries = api.visibleEntries() || [];
+        } else if (!limited && api && typeof api.currentSnapshot === 'function') {
+            entries = [api.currentSnapshot()];
         }
         var papers = [];
         var seen = {};
         entries.forEach(function (e) {
-            papersFromHtml(e.html || '', e).forEach(function (p) {
-                var key = (p.codigoSAFT || '') + '|' + (p.numero || '') + '|' + (p.cliente || '');
+            papersFromHtml(e.html || '', e, true).forEach(function (p) {
+                var key = (p.ownerId || '') + '|' + (p.tipo || p.codigoSAFT || '') + '|' + (p.numero || '') + '|' + (p.cliente || '');
                 if (seen[key]) return;
                 seen[key] = true;
                 papers.push(p);
             });
         });
-        if (!papers.length) papers = currentPapers();
         return { papers: papers, entries: entries };
     }
 
@@ -530,14 +614,40 @@
 
     function splitSerie(num) {
         var r = String(num || '').trim();
+        if (!r) return { serie: '', numero: '' };
         var m = r.match(/^([A-Za-z]+)-(\d{4})-(\d+)$/);
         if (m) return { serie: m[1] + '-' + m[2], numero: m[3] };
-        return { serie: 'ORC', numero: r || '1' };
+        return { serie: '', numero: r };
+    }
+
+    function accountingUse(paper) {
+        if (paper.tipo === 'ORCAMENTO') {
+            return {
+                uso: 'BASE_PARA_FATURA',
+                acao: 'Criar a fatura certificada depois de confirmar aceitacao e execucao.',
+                faturar: 'SIM'
+            };
+        }
+        if (paper.tipo === 'RECIBO_COMERCIAL') {
+            return {
+                uso: 'COMPROVATIVO_DE_PAGAMENTO',
+                acao: 'Associar a fatura existente ou regularizar a fatura se ainda nao existir.',
+                faturar: 'A_VALIDAR'
+            };
+        }
+        var priced = (paper.items || []).some(function (it) { return Number(it.price) || Number(it.total); });
+        return {
+            uso: 'SUPORTE_TECNICO',
+            acao: priced
+                ? 'Analisar os trabalhos valorizados e criar a fatura se estiverem aceites ou executados.'
+                : 'Anexar ao processo do cliente como relatorio tecnico.',
+            faturar: priced ? 'A_VALIDAR' : 'NAO'
+        };
     }
 
     function buildCsvPack(papers, decimalPt) {
         var co = company();
-        var emit = nifPack(co.nif, false);
+        var emit = issuerNifPack(co.nif);
         var fmt = decimalPt ? decPt : decDot;
         var docHdr = [
             'TipoDocumento', 'CodigoSAFT', 'FamiliaSAFT', 'Serie', 'Numero', 'Data', 'Ano', 'Mes', 'DataVencimento',
@@ -548,13 +658,15 @@
             'DescontoPercent', 'DescontoValor', 'RegimeIVA', 'MotivoIsencao',
             'Base_IVA23', 'IVA_23', 'Base_IVA13', 'IVA_13', 'Base_IVA6', 'IVA_6', 'Base_Isento',
             'Total_IVA', 'Total_Documento', 'Moeda', 'ContaSNC', 'IBAN',
-            'MetodoPagamento', 'DocumentoOrigem', 'SugestaoDocumentoAT', 'NaoEFaturaAT', 'Aviso'
+            'MetodoPagamento', 'DocumentoOrigem', 'SugestaoDocumentoAT', 'NaoEFaturaAT',
+            'UsoContabilista', 'AcaoContabilista', 'FaturaACriar', 'DocumentoABENE_NaoFatura', 'Aviso'
         ];
         var lineHdr = [
             'TipoDocumento', 'CodigoSAFT', 'Serie', 'Numero', 'Data', 'NIF_Emitente', 'NIF_Cliente',
             'Linha', 'Descricao', 'Quantidade', 'Unidade', 'PrecoUnitario_sIVA', 'DescontoPercent',
             'TaxaIVA', 'CodigoTaxa', 'MotivoIsencao',
-            'BaseLinha', 'IVALinha', 'TotalLinha_cIVA', 'ContaSNC', 'ContaIVA', 'NaoEFaturaAT', 'Aviso'
+            'BaseLinha', 'IVALinha', 'TotalLinha_cIVA', 'ContaSNC', 'ContaIVA', 'NaoEFaturaAT',
+            'UsoContabilista', 'FaturaACriar', 'Aviso'
         ];
         var docs = [docHdr.map(csvEsc).join(';')];
         var lines = [lineHdr.map(csvEsc).join(';')];
@@ -572,8 +684,9 @@
             var cp = p.postal || parsed.cp;
             var loc = p.localidade || parsed.local;
             var motivo = motivoIsencao(p.ivaRegime, totIva === 0 && totBase ? 0 : 23);
+            var use = accountingUse(p);
             docs.push([
-                p.label || p.tipo, p.codigoSAFT || 'OR', p.familiaSAFT || 'working',
+                p.label || p.tipo, saftCode(p), p.familiaSAFT || 'working',
                 sn.serie, sn.numero, ym.iso, ym.ano, ym.mes, venc,
                 emit.nif, emit.valido, co.name || 'Genius Raros',
                 cli.nif, cli.valido, cli.consumidor, p.cliente || '', p.morada || '',
@@ -585,7 +698,8 @@
                 fmt(tb.bases[6]), fmt(tb.ivas[6]), fmt(tb.bases[0]),
                 fmt(totIva), fmt(total), 'EUR', '72', co.iban || '',
                 p.pagamento || '', p.origem || '',
-                p.sugestaoAT || 'FT', p.naoEFatura || 'SIM', aviso
+                p.sugestaoAT || '', p.naoEFatura || 'SIM',
+                use.uso, use.acao, use.faturar, 'SIM', aviso
             ].map(csvEsc).join(';'));
             (tb.items.length ? tb.items : [{ desc: p.objeto || p.label, qty: 1, unit: 'un', price: total, vat: 0 }]).forEach(function (it, idx) {
                 var rate = Number(it.vat);
@@ -597,17 +711,47 @@
                 var iva = base * (rate / 100);
                 var lineMotivo = motivoIsencao(p.ivaRegime, rate);
                 lines.push([
-                    p.label || p.tipo, p.codigoSAFT || 'OR', sn.serie, sn.numero, ym.iso,
+                    p.label || p.tipo, saftCode(p), sn.serie, sn.numero, ym.iso,
                     emit.nif, cli.nif,
                     String(idx + 1), it.desc || '', it.qty || 1, it.unit || 'un', fmt(it.price),
                     fmt(p.discount || 0),
                     rate, ptTaxCode(rate), lineMotivo,
                     fmt(base), fmt(iva), fmt(base + iva),
-                    '72', sncIva(rate), p.naoEFatura || 'SIM', aviso
+                    '72', sncIva(rate), p.naoEFatura || 'SIM', use.uso, use.faturar, aviso
                 ].map(csvEsc).join(';'));
             });
         });
         return { documentos: docs.join('\r\n') + '\r\n', linhas: lines.join('\r\n') + '\r\n' };
+    }
+
+    function buildResumoCsv(papers, decimalPt) {
+        var fmt = decimalPt ? decPt : decDot;
+        var hdr = ['TipoDocumento', 'Quantidade', 'BaseSemIVA', 'IVA', 'TotalComIVA', 'Finalizados', 'A_Faturar', 'A_Validar', 'Observacao'];
+        var rows = [hdr.map(csvEsc).join(';')];
+        ['RELATORIO', 'ORCAMENTO', 'RECIBO_COMERCIAL', 'TOTAL'].forEach(function (tipo) {
+            var list = tipo === 'TOTAL' ? papers : papers.filter(function (p) { return p.tipo === tipo; });
+            if (tipo !== 'TOTAL' && !list.length) return;
+            var base = 0, iva = 0, total = 0, finals = 0, faturar = 0, validar = 0;
+            list.forEach(function (p) {
+                var calc = lineBases(p);
+                Object.keys(calc.bases).forEach(function (k) { base += Number(calc.bases[k]) || 0; });
+                Object.keys(calc.ivas).forEach(function (k) { iva += Number(calc.ivas[k]) || 0; });
+                var use = accountingUse(p);
+                if (use.faturar === 'SIM') faturar += 1;
+                if (use.faturar === 'A_VALIDAR') validar += 1;
+                if (p.final || p.status === 'final') finals += 1;
+            });
+            total = base + iva;
+            var note = tipo === 'ORCAMENTO'
+                ? 'Potencial faturacao; confirmar aceitacao e execucao.'
+                : (tipo === 'RECIBO_COMERCIAL'
+                    ? 'Fluxo de pagamento; nao somar novamente como faturacao.'
+                    : (tipo === 'RELATORIO'
+                        ? 'Suporte tecnico; valores podem repetir um orcamento.'
+                        : 'TOTAL INDICATIVO NAO FISCAL; pode conter valores repetidos entre relatorio, orcamento e recibo.'));
+            rows.push([tipo, list.length, fmt(base), fmt(iva), fmt(total), finals, faturar, validar, note].map(csvEsc).join(';'));
+        });
+        return rows.join('\r\n') + '\r\n';
     }
 
     function buildClientsCsv(papers) {
@@ -641,7 +785,7 @@
 
     function buildEmpresaCsv() {
         var co = company();
-        var emit = nifPack(co.nif, false);
+        var emit = issuerNifPack(co.nif);
         var hdr = ['Nome', 'FormaJuridica', 'NIF', 'NIF_Valido', 'CAE', 'Morada', 'Pais', 'Telefone', 'Email', 'Website', 'IBAN', 'BIC', 'RegimeIVA', 'TaxaIVAPredefinida', 'Moeda'];
         var row = [
             co.name || 'Genius Raros', co.legalForm || '', emit.nif, emit.valido, co.cae || '',
@@ -659,7 +803,7 @@
         var seen = {};
         var n = 0;
         papers.forEach(function (p) {
-            if (p.tipo !== 'ORCAMENTO') return;
+            if (p.tipo !== 'ORCAMENTO' && p.tipo !== 'RELATORIO') return;
             (p.items || []).forEach(function (it) {
                 var name = String(it.desc || '').trim();
                 if (!name) return;
@@ -684,7 +828,7 @@
         function push(grav, p, campo, detalhe) {
             rows.push([grav, (p && p.label) || '', (p && p.numero) || '', (p && p.cliente) || '', campo, detalhe].map(csvEsc).join(';'));
         }
-        var emit = nifPack(co.nif, false);
+        var emit = issuerNifPack(co.nif);
         if (!onlyDigits(co.nif)) push('ERRO', null, 'NIF_Emitente', 'NIF da empresa vazio nas Definicoes — o TOC nao pode emitir FT.');
         else if (emit.valido === 'NAO') push('ERRO', null, 'NIF_Emitente', 'NIF da empresa invalido (digito de controlo).');
         if (!co.cae) push('AVISO', null, 'CAE', 'CAE da empresa nao preenchido nas Definicoes.');
@@ -706,6 +850,9 @@
             }
             if (p.tipo === 'RECIBO_COMERCIAL' && !(p.origem || '').trim()) {
                 push('AVISO', p, 'DocumentoOrigem', 'Recibo sem n. de orcamento associado.');
+            }
+            if (p.tipo === 'RELATORIO' && !(p.items || []).length) {
+                push('INFO', p, 'FaturaACriar', 'Relatorio sem linhas valorizadas — exportado apenas como suporte tecnico.');
             }
             if (p.tipo === 'ORCAMENTO' && p.total) {
                 var tb = lineBases(p);
@@ -759,7 +906,10 @@
             var nif = nifPack(p.nifCliente, p.consumerFinal).nif;
             var nome = p.cliente || 'Consumidor final';
             var desc = 'Recebimento ' + (p.numero || '') + (p.objeto ? ' — ' + p.objeto : '');
-            var common = [String(ordem), 'VEN', 'RG', isoDate(p.data), isoDate(p.data), desc, p.numero || '',
+            var c = (window.abene && window.abene.companyData) || {};
+            var diario = String(c.tocDiario || 'VEN').toUpperCase();
+            var tipoDoc = String(c.tocTipoDoc || 'RG').toUpperCase();
+            var common = [String(ordem), diario, tipoDoc, isoDate(p.data), isoDate(p.data), desc, p.numero || '',
                 'Cliente', nif, nome];
             rows.push(common.concat(['12', 'Recebimento em caixa/banco', amt, '', 'Nao usar codigo de IVA', aviso]).map(csvEsc).join(';'));
             rows.push(common.concat(['211', 'Cliente — adiantamento / conta corrente', '', amt, 'Nao usar codigo de IVA', aviso]).map(csvEsc).join(';'));
@@ -775,8 +925,8 @@
             'ESTE PACOTE NAO E FATURA CERTIFICADA PELA AT.',
             'Nao contem ATCUD, codigo QR, hash SAF-T nem ficheiro SAF-T (PT).',
             'Nao substitui software certificado (Moloni, TOConline, InvoiceXpress, PHC, Primavera, Sage)',
-            'nem o Portal das Financas. Os documentos Genius Raros sao ORCAMENTO (codigo SAF-T OR) e',
-            'RECIBO COMERCIAL (RG). A coluna CodigoSAFT nunca e FT.',
+            'nem o Portal das Financas. O pack inclui RELATORIOS TECNICOS, ORCAMENTOS e',
+            'RECIBOS COMERCIAIS. Relatorios nao recebem codigo SAF-T; a coluna CodigoSAFT nunca e FT.',
             'A fatura com ATCUD emite-se no programa certificado do TOC, com base nestes dados.',
             '',
             '========== CONVENCOES ==========',
@@ -808,7 +958,8 @@
             '   para esse modelo (nao carregar este CSV diretamente se o TOC recusar ficheiros externos).',
             '',
             '02_documentos_excel-PT.csv  /  04_documentos_import-ERP.csv',
-            '   Cabecalho por orcamento/recibo: bases de IVA por taxa, totais, NIF, serie/numero.',
+            '   Cabecalho por relatorio/orcamento/recibo: bases de IVA, totais, NIF, serie/numero.',
+            '   UsoContabilista, AcaoContabilista e FaturaACriar explicam como tratar cada documento.',
             '   Moloni NAO importa documentos por CSV (so por SAF-T certificado). Usar estes dados',
             '   para criar a Fatura (FT) no software certificado, linha a linha ou por copia.',
             '   PHC CS: Copiar dados de um ficheiro .xls nas linhas do documento (cabecalhos da grelha).',
@@ -827,7 +978,7 @@
             '   Numero de ordem, Diario, Tipo de Documento, Datas, Descricao, Vossa referencia,',
             '   Controlo de terceiros, NIF, Nome, Conta, Debito, Credito.',
             '   OBRIGATORIO: descarregar o modelo Excel do proprio TOConline e copiar as linhas.',
-            '   Diario (VEN) e Tipo de Documento (RG) sao placeholders — substituir pelos vossos codigos.',
+            '   Diario e Tipo de Documento vêm das Definições da empresa (predefinição VEN / RG).',
             '   Lancamento sugerido: Debito 12 (caixa/banco) / Credito 211 (cliente), valor recebido.',
             '   A fatura posterior: Debito 211 / Credito 72 + 243x (o software certificado faz isto sozinho).',
             '',
@@ -837,8 +988,14 @@
             '09_artigos_moloni.csv',
             '   Tabelas > Importar artigos: Numero, Nome, Unidade, Preco, IVA.',
             '',
+            '10_resumo_excel-PT.csv',
+            '   Totais e quantidades por tipo de documento para controlar o periodo exportado.',
+            '',
+            '11_parametros_exportacao.json',
+            '   Data da exportacao, filtros aplicados e quantidade de documentos selecionados.',
+            '',
             'PDF/',
-            '   Versoes finais gravadas no Arquivo (relatorio / orcamento / recibo), se existirem.',
+            '   Versoes finais gravadas no Arquivo e 00_indice_PDF.csv, se existirem.',
             '',
             '========== O QUE NAO FAZER ==========',
             '- Nao gerar nem importar um SAF-T caseiro com tipo FT: isso aparentaria faturas reais.',
@@ -875,7 +1032,7 @@
             '<p>Nao constitui fatura certificada AT.</p></body></html>';
     }
 
-    function fillZipCore(zip, papers) {
+    function fillZipCore(zip, papers, exportMeta) {
         var excelPt = buildCsvPack(papers, true);
         var erp = buildCsvPack(papers, false);
         zip.file('LEIA-ME.txt', readmePt());
@@ -890,29 +1047,71 @@
         zip.file('07_sugestao_lancamentos_TOConline.csv', '\uFEFF' + buildTocJournalCsv(papers));
         zip.file('08_mapa.xls', htmlExcel(papers));
         zip.file('09_artigos_moloni.csv', '\uFEFF' + buildArtigosCsv(papers, true));
+        zip.file('10_resumo_excel-PT.csv', '\uFEFF' + buildResumoCsv(papers, true));
+        zip.file('11_parametros_exportacao.json', JSON.stringify(exportMeta || {
+            generatedAt: new Date().toISOString(),
+            documentCount: papers.length
+        }, null, 2));
     }
 
-    function attachFinalPdfs(zip, entries) {
+    function attachFinalPdfs(zip, entries, papers) {
         var api = window.abeneArquivoApi;
         if (!api || !entries || !entries.length) return Promise.resolve();
         var san = api.sanitizeName || function (s) { return String(s || 'doc').replace(/[\\/:*?"<>|]/g, '-'); };
+        var fileBase = api.archiveFileBase || function (e) { return san(e && e.name || 'documento'); };
+        var allowed = {};
+        (papers || []).forEach(function (p) {
+            var owner = String(p.ownerId || '');
+            if (!owner) return;
+            if (!allowed[owner]) allowed[owner] = {};
+            if (p.tipo === 'RELATORIO') allowed[owner].relatorio = true;
+            if (p.tipo === 'ORCAMENTO') allowed[owner].orcamento = true;
+            if (p.tipo === 'RECIBO_COMERCIAL') allowed[owner].recibo = true;
+        });
+        var index = [['Cliente', 'Pasta', 'TipoArquivo', 'Numero', 'DataDocumento', 'EtapaPDF', 'Revisao', 'Ficheiro']
+            .map(csvEsc).join(';')];
+        var attached = 0;
         return Promise.all(entries.map(function (e) {
             var owner = api.ownerIdOf ? api.ownerIdOf(e) : e.id;
             if (!owner || typeof api.listFinals !== 'function') return Promise.resolve();
             return api.listFinals(owner).then(function (rows) {
                 (rows || []).forEach(function (r) {
                     if (!r.blob) return;
-                    var folder = ['PDF', san(e.client || 'Cliente'), san(e.name || 'documento')].join('/');
-                    zip.file(folder + '/' + san(e.name) + '_' + r.etape + '_v' + r.rev + '.pdf', r.blob);
+                    if (!allowed[String(owner)] || !allowed[String(owner)][r.etape]) return;
+                    var matchedPaper = (papers || []).filter(function (p) {
+                        if (String(p.ownerId || '') !== String(owner)) return false;
+                        if (r.etape === 'relatorio') return p.tipo === 'RELATORIO';
+                        if (r.etape === 'orcamento') return p.tipo === 'ORCAMENTO';
+                        if (r.etape === 'recibo') return p.tipo === 'RECIBO_COMERCIAL';
+                        return false;
+                    })[0] || null;
+                    var base = fileBase(e);
+                    var folder = ['PDF', san(e.client || 'Cliente'), base].join('/');
+                    var path = folder + '/' + base + '_' + r.etape + '_v' + r.rev + '.pdf';
+                    zip.file(path, r.blob);
+                    attached += 1;
+                    index.push([
+                        e.client || (matchedPaper && matchedPaper.cliente) || '',
+                        e.pasta || (matchedPaper && matchedPaper.pasta) || '',
+                        e.type || (matchedPaper && matchedPaper.tipo) || '',
+                        e.number || (matchedPaper && matchedPaper.numero) || '',
+                        isoDate(e.documentDate || (matchedPaper && matchedPaper.data) || e.archivedAt),
+                        r.etape || '', r.rev || '', path
+                    ]
+                        .map(csvEsc).join(';'));
                 });
             });
-        }));
+        })).then(function () {
+            if (attached) zip.file('PDF/00_indice_PDF.csv', '\uFEFF' + index.join('\r\n') + '\r\n');
+            else zip.file('PDF/LEIA-ME.txt', 'Nenhum PDF final corresponde aos documentos selecionados. Finalize os documentos no Arquivo para os incluir aqui.\r\n');
+            return attached;
+        });
     }
 
     function exportAccounting() {
         var papers = currentPapers();
         if (!papers.length) {
-            alert(tt('acctEmpty', 'Não há orçamento nem recibo no documento para exportar.'));
+            alert(tt('acctEmpty', 'Não há relatório, orçamento nem recibo no documento para exportar.'));
             return;
         }
         var stamp = new Date().toISOString().slice(0, 10);
@@ -931,30 +1130,289 @@
         if (typeof showToast === 'function') showToast(tt('toastAcctOk', 'CSV de contabilidade PT descarregado.'));
     }
 
-    function downloadPackContabilista() {
-        var src = collectPackSources();
+    function downloadPackContabilista(opts) {
+        opts = opts || {};
+        var src = collectPackSources(opts.entries);
         if (!src.papers.length) {
-            if (typeof showToast === 'function') showToast(tt('packEmpty', 'Não há orçamento nem recibo nesta vista para o contabilista.'));
-            else alert(tt('packEmpty', 'Não há orçamento nem recibo nesta vista para o contabilista.'));
+            var fallback = !Array.isArray(opts.entries) ? collectPackSources(undefined, true) : { papers: [], entries: [] };
+            if (fallback.papers.length) {
+                src = fallback;
+                opts.defaultScope = 'all';
+            } else {
+                if (typeof showToast === 'function') showToast(tt('packEmpty', 'Não há relatórios, orçamentos nem recibos disponíveis para o contabilista.'));
+                else alert(tt('packEmpty', 'Não há relatórios, orçamentos nem recibos disponíveis para o contabilista.'));
+                return;
+            }
+        }
+        if (opts.skipChooser !== true && typeof window.openGenericModal === 'function') {
+            openPackChooser(src, opts);
             return;
         }
+        runPackDownload(src, {
+            skipChooser: true,
+            includeCsv: opts.includeCsv !== false,
+            includePdf: opts.includePdf !== false,
+            exportMeta: opts.exportMeta || null
+        });
+    }
+
+    window.downloadPackContabilistaSelect = function (opts) {
+        downloadPackContabilista(Object.assign({}, opts || {}, { select: true }));
+    };
+
+    function localIso(d) {
+        return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
+    }
+    function packPeriodBounds(preset) {
+        var now = new Date();
+        var start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        var end = new Date(start.getTime());
+        if (preset === 'month') start = new Date(now.getFullYear(), now.getMonth(), 1);
+        else if (preset === 'previousMonth') {
+            start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+            end = new Date(now.getFullYear(), now.getMonth(), 0);
+        } else if (preset === 'year') start = new Date(now.getFullYear(), 0, 1);
+        else if (preset !== 'today') return { from: '', to: '' };
+        return { from: localIso(start), to: localIso(end) };
+    }
+    function paperKey(p) {
+        return [p.ownerId || '', p.tipo || '', p.numero || '', p.data || '', p.cliente || '', p.arquivoNome || ''].join('|');
+    }
+    function openPackChooser(src, openOpts) {
+        openOpts = openOpts || {};
+        var fixedSelection = Array.isArray(openOpts.entries);
+        var archiveOpen = !!document.querySelector('#arqOverlay.open');
+        var allSrc = fixedSelection ? src : collectPackSources(undefined, true);
+        var chosen = {};
+        (allSrc.papers || []).concat(src.papers || []).forEach(function (p) { chosen[paperKey(p)] = true; });
+        var scopeHtml = fixedSelection
+            ? '<input type="hidden" id="packScope" value="selected"><p class="pack-note">' + esc(tt('packScopeSelected', 'Seleção atual do Arquivo')) + '</p>'
+            : '<label class="pack-field"><span>' + esc(tt('packScope', 'Origem')) + '</span><select id="packScope">' +
+              '<option value="visible">' + esc(archiveOpen ? tt('packScopeVisible', 'Documentos visíveis no Arquivo') : tt('packScopeCurrent', 'Documento atual')) + '</option>' +
+              '<option value="all">' + esc(tt('packScopeAll', 'Todo o Arquivo')) + '</option></select></label>';
+        var body = '<style>' +
+            '.pack-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 12px}.pack-field{display:grid;gap:4px;font-size:12px}.pack-field>span,.pack-group-title{font-weight:700;color:#243247}.pack-field input,.pack-field select{min-height:36px;border:1px solid #c8d0da;border-radius:4px;padding:6px 8px;background:#fff}.pack-types,.pack-outputs{display:flex;gap:10px 16px;flex-wrap:wrap}.pack-types label,.pack-outputs label,.pack-check{display:flex;gap:7px;align-items:center;font-size:12px}.pack-section{border-top:1px solid #d7dde5;margin-top:10px;padding-top:10px}.pack-actions{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}.pack-summary{font-size:12px;font-weight:700;color:#243247;background:#f2f5f8;padding:8px;border-radius:4px}.pack-note{font-size:12px;color:#596579;margin:0}.pack-doc{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:start;padding:7px 4px;border-bottom:1px solid #edf0f3;font-size:12px}.pack-doc small{display:block;color:#687386;margin-top:2px}.pack-total{font-weight:700;white-space:nowrap}@media(max-width:600px){.pack-grid{grid-template-columns:1fr}.pack-doc{grid-template-columns:auto 1fr}.pack-total{grid-column:2}.pack-actions button{min-height:40px}}' +
+            '</style><p class="pack-note">' + esc(tt('packChooserHint', 'Escolha livremente a origem, o período, os tipos e os ficheiros do pack.')) + '</p>' +
+            '<div class="pack-grid pack-section">' + scopeHtml +
+            '<label class="pack-field"><span>' + esc(tt('packPeriod', 'Período')) + '</span><select id="packPeriod">' +
+            '<option value="all">' + esc(tt('packPeriodAll', 'Todas as datas')) + '</option>' +
+            '<option value="today">' + esc(tt('packPeriodToday', 'Hoje')) + '</option>' +
+            '<option value="month">' + esc(tt('packPeriodMonth', 'Este mês')) + '</option>' +
+            '<option value="previousMonth">' + esc(tt('packPeriodPreviousMonth', 'Mês anterior')) + '</option>' +
+            '<option value="year">' + esc(tt('packPeriodYear', 'Este ano')) + '</option>' +
+            '<option value="custom">' + esc(tt('packPeriodCustom', 'Datas personalizadas')) + '</option></select></label>' +
+            '<label class="pack-field"><span>' + esc(tt('packDateFrom', 'Data inicial')) + '</span><input type="date" id="packDateFrom"></label>' +
+            '<label class="pack-field"><span>' + esc(tt('packDateTo', 'Data final')) + '</span><input type="date" id="packDateTo"></label></div>' +
+            '<label class="pack-check"><input type="checkbox" id="packIncludeUndated" checked> ' + esc(tt('packIncludeUndated', 'Incluir documentos sem data')) + '</label>' +
+            '<div class="pack-section"><div class="pack-group-title">' + esc(tt('packTypes', 'Tipos de documento')) + '</div><div class="pack-types">' +
+            '<label><input type="checkbox" class="pack-type-cb" value="RELATORIO" checked> ' + esc(tt('packTypeReport', 'Relatórios')) + '</label>' +
+            '<label><input type="checkbox" class="pack-type-cb" value="ORCAMENTO" checked> ' + esc(tt('packTypeQuote', 'Orçamentos')) + '</label>' +
+            '<label><input type="checkbox" class="pack-type-cb" value="RECIBO_COMERCIAL" checked> ' + esc(tt('packTypeReceipt', 'Recibos')) + '</label>' +
+            '<label><input type="checkbox" id="packFinalsOnly"> ' + esc(tt('packFinalsOnly', 'Só versões finais / concluídos')) + '</label></div></div>' +
+            '<div class="pack-section"><div class="pack-group-title">' + esc(tt('packContents', 'Conteúdo do ficheiro')) + '</div><div class="pack-outputs">' +
+            '<label><input type="checkbox" id="packIncludeCsv" checked> ' + esc(tt('packIncludeCsv', 'CSV para Excel / importação ERP')) + '</label>' +
+            '<label><input type="checkbox" id="packIncludePdf" checked> ' + esc(tt('packIncludePdf', 'PDFs finais gravados no Arquivo')) + '</label></div></div>' +
+            '<div class="pack-section"><div class="pack-actions"><label class="pack-check"><input type="checkbox" id="packAllDocs" checked> ' + esc(tt('packAllDocs', 'Selecionar todos os resultados filtrados')) + '</label>' +
+            '<button type="button" class="btn-secondary" id="packSelectAllBtn">' + esc(tt('packSelectAll', 'Selecionar tudo')) + '</button>' +
+            '<button type="button" class="btn-secondary" id="packSelectNoneBtn">' + esc(tt('packSelectNone', 'Limpar seleção')) + '</button></div>' +
+            '<div class="pack-summary" id="packSummary"></div><div id="packDocList" style="max-height:260px;overflow:auto;margin-top:6px;border:1px solid #d7dde5;border-radius:4px;padding:0 6px;"></div></div>';
+
+        function syncChosen() {
+            document.querySelectorAll('.pack-doc-cb').forEach(function (cb) {
+                chosen[cb.getAttribute('data-key') || ''] = !!cb.checked;
+            });
+        }
+        function sourceNow() {
+            var scope = (document.getElementById('packScope') || {}).value || 'visible';
+            return scope === 'all' ? allSrc : src;
+        }
+        function filterNow() {
+            var base = sourceNow();
+            var allowedTypes = {};
+            document.querySelectorAll('.pack-type-cb:checked').forEach(function (cb) { allowedTypes[cb.value] = true; });
+            var from = (document.getElementById('packDateFrom') || {}).value || '';
+            var to = (document.getElementById('packDateTo') || {}).value || '';
+            var includeUndated = !!(document.getElementById('packIncludeUndated') || {}).checked;
+            var finalsOnly = !!(document.getElementById('packFinalsOnly') || {}).checked;
+            return (base.papers || []).filter(function (p) {
+                if (!allowedTypes[p.tipo]) return false;
+                if (finalsOnly && !(p.final || p.status === 'final')) return false;
+                var d = isoDate(p.data);
+                if (!d) return includeUndated;
+                if (from && d < from) return false;
+                if (to && d > to) return false;
+                return true;
+            });
+        }
+        function paperLabel(p, i) {
+            var name = p.tipo === 'RELATORIO' ? tt('packTypeReportOne', 'Relatório') : (p.tipo === 'ORCAMENTO' ? tt('packTypeQuoteOne', 'Orçamento') : tt('packTypeReceiptOne', 'Recibo'));
+            return esc((p.numero || ('#' + (i + 1))) + ' — ' + (p.cliente || tt('packNoClient', 'Sem cliente')) + ' — ' + name);
+        }
+        function renderDocs() {
+            syncChosen();
+            var box = document.getElementById('packDocList');
+            var summary = document.getElementById('packSummary');
+            if (!box) return;
+            var papers = filterNow();
+            box._papers = papers;
+            var total = 0;
+            papers.forEach(function (p) {
+                var tb = lineBases(p), one = 0;
+                Object.keys(tb.bases).forEach(function (k) { one += Number(tb.bases[k]) || 0; });
+                Object.keys(tb.ivas).forEach(function (k) { one += Number(tb.ivas[k]) || 0; });
+                total += one || Number(p.total) || 0;
+            });
+            if (summary) summary.textContent = tt('packSummary', '{n} documento(s) · total indicativo {total} €')
+                .replace('{n}', String(papers.length)).replace('{total}', decPt(total));
+            box.innerHTML = papers.map(function (p, i) {
+                var k = paperKey(p);
+                var tb = lineBases(p), one = 0;
+                Object.keys(tb.bases).forEach(function (rate) { one += Number(tb.bases[rate]) || 0; });
+                Object.keys(tb.ivas).forEach(function (rate) { one += Number(tb.ivas[rate]) || 0; });
+                return '<label class="pack-doc"><input type="checkbox" class="pack-doc-cb" data-key="' + esc(k) + '" data-i="' + i + '"' + (chosen[k] !== false ? ' checked' : '') + '>' +
+                    '<span>' + paperLabel(p, i) + '<small>' + esc((isoDate(p.data) || tt('packNoDate', 'Sem data')) + (p.objeto ? ' · ' + p.objeto : '')) + '</small></span>' +
+                    '<span class="pack-total">' + decPt(one || p.total || 0) + ' €</span></label>';
+            }).join('') || ('<p style="padding:10px;font-size:12px;">' + esc(tt('packNoResults', 'Nenhum documento corresponde a estes filtros.')) + '</p>');
+            var all = document.getElementById('packAllDocs');
+            if (all) all.checked = papers.length > 0 && papers.every(function (p) { return chosen[paperKey(p)] !== false; });
+        }
+        function setPeriod() {
+            var preset = (document.getElementById('packPeriod') || {}).value || 'all';
+            if (preset !== 'custom') {
+                var bounds = packPeriodBounds(preset);
+                document.getElementById('packDateFrom').value = bounds.from;
+                document.getElementById('packDateTo').value = bounds.to;
+            }
+            renderDocs();
+        }
+        function bindChange(id, fn) {
+            var el = document.getElementById(id);
+            if (el) el.onchange = fn || renderDocs;
+        }
+
+        if (typeof window.openGenericModal === 'function') {
+            window.openGenericModal(
+                tt('packChooserTitle', 'Pack contabilista — seleção profissional'),
+                body,
+                '<button class="btn-secondary" onclick="closeModal(\'genericModal\')">' + esc(tt('cancel', 'Cancelar')) + '</button>' +
+                '<button class="btn-primary" id="packGoBtn">' + esc(tt('packDownload', 'Descarregar pack')) + '</button>'
+            );
+            setTimeout(function () {
+                var scope = document.getElementById('packScope');
+                if (scope && openOpts.defaultScope) scope.value = openOpts.defaultScope;
+                renderDocs();
+                bindChange('packScope');
+                bindChange('packPeriod', setPeriod);
+                bindChange('packIncludeUndated');
+                bindChange('packFinalsOnly');
+                document.querySelectorAll('.pack-type-cb').forEach(function (cb) { cb.onchange = renderDocs; });
+                ['packDateFrom', 'packDateTo'].forEach(function (id) {
+                    bindChange(id, function () {
+                        var preset = document.getElementById('packPeriod');
+                        if (preset) preset.value = 'custom';
+                        renderDocs();
+                    });
+                });
+                var all = document.getElementById('packAllDocs');
+                if (all) all.onchange = function () {
+                    var papers = filterNow();
+                    papers.forEach(function (p) { chosen[paperKey(p)] = !!all.checked; });
+                    renderDocs();
+                };
+                var selectAll = document.getElementById('packSelectAllBtn');
+                if (selectAll) selectAll.onclick = function () {
+                    filterNow().forEach(function (p) { chosen[paperKey(p)] = true; });
+                    renderDocs();
+                };
+                var selectNone = document.getElementById('packSelectNoneBtn');
+                if (selectNone) selectNone.onclick = function () {
+                    filterNow().forEach(function (p) { chosen[paperKey(p)] = false; });
+                    renderDocs();
+                };
+                var go = document.getElementById('packGoBtn');
+                if (go) go.onclick = function () {
+                    syncChosen();
+                    var visible = filterNow();
+                    var selected = visible.filter(function (p) { return chosen[paperKey(p)] !== false; });
+                    if (!selected.length) {
+                        if (typeof showToast === 'function') showToast(tt('packSelectOne', 'Selecione pelo menos um documento.'));
+                        return;
+                    }
+                    var includeCsv = !!(document.getElementById('packIncludeCsv') || { checked: true }).checked;
+                    var includePdf = !!(document.getElementById('packIncludePdf') || { checked: true }).checked;
+                    if (!includeCsv && !includePdf) {
+                        if (typeof showToast === 'function') showToast(tt('packNeedOutput', 'Escolha CSV, PDFs ou ambos.'));
+                        return;
+                    }
+                    var source = sourceNow();
+                    var api = window.abeneArquivoApi;
+                    var selectedEntries = (source.entries || []).filter(function (entry) {
+                        var owner = api && api.ownerIdOf ? api.ownerIdOf(entry) : entry.id;
+                        return selected.some(function (paper) {
+                            if (paper.ownerId && owner) return String(paper.ownerId) === String(owner);
+                            return paper.numero && String(entry.number || '') === String(paper.numero);
+                        });
+                    });
+                    var types = [];
+                    document.querySelectorAll('.pack-type-cb:checked').forEach(function (cb) { types.push(cb.value); });
+                    var meta = {
+                        generatedAt: new Date().toISOString(),
+                        scope: (document.getElementById('packScope') || {}).value || 'visible',
+                        period: (document.getElementById('packPeriod') || {}).value || 'all',
+                        dateFrom: (document.getElementById('packDateFrom') || {}).value || '',
+                        dateTo: (document.getElementById('packDateTo') || {}).value || '',
+                        includeUndated: !!(document.getElementById('packIncludeUndated') || {}).checked,
+                        documentTypes: types,
+                        finalsOnly: !!(document.getElementById('packFinalsOnly') || {}).checked,
+                        documentCount: selected.length
+                    };
+                    if (typeof closeModal === 'function') closeModal('genericModal');
+                    runPackDownload({ papers: selected, entries: selectedEntries }, {
+                        skipChooser: true,
+                        includeCsv: includeCsv,
+                        includePdf: includePdf,
+                        exportMeta: meta
+                    });
+                };
+            }, 40);
+        } else {
+            runPackDownload(src, { skipChooser: true });
+        }
+    }
+
+    function runPackDownload(src, opts) {
+        opts = opts || {};
         var stamp = new Date().toISOString().slice(0, 10);
+        var includeCsv = opts.includeCsv !== false;
+        var includePdf = opts.includePdf !== false;
         if (!window.JSZip) {
-            downloadBlob('01_clientes_moloni.csv', '\uFEFF' + buildClientsCsv(src.papers), 'text/csv;charset=utf-8');
+            if (includeCsv) downloadBlob('01_clientes_moloni.csv', '\uFEFF' + buildClientsCsv(src.papers), 'text/csv;charset=utf-8');
             return;
         }
         var zip = new JSZip();
-        fillZipCore(zip, src.papers);
-        attachFinalPdfs(zip, src.entries).then(function () {
+        if (includeCsv) fillZipCore(zip, src.papers, opts.exportMeta);
+        else zip.file('LEIA-ME.txt', 'Pack parcial — só PDFs selecionados.\n');
+        var pdfPromise = includePdf ? attachFinalPdfs(zip, src.entries, src.papers) : Promise.resolve(0);
+        pdfPromise.then(function (pdfCount) {
+            if (includeCsv && opts.exportMeta) {
+                opts.exportMeta.pdfCount = Number(pdfCount) || 0;
+                zip.file('11_parametros_exportacao.json', JSON.stringify(opts.exportMeta, null, 2));
+            }
             return zip.generateAsync({ type: 'blob' });
         }).then(function (blob) {
-            downloadBlob('Pacote_Contabilista_PT_' + stamp + '.zip', blob, 'application/zip');
-            var emit = nifPack(company().nif, false);
+            var meta = opts.exportMeta || {};
+            var period = meta.dateFrom || meta.dateTo
+                ? [meta.dateFrom || 'inicio', meta.dateTo || 'fim'].join('_a_')
+                : (meta.period && meta.period !== 'all' ? meta.period : 'todas-as-datas');
+            downloadBlob('Pacote_Contabilista_PT_' + period.replace(/[^a-zA-Z0-9_-]+/g, '-') + '_' + stamp + '.zip', blob, 'application/zip');
+            var emit = issuerNifPack(company().nif);
             var msg = tt('packOk', 'Pack contabilista PT descarregado (' + src.papers.length + ' documento(s)).');
             if (!onlyDigits(company().nif) || emit.valido === 'NAO') {
                 msg = 'Pack descarregado. Ver 00_controlo.csv: NIF da empresa em falta ou inválido.';
             }
             if (typeof showToast === 'function') showToast(msg);
+        }).catch(function () {
+            if (typeof showToast === 'function') showToast(tt('packFail', 'Não foi possível criar o pack. Tente novamente.'));
         });
     }
 
@@ -997,6 +1455,9 @@
     window.insertWorksTable = function () { insertQuoteTable('works'); };
     window.exportAccountingPt = exportAccounting;
     window.downloadPackContabilista = downloadPackContabilista;
+    window.downloadPackContabilistaSelect = function (opts) {
+        downloadPackContabilista(Object.assign({}, opts || {}, { select: true }));
+    };
     window.importQuoteTableToModal = function () {
         var n = fillDevisFromTables(true);
         if (typeof showToast === 'function') {
@@ -1013,6 +1474,7 @@
         refreshQuoteTableTotals: refreshQuoteTableTotals,
         journalPush: journalPush,
         exportAccounting: exportAccounting,
-        downloadPackContabilista: downloadPackContabilista
+        downloadPackContabilista: downloadPackContabilista,
+        downloadPackContabilistaSelect: function (opts) { downloadPackContabilista(Object.assign({}, opts || {}, { select: true })); }
     };
 })();

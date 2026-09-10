@@ -62,6 +62,9 @@
     function trySplit(table, limit, editor, helpers) {
         if (!useEngine) return false;
         if (!table || table.tagName !== 'TABLE') return false;
+        var cn = ' ' + (table.className || '') + ' ';
+        if (/\sgr-(signs|letterhead|meta|parties|totals)\s/.test(cn)) return false;
+        if (table.closest && (table.closest('.gr-sign-block') || table.closest('.gr-letterhead'))) return false;
         helpers = helpers || {};
         var yIn = helpers.yInEditor;
         var ensureCol = helpers.ensureColgroup;

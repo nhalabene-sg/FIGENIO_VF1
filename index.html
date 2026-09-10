@@ -3921,6 +3921,14 @@
                 font-size: 13px;
                 flex-shrink: 0;
             }
+            .excel-sheet-scroll {
+                flex-basis: 44px;
+                min-width: 44px;
+                min-height: 40px;
+                height: 40px;
+                margin-top: 4px;
+                font-size: 26px;
+            }
             .paper-preview-overlay { padding: 8px; }
             .paper-preview-toolbar { flex-wrap: wrap; }
             #arqOverlay { padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right); }
@@ -4296,7 +4304,31 @@
             z-index: 40;
             position: relative;
             scrollbar-width: thin;
+            scrollbar-color: #8a96a6 #e2e5e9;
+            -webkit-overflow-scrolling: touch;
+            touch-action: pan-x;
+            overscroll-behavior-x: contain;
         }
+        .excel-sheets::-webkit-scrollbar { height: 7px; }
+        .excel-sheets::-webkit-scrollbar-track { background: #e2e5e9; }
+        .excel-sheets::-webkit-scrollbar-thumb { background: #7c8999; border-radius: 6px; }
+        .excel-sheet-scroll {
+            position: sticky;
+            z-index: 5;
+            flex: 0 0 34px;
+            min-width: 34px;
+            height: 28px;
+            margin-top: 4px;
+            border: 1px solid #aeb6c0;
+            background: #f8f9fb;
+            color: #243247;
+            font-size: 22px;
+            line-height: 1;
+            cursor: pointer;
+            touch-action: manipulation;
+        }
+        .excel-sheet-scroll.prev { left: 0; border-radius: 4px 0 0 4px; }
+        .excel-sheet-scroll.next { right: 0; border-radius: 0 4px 4px 0; }
         .excel-sht {
             border: 1px solid #c8c6c4;
             border-bottom: none;
@@ -4320,8 +4352,7 @@
             padding: 0;
             font-weight: 700;
             margin-left: 4px;
-            position: sticky;
-            right: 0;
+            position: relative;
             z-index: 2;
             background: #f3f2f1;
             max-width: none;
@@ -4419,6 +4450,14 @@
                 padding: 0 14px;
                 font-size: 13px;
                 flex-shrink: 0;
+            }
+            .excel-sheet-scroll {
+                flex-basis: 44px;
+                min-width: 44px;
+                min-height: 40px;
+                height: 40px;
+                margin-top: 4px;
+                font-size: 26px;
             }
         }
         @media screen and (max-width: 960px) and (max-height: 480px) and (orientation: landscape) {
@@ -4898,6 +4937,11 @@
         }
         body.dark-mode .excel-sht.add {
             background: var(--abene-d-ribbon);
+        }
+        body.dark-mode .excel-sheet-scroll {
+            background: var(--abene-d-ribbon);
+            border-color: var(--abene-d-line);
+            color: var(--abene-d-text);
         }
         body.dark-mode .xl-ctx button {
             background: var(--abene-d-surf);
@@ -6026,7 +6070,7 @@
             <div class="ribbon-group">
                 <div class="ribbon-group-content">
                     <div class="btn-row">
-                        <button class="ribbon-btn" onclick="abeneExcelBusiness()"><span class="icon">🏢</span><span data-i18n="xlBizTpl">Modelo métier</span></button>
+                        <button class="ribbon-btn" onclick="abeneExcelBusiness()"><span class="icon">🏢</span><span data-i18n="xlBizTpl">Modelo de negócio</span></button>
                         <button class="ribbon-btn" onclick="abeneExcelFromQuote()"><span class="icon">⇆</span><span data-i18n="xlFromQuote">Orçamento → Excel</span></button>
                         <button class="ribbon-btn" onclick="abeneExcelToQuote()"><span class="icon">↩</span><span data-i18n="xlToQuote">Excel → Orçamento</span></button>
                     </div>
@@ -6037,7 +6081,7 @@
                         <button class="ribbon-btn-sm" onclick="abeneExcelHelp()" data-i18n-title="xlHelp" title="Ajuda">?</button>
                     </div>
                 </div>
-                <div class="ribbon-group-label" data-i18n="xlGroupBiz">Métier / Interop</div>
+                <div class="ribbon-group-label" data-i18n="xlGroupBiz">Negócio / Interoperabilidade</div>
             </div>
         </div>
     </div>
@@ -6905,7 +6949,7 @@
     <input type="file" id="imageInput" style="display:none" accept="image/*" multiple onchange="handleImageUpload(event)">
     <input type="file" id="excelFileInput" style="display:none" accept=".xlsx,.csv,.txt">
 
-    <script src="libs/abene-i18n.js?v=20260910-accountant-professional-7"></script>
+    <script src="libs/abene-i18n.js?v=20260910-sheet-mobile-api-3"></script>
     <script src="libs/abene-tips.js"></script>
     <script src="libs/abene-page-geometry.js"></script>
     <script>
@@ -10406,23 +10450,23 @@ table { border-collapse: collapse; }
             }
             const spacing = docxFirst(pPr, 'spacing', true);
             if (spacing) {
-                const before = Number(docxAttr(spacing, 'before'));
-                const after = Number(docxAttr(spacing, 'after'));
+                const beforeRaw = docxAttr(spacing, 'before');
+                const afterRaw = docxAttr(spacing, 'after');
                 const line = Number(docxAttr(spacing, 'line'));
-                if (isFinite(before)) props.before = before / 20;
-                if (isFinite(after)) props.after = after / 20;
+                if (beforeRaw !== '' && isFinite(Number(beforeRaw))) props.before = Number(beforeRaw) / 20;
+                if (afterRaw !== '' && isFinite(Number(afterRaw))) props.after = Number(afterRaw) / 20;
                 if (line > 0) props.lineHeight = (docxAttr(spacing, 'lineRule') || 'auto') === 'auto' ? String(line / 240) : (line / 20) + 'pt';
             }
             const ind = docxFirst(pPr, 'ind', true);
             if (ind) {
-                const left = Number(docxAttr(ind, 'left') || docxAttr(ind, 'start'));
-                const right = Number(docxAttr(ind, 'right') || docxAttr(ind, 'end'));
-                const first = Number(docxAttr(ind, 'firstLine'));
-                const hanging = Number(docxAttr(ind, 'hanging'));
-                if (isFinite(left)) props.left = left / 20;
-                if (isFinite(right)) props.right = right / 20;
-                if (isFinite(first)) props.firstLine = first / 20;
-                if (isFinite(hanging) && hanging) props.firstLine = -hanging / 20;
+                const leftRaw = docxAttr(ind, 'left') || docxAttr(ind, 'start');
+                const rightRaw = docxAttr(ind, 'right') || docxAttr(ind, 'end');
+                const firstRaw = docxAttr(ind, 'firstLine');
+                const hangingRaw = docxAttr(ind, 'hanging');
+                if (leftRaw !== '' && isFinite(Number(leftRaw))) props.left = Number(leftRaw) / 20;
+                if (rightRaw !== '' && isFinite(Number(rightRaw))) props.right = Number(rightRaw) / 20;
+                if (firstRaw !== '' && isFinite(Number(firstRaw))) props.firstLine = Number(firstRaw) / 20;
+                if (hangingRaw !== '' && isFinite(Number(hangingRaw)) && Number(hangingRaw)) props.firstLine = -Number(hangingRaw) / 20;
             }
             const shading = docxFirst(pPr, 'shd', true);
             if (shading && docxColor(docxAttr(shading, 'fill'))) props.background = docxColor(docxAttr(shading, 'fill'));
@@ -10890,16 +10934,16 @@ table { border-collapse: collapse; }
                     }
                     const pgMar = docxFirst(sectPr, 'pgMar');
                     if (pgMar) {
-                        const t2 = Number(docxAttr(pgMar, 'top'));
-                        const r2 = Number(docxAttr(pgMar, 'right'));
-                        const b2 = Number(docxAttr(pgMar, 'bottom'));
-                        const l2 = Number(docxAttr(pgMar, 'left'));
+                        const topRaw = docxAttr(pgMar, 'top');
+                        const rightRaw = docxAttr(pgMar, 'right');
+                        const bottomRaw = docxAttr(pgMar, 'bottom');
+                        const leftRaw = docxAttr(pgMar, 'left');
                         const conv = v => Math.round(v / 20 * 96 / 72);
                         pageMargins = {
-                            top: isFinite(t2) ? conv(t2) : pageMargins.top,
-                            right: isFinite(r2) ? conv(r2) : pageMargins.right,
-                            bottom: isFinite(b2) ? conv(b2) : pageMargins.bottom,
-                            left: isFinite(l2) ? conv(l2) : pageMargins.left
+                            top: topRaw !== '' && isFinite(Number(topRaw)) ? conv(Number(topRaw)) : pageMargins.top,
+                            right: rightRaw !== '' && isFinite(Number(rightRaw)) ? conv(Number(rightRaw)) : pageMargins.right,
+                            bottom: bottomRaw !== '' && isFinite(Number(bottomRaw)) ? conv(Number(bottomRaw)) : pageMargins.bottom,
+                            left: leftRaw !== '' && isFinite(Number(leftRaw)) ? conv(Number(leftRaw)) : pageMargins.left
                         };
                         editor.style.padding = `${pageMargins.top}px ${pageMargins.right}px ${pageMargins.bottom}px ${pageMargins.left}px`;
                     }
@@ -11402,10 +11446,9 @@ table { border-collapse: collapse; }
                     var coded = (typeof API_URL === 'string' && API_URL.trim()) ? API_URL.trim() : '';
                     var shown = coded || (companyData.appsScriptUrl || '');
                     var ok = /script.google.com\/macros\/s\//.test(shown);
-                    return '<input type="hidden" id="appsScriptUrl" value="' + String(shown).replace(/"/g, '&quot;') + '">' +
+                    return field('appsScriptUrl', t('appsUrl'), shown, 'url') +
                         '<p style="font-size:12px;line-height:1.45;margin:8px 0;color:' + (ok ? '#1e6b3a' : '#a33') + ';">' +
                         (ok ? t('appsUrlCoded') : t('appsUrlMissing')) +
-                        (ok ? '<br><span style="word-break:break-all;color:#555;">' + String(shown).replace(/</g, '') + '</span>' : '') +
                         '</p>';
                 })()}
                 ${field('syncToken', t('sheetsToken'), companyData.syncToken || '', 'password')}
@@ -11740,8 +11783,8 @@ table { border-collapse: collapse; }
     <script src="libs/abene-arquivo.js?v=20260909-period-selection-6"></script>
     <script src="libs/abene-phone.js?v=20260909-mobile-professional-4"></script>
     <script src="libs/abene-excel-engine.js"></script>
-    <script src="libs/abene-excel.js"></script>
-    <script src="libs/abene-sheets.js?v=20260909-accountant-professional-1"></script>
+    <script src="libs/abene-excel.js?v=20260910-sheet-mobile-api-1"></script>
+    <script src="libs/abene-sheets.js?v=20260910-sheet-mobile-api-1"></script>
     <script src="libs/abene-collab.js?v=20260909-p0p5-final-3"></script>
     <script src="libs/abene-gdocs.js?v=20260909-p0p5-final-3"></script>
     <script src="libs/abene-pickers.js"></script>

@@ -1157,7 +1157,10 @@
         try { localStorage.setItem('abeneMargins', JSON.stringify(m)); } catch (e) {}
         liveSyncChromeMargins(m);
         var editorNow = ed();
-        if (editorNow) abeneKeepBodyInWritingBands(editorNow, pageH(), m);
+        if (editorNow) {
+            abeneKeepBodyInWritingBands(editorNow, pageH(), m);
+            keepSignClustersOnPage(editorNow, pageH(), m);
+        }
         abeneScheduleBodyAlignToRuler(false);
     }
 
@@ -1747,6 +1750,27 @@
         }
     }
 
+    function mergeContinuedContainers(root) {
+        if (!root || !root.querySelectorAll) return;
+        var list = Array.prototype.slice.call(root.querySelectorAll('[data-abene-cont="block"]'));
+        var i;
+        for (i = list.length - 1; i >= 0; i--) {
+            var t = list[i];
+            if (!t.parentNode) continue;
+            var prev = t.previousElementSibling;
+            while (prev && prev.classList && prev.classList.contains('abene-page-flow')) prev = prev.previousElementSibling;
+            if (!prev || prev.tagName !== t.tagName) {
+                var orphanKind = t.getAttribute('data-abene-origin-block');
+                if (orphanKind) t.setAttribute('data-abene-block', orphanKind);
+                t.removeAttribute('data-abene-cont');
+                t.removeAttribute('data-abene-origin-block');
+                continue;
+            }
+            while (t.firstChild) prev.appendChild(t.firstChild);
+            t.parentNode.removeChild(t);
+        }
+    }
+
     function clampOverflowMedia(editor, writeH) {
         editor.querySelectorAll('img, video, canvas, svg').forEach(function (el) {
             if (el.closest && el.closest('.page-chrome, .hf-brand')) return;
@@ -1786,7 +1810,65 @@
         return out;
     }
 
+    function trySplitList(list, limit, editor) {
+        if (!list || (list.tagName !== 'UL' && list.tagName !== 'OL')) return false;
+        var items = [];
+        var node = list.firstElementChild;
+        while (node) {
+            if (node.tagName === 'LI') items.push(node);
+            node = node.nextElementSibling;
+        }
+        if (items.length < 2) return false;
+        var splitAt = -1;
+        var i;
+        for (i = 0; i < items.length; i++) {
+            var li = items[i];
+            var top = yInEditor(li, editor);
+            var bottom = top + li.offsetHeight;
+            if (bottom <= limit + 1) continue;
+            if (i === 0) {
+                var nested = null;
+                var child = li.firstElementChild;
+                while (child) {
+                    if (child.tagName === 'UL' || child.tagName === 'OL') nested = child;
+                    child = child.nextElementSibling;
+                }
+                if (nested && trySplitList(nested, limit, editor)) return true;
+                return false;
+            }
+            splitAt = i;
+            break;
+        }
+        if (splitAt < 1) return false;
+        var clone = list.cloneNode(false);
+        clone.removeAttribute('id');
+        clone.setAttribute('data-abene-cont', 'list');
+        if (list.tagName === 'OL') {
+            var start = Number(list.getAttribute('start') || list.start || 1) || 1;
+            clone.setAttribute('start', String(start + splitAt));
+            try { clone.start = start + splitAt; } catch (errStart) {}
+        }
+        for (i = splitAt; i < items.length; i++) clone.appendChild(items[i]);
+        if (!clone.children.length) return false;
+        if (list.nextSibling) list.parentNode.insertBefore(clone, list.nextSibling);
+        else list.parentNode.appendChild(clone);
+        if (!list.querySelector('li')) {
+            if (clone.parentNode) clone.parentNode.removeChild(clone);
+            return false;
+        }
+        return true;
+    }
+
+    function isUnsplittableTable(table) {
+        if (!table) return false;
+        var cn = ' ' + (table.className || '') + ' ';
+        if (/\sgr-(signs|letterhead|meta|parties|totals)\s/.test(cn)) return true;
+        if (table.closest && (table.closest('.gr-sign-block') || table.closest('.gr-letterhead'))) return true;
+        return false;
+    }
+
     function trySplitTable(table, limit, editor) {
+        if (isUnsplittableTable(table)) return false;
         if (window.ABENE && window.ABENE.Tables && window.ABENE.Tables.useEngine !== false &&
             typeof window.ABENE.Tables.trySplit === 'function') {
             return window.ABENE.Tables.trySplit(table, limit, editor, {
@@ -1800,6 +1882,7 @@
 
     function trySplitTableLegacy(table, limit, editor) {
         if (!table || table.tagName !== 'TABLE') return false;
+        if (isUnsplittableTable(table)) return false;
         var rows = Array.prototype.slice.call(table.rows || []);
         if (rows.length < 2) return false;
         var splitAt = -1;
@@ -1928,9 +2011,87 @@
         }
     }
 
+    function canSplitContainerBlock(el) {
+        if (!el || el.nodeType !== 1) return false;
+        if (!/^(DIV|SECTION|ARTICLE|MAIN)$/.test(el.tagName)) return false;
+        if (el.classList.contains('abene-page-flow') || el.classList.contains('page-chrome')) return false;
+        if (el.getAttribute('data-abene-keep') === '1') return false;
+        var kind = el.getAttribute('data-abene-block') || el.getAttribute('data-abene-origin-block') || '';
+        if (/^(cover|titlepage|body-logo|signs)$/i.test(kind)) return false;
+        if (el.closest && (el.closest('.gr-sign-block') || el.closest('.gr-letterhead'))) return false;
+        var cs = window.getComputedStyle ? window.getComputedStyle(el) : null;
+        if (cs && /^(flex|inline-flex|grid|inline-grid|table)$/.test(cs.display)) return false;
+        return true;
+    }
+
+    function hasMeaningfulContainerContent(el) {
+        if (!el) return false;
+        if ((el.textContent || '').replace(/[\u200b\s]/g, '').length) return true;
+        return !!(el.querySelector && el.querySelector('br, img, video, canvas, svg, table'));
+    }
+
+    function trySplitContainerBlock(container, limit, editor) {
+        if (!canSplitContainerBlock(container)) return false;
+        var children = Array.prototype.slice.call(container.children || []).filter(function (child) {
+            if (!child || child.offsetHeight <= 0) return false;
+            if (child.classList && (child.classList.contains('page-chrome') || child.classList.contains('abene-page-flow'))) return false;
+            var cs = window.getComputedStyle ? window.getComputedStyle(child) : null;
+            return !cs || (cs.display !== 'none' && cs.position !== 'absolute' && cs.position !== 'fixed');
+        });
+        if (!children.length) return false;
+
+        var splitAt = null;
+        var i;
+        for (i = 0; i < children.length; i++) {
+            var child = children[i];
+            var top = yInEditor(child, editor);
+            var bottom = top + child.offsetHeight;
+            if (bottom <= limit + 1) continue;
+            splitAt = child;
+            if (top < limit - 18) {
+                var didInnerSplit = false;
+                if (child.tagName === 'TABLE') didInnerSplit = trySplitTable(child, limit, editor);
+                else if (child.tagName === 'UL' || child.tagName === 'OL') didInnerSplit = trySplitList(child, limit, editor);
+                else if (canSplitBlock(child)) didInnerSplit = trySplitBlock(child, limit, editor);
+                else if (canSplitContainerBlock(child)) didInnerSplit = trySplitContainerBlock(child, limit, editor);
+                if (didInnerSplit) splitAt = child.nextSibling;
+            }
+            break;
+        }
+        if (!splitAt || !splitAt.parentNode) return false;
+
+        var before = container.cloneNode(false);
+        var node = container.firstChild;
+        while (node && node !== splitAt) {
+            before.appendChild(node.cloneNode(true));
+            node = node.nextSibling;
+        }
+        if (!hasMeaningfulContainerContent(before)) return false;
+
+        var clone = container.cloneNode(false);
+        var originKind = container.getAttribute('data-abene-block') || container.getAttribute('data-abene-origin-block') || '';
+        clone.setAttribute('data-abene-cont', 'block');
+        if (originKind) clone.setAttribute('data-abene-origin-block', originKind);
+        clone.removeAttribute('data-abene-block');
+        clone.removeAttribute('id');
+        while (splitAt) {
+            var next = splitAt.nextSibling;
+            clone.appendChild(splitAt);
+            splitAt = next;
+        }
+        if (!hasMeaningfulContainerContent(clone)) {
+            while (clone.firstChild) container.appendChild(clone.firstChild);
+            return false;
+        }
+        if (container.nextSibling) container.parentNode.insertBefore(clone, container.nextSibling);
+        else container.parentNode.appendChild(clone);
+        return true;
+    }
+
     window.abeneStripPageFlow = function (root) {
         if (!root || !root.querySelectorAll) return;
         root.querySelectorAll('.abene-page-flow').forEach(function (el) { el.remove(); });
+        mergeContinuedContainers(root);
         mergeContinuedTables(root);
         mergeContinuedBlocks(root);
     };
@@ -2078,13 +2239,29 @@
                     didSplit = true;
                     break;
                 }
+                if ((el.tagName === 'UL' || el.tagName === 'OL') && remain > 28 && trySplitList(el, limit, editor)) {
+                    didSplit = true;
+                    break;
+                }
                 if (remain > 18 && trySplitBlock(el, limit, editor)) {
                     didSplit = true;
                     break;
                 }
                 if (el.offsetHeight > writeH + 4) {
+                    var containerSplit = false;
+                    try { containerSplit = trySplitContainerBlock(el, limit, editor); }
+                    catch (errContainerSplit) {}
+                    if (containerSplit) {
+                        didSplit = true;
+                        break;
+                    }
                     var innerTbl = el.tagName !== 'TABLE' ? el.querySelector && el.querySelector('table') : null;
                     if (innerTbl && remain > 36 && trySplitTable(innerTbl, limit, editor)) {
+                        didSplit = true;
+                        break;
+                    }
+                    var innerList = (el.tagName !== 'UL' && el.tagName !== 'OL') ? el.querySelector && el.querySelector('ul, ol') : null;
+                    if (innerList && remain > 28 && trySplitList(innerList, limit, editor)) {
                         didSplit = true;
                         break;
                     }
@@ -2128,6 +2305,7 @@
             stuck = null;
         }
         abeneKeepBodyInWritingBands(editor, h, m);
+        keepSignClustersOnPage(editor, h, m);
         if (window.ABENE && window.ABENE.Images && typeof window.ABENE.Images.syncAnchors === 'function') {
             try { window.ABENE.Images.syncAnchors(editor); } catch (errImg) {}
         }
@@ -2155,9 +2333,62 @@
         spacer.setAttribute('aria-hidden', 'true');
         spacer.style.setProperty('height', heightPx + 'px', 'important');
         spacer.style.setProperty('--flow-h', heightPx + 'px');
-        if (beforeEl && beforeEl.parentNode === editor) editor.insertBefore(spacer, beforeEl);
+        if (beforeEl && beforeEl.parentNode) beforeEl.parentNode.insertBefore(spacer, beforeEl);
         else editor.appendChild(spacer);
         return spacer;
+    }
+
+    function clusterEnd(el) {
+        if (!el) return el;
+        if (el.classList && el.classList.contains('gr-sign-block')) return el;
+        var n = el.nextElementSibling;
+        var last = el;
+        while (n) {
+            if (n.classList.contains('abene-page-flow')) {
+                n = n.nextElementSibling;
+                continue;
+            }
+            if (n.classList.contains('gr-doc-foot') || n.classList.contains('gr-goldbar') || n.classList.contains('gr-iva-note')) {
+                last = n;
+                n = n.nextElementSibling;
+                continue;
+            }
+            break;
+        }
+        return last;
+    }
+
+    function keepSignClustersOnPage(editor, h, m) {
+        if (!editor || !h) return;
+        m = m || { top: 96, bottom: 96 };
+        var writeH = Math.max(80, h - (m.top || 0) - (m.bottom || 0));
+        var guard = 0;
+        while (guard++ < 16) {
+            var moved = false;
+            var nodes = editor.querySelectorAll('.gr-sign-block, table.gr-signs');
+            var i, el, last, top, bottom, page, limit, dest, need, clusterH;
+            for (i = 0; i < nodes.length; i++) {
+                el = nodes[i];
+                if (el.tagName === 'TABLE' && el.closest && el.closest('.gr-sign-block')) continue;
+                last = clusterEnd(el);
+                top = yInEditor(el, editor);
+                bottom = yInEditor(last, editor) + last.offsetHeight;
+                clusterH = Math.max(last.offsetHeight || 0, bottom - top);
+                if (clusterH > writeH + 8) continue;
+                page = Math.max(0, Math.floor(top / h));
+                limit = writingLimit(page, h, m);
+                dest = 0;
+                if (top < limit && bottom > limit + 1) dest = nextWritingStart(page, h, m);
+                else if (top >= limit - 1 && top < (page + 1) * h) dest = nextWritingStart(page, h, m);
+                if (!dest) continue;
+                need = dest - top;
+                if (need < 4 || need > h) continue;
+                insertFlowSpacer(editor, el, need);
+                moved = true;
+                break;
+            }
+            if (!moved) break;
+        }
     }
 
     function abeneKeepBodyInWritingBands(editor, h, m) {
@@ -3246,6 +3477,7 @@
         else if (name === 'selectAll' && typeof selectAll === 'function') selectAll();
         else if (name === 'undo' && typeof undo === 'function') undo();
         else if (name === 'redo' && typeof redo === 'function') redo();
+        else if (name === 'save' && typeof openSaveChooser === 'function') openSaveChooser();
         else if (name === 'save' && typeof saveDocument === 'function') saveDocument();
         else if (name === 'new' && typeof newDocument === 'function') newDocument();
         else if (name === 'open' && typeof openFile === 'function') openFile();
@@ -3549,14 +3781,15 @@
         var h = pageH();
         var m = A().pageMargins || { top: 96, bottom: 96, left: 96, right: 96 };
         var chrome = document.getElementById('pageChrome');
-        var totalH = Math.max(h, editor.scrollHeight || 0, chrome && chrome.offsetHeight ? chrome.offsetHeight : 0);
-        totalH = Math.ceil(totalH / h) * h;
-        var pages = Math.max(1, Math.round(totalH / h));
+        var used = typeof window.abeneCountUsedPages === 'function' ? window.abeneCountUsedPages(editor) : 1;
+        var pages = Math.max(1, used);
+        var totalH = pages * h;
         var root = document.createElement('div');
         root.id = 'abeneExportRoot';
         root.className = 'abene-export-root';
         root.setAttribute('data-abene-export', '1');
         root.style.setProperty('--export-page-w', w + 'px');
+        root.style.setProperty('--export-page-h', h + 'px');
         root.style.setProperty('--export-page-h-total', totalH + 'px');
         root.style.setProperty('--pad-top', m.top + 'px');
         root.style.setProperty('--pad-right', m.right + 'px');
@@ -3565,6 +3798,13 @@
         root.style.setProperty('--write-h', Math.max(80, h - m.top - m.bottom) + 'px');
         var pad = editor.style.padding || (m.top + 'px ' + m.right + 'px ' + m.bottom + 'px ' + m.left + 'px');
         var bg = editor.style.backgroundColor || '#fff';
+        var sourceChildren = Array.prototype.slice.call(editor.children || []);
+        function sourcePageIndex(node) {
+            if (!node || (node.classList && (node.classList.contains('abene-page-flow') || node.classList.contains('page-gap-band')))) return -1;
+            var top = Number(node.offsetTop);
+            if (!isFinite(top)) top = 0;
+            return Math.max(0, Math.min(pages - 1, Math.floor((top + 1) / h)));
+        }
         var i;
         for (i = 0; i < pages; i++) {
             var sheet = document.createElement('div');
@@ -3572,7 +3812,7 @@
             sheet.style.cssText = 'width:' + w + 'px;height:' + h + 'px;position:relative;overflow:hidden;background:#fff;margin:0;padding:0;border:0;box-sizing:border-box;page-break-inside:avoid;break-inside:avoid;';
             var inner = document.createElement('div');
             inner.className = 'abene-export-clip';
-            inner.style.cssText = 'position:absolute;left:0;top:' + (-i * h) + 'px;width:' + w + 'px;height:' + totalH + 'px;';
+            inner.style.cssText = 'position:absolute;left:0;top:0;width:' + w + 'px;height:' + h + 'px;overflow:hidden;';
             var edClone = editor.cloneNode(true);
             edClone.removeAttribute('id');
             edClone.removeAttribute('contenteditable');
@@ -3583,8 +3823,10 @@
             edClone.style.boxShadow = 'none';
             edClone.style.position = 'relative';
             edClone.style.width = w + 'px';
-            edClone.style.setProperty('height', totalH + 'px', 'important');
-            edClone.style.setProperty('min-height', totalH + 'px', 'important');
+            edClone.style.setProperty('height', h + 'px', 'important');
+            edClone.style.setProperty('min-height', h + 'px', 'important');
+            edClone.style.setProperty('max-height', h + 'px', 'important');
+            edClone.style.overflow = 'hidden';
             edClone.style.backgroundColor = bg;
             edClone.style.padding = pad;
             edClone.style.setProperty('--page-w', w + 'px');
@@ -3594,9 +3836,15 @@
             edClone.style.setProperty('--pad-bottom', m.bottom + 'px');
             edClone.style.setProperty('--pad-left', m.left + 'px');
             edClone.style.setProperty('--write-h', Math.max(80, h - m.top - m.bottom) + 'px');
+            Array.prototype.slice.call(edClone.children || []).forEach(function (child, childIndex) {
+                var source = sourceChildren[childIndex];
+                if (!source || sourcePageIndex(source) !== i) child.remove();
+            });
             edClone.querySelectorAll('.abene-page-flow').forEach(function (sp) {
                 var hh = sp.style.getPropertyValue('--flow-h') || sp.style.height || (sp.offsetHeight + 'px');
                 if (hh) sp.style.setProperty('height', hh, 'important');
+                sp.style.setProperty('background', '#fff', 'important');
+                sp.style.setProperty('box-shadow', 'none', 'important');
             });
             inner.appendChild(edClone);
             if (chrome && chrome.childNodes.length) {
@@ -3605,16 +3853,31 @@
                 chClone.classList.remove('hf-guides-on');
                 chClone.querySelectorAll('.hf-tab, .hf-rule, .page-gap-band, .hf-close').forEach(function (n) { n.remove(); });
                 chClone.querySelectorAll('[contenteditable]').forEach(function (el) { el.contentEditable = 'false'; });
+                chClone.querySelectorAll('.page-header-zone').forEach(function (zone) {
+                    if (Number(zone.getAttribute('data-page') || '1') !== i + 1) {
+                        zone.remove();
+                        return;
+                    }
+                    zone.style.top = '0px';
+                    zone.style.background = '#fff';
+                    zone.style.zIndex = '12';
+                });
                 chClone.querySelectorAll('.page-footer-zone').forEach(function (zone) {
-                    var pg = Math.max(0, Number(zone.getAttribute('data-page') || '1') - 1);
+                    if (Number(zone.getAttribute('data-page') || '1') !== i + 1) {
+                        zone.remove();
+                        return;
+                    }
                     zone.style.height = m.bottom + 'px';
-                    zone.style.top = (pg * h + h - m.bottom) + 'px';
+                    zone.style.top = (h - m.bottom) + 'px';
+                    zone.style.setProperty('--hf-seam', '0px');
+                    zone.style.background = '#fff';
+                    zone.style.zIndex = '12';
                 });
                 chClone.style.position = 'absolute';
                 chClone.style.top = '0';
                 chClone.style.left = '0';
                 chClone.style.width = w + 'px';
-                chClone.style.height = totalH + 'px';
+                chClone.style.height = h + 'px';
                 chClone.style.pointerEvents = 'none';
                 inner.appendChild(chClone);
             }

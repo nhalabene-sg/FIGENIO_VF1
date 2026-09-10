@@ -17,11 +17,13 @@
     function pageH() {
         if (root.PageGeometry && root.PageGeometry.height) return root.PageGeometry.height;
         if (typeof root.getPageHeight === 'function') return root.getPageHeight();
+        if (root.PageGeometry && root.PageGeometry.SIZES && root.PageGeometry.SIZES.a4) return root.PageGeometry.SIZES.a4.h;
         return 1123;
     }
     function pageW() {
         if (root.PageGeometry && root.PageGeometry.width) return root.PageGeometry.width;
         if (typeof root.getPageWidth === 'function') return root.getPageWidth();
+        if (root.PageGeometry && root.PageGeometry.SIZES && root.PageGeometry.SIZES.a4) return root.PageGeometry.SIZES.a4.w;
         return 794;
     }
     function yInEditor(el, editor) {

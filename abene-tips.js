@@ -137,6 +137,8 @@
             undo: 'Anula a última ação.',
             redo: 'Refaz a ação anulada.',
             companySettings: 'Definições da empresa, papel e ligação Google.',
+            sheetsRefresh: 'Lê as linhas novas que escreveu no Google Sheets (clientes, artigos, pastas).',
+            sheetsRefreshTitle: 'Depois de acrescentar dados na folha Google, clique aqui. O documento Word não é apagado.',
             docName: 'Nome do ficheiro. Prima Enter para confirmar.',
             minimize: 'Minimiza a janela da aplicação.',
             maximize: 'Maximiza ou restaura a janela.',

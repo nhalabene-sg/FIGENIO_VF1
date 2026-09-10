@@ -1,72 +1,54 @@
-# Genius Raros 1.0
+# ABENE — Genius Raros 1.0
 
-Editor **Word + Excel + Arquivo**. Uma só fonte (`src/`), um só livrable (`app/`).
+Aplicação profissional de edição de documentos, Excel, Arquivo, orçamentos,
+recibos comerciais e preparação de ficheiros para o contabilista.
 
-Interface por omissão: **português (Portugal)**.  
-O projeto Next Level **não foi modificado**.
+A interface abre por defeito em **português de Portugal**. Também estão
+disponíveis francês, inglês e espanhol.
 
----
+## Publicar no GitHub Pages
 
-## Abrir
+Publicar **todo o conteúdo desta pasta ABENE** na raiz do repositório:
 
-1. `index.html` nesta pasta (entrada), **ou**
-2. `app/index.html` (pacote gerado)
+- `index.html`
+- `404.html`
+- `.nojekyll`
+- `manifest.webmanifest`
+- `libs/`
+- `branding/`
+- `apps-script/`
+- `README.md`
+- `LICENSE`
 
-Se `app/` ainda não existir: `.\build.ps1` ou `npm run build`.
+O dossier `Fligenio/ABENE 1.0` contém apenas salvaguardas, testes e documentos
+de desenvolvimento. Não é necessário publicá-lo no GitHub.
 
-Funciona **sem internet**. Com internet: ⚙ Definições → o URL `/exec` do Google do cliente (ver `backend/`).
+## Abrir a aplicação
 
-Depois de atualizar: **Ctrl+F5**.
+Abrir `index.html` ou ativar o GitHub Pages na raiz do repositório. Depois de
+publicar uma atualização, atualizar o browser com `Ctrl+F5`.
 
----
+## Ligação Google opcional
 
-## Pastas
+1. Abrir `apps-script/LEIA-ME.txt`.
+2. Instalar `apps-script/emaildrive.gs.txt` no Apps Script da conta Google do
+   cliente.
+3. Executar `initialiserSysteme` e criar uma nova implementação Web App.
+4. Nas Definições da aplicação, introduzir separadamente:
+   - o **URL da API**, que termina em `/exec`;
+   - a **Chave de acesso da API ABENE**, apresentada por
+     `initialiserSysteme`.
+5. Utilizar **Testar ligação**.
 
-```
-GENIUS RAROS 1.0/
-├── src/                           ← única fonte editável
-│   ├── Genius_Raros_ABENE.html
-│   ├── libs/                      (abene-*.js + JSZip, html2pdf, docx)
-│   └── branding/
-├── app/                           ← livrable (gerado; não editar)
-├── backend/                       ← emaildrive.gs.txt
-├── build.ps1
-├── scripts/build.js
-├── tests/run-all.js
-├── docs/
-├── archive/                       ← P0 (zip) + specs
-└── index.html                     ← página de entrada
-```
+O URL e a chave de acesso de cada cliente são configurações privadas. Não os
+publique no GitHub.
 
-Editar **apenas** `src/`. Depois: `.\build.ps1` ou `npm run build`.
+## Dados e segurança
 
-Não renomear `abene-*.js` nem as chaves `localStorage` `abene*`.
-
----
-
-## Google (opcional)
-
-Ver `backend/INSTALAR.html`. Colar o URL `/exec` em `src/Genius_Raros_ABENE.html` na linha `var API_URL = '';` e voltar a gerar `app/`. **Não publique o `/exec`.**
-
----
-
-## GitHub Pages
-
-Publicar o **conteúdo de `app/`** na raiz do repositório (index + libs + branding + `.nojekyll` + `SHA256SUMS.txt`).
-
-Ou publicar esta pasta e abrir `…/app/`.
-
----
-
-## Testes
-
-```
-npm test
-```
-
-Limites conhecidos: `docs/P14-RESULTATS-2026-09-04.md` e `docs/EXCEL-EXPORT-LIMITES.md`.  
-A colaboração **não** é edição em tempo real (última gravação vence).
+A aplicação continua editável sem internet. Quando a ligação Google está
+configurada, os ficheiros são guardados no Drive do cliente e os e-mails são
+enviados pelo Gmail do cliente. Os documentos enviados ao cliente são PDFs.
 
 ## Licença
 
-Uso interno Genius Raros. Ver `LICENSE`.
+Uso interno Genius Raros. Consultar `LICENSE`.

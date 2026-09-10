@@ -354,8 +354,9 @@
                 icon + ' ' + esc(label) + '</button>';
         }
         openGenericModal(tt('exportDoc'),
-            btn('exportPDF', '📥', tt('filePdf')) +
-            btn('exportDocx', '📘', tt('fileDocx')) +
+            btn('exportDocx', '📘', tt('saveAsWord') || tt('fileDocx')) +
+            btn('exportPDF', '📥', tt('saveAsPdf') || tt('filePdf')) +
+            btn('saveForAccountant', '📊', tt('saveAsAcct') || tt('acctCsv')) +
             btn('exportWord', '📄', tt('fileDoc')) +
             btn('exportHtml', '🌐', tt('exportHtml')) +
             btn('saveAsText', '📝', tt('fileSaveTxt')) +

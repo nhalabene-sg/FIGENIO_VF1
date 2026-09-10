@@ -58,6 +58,17 @@
         if (A().documentState && A().documentState.pagination === false) return false;
         if (editor.querySelector('.page-break-marker') && !editor.querySelector('.abene-page-flow')) return false;
         if (geoKey() !== lastGeo) return false;
+        var ph = pageHeight();
+        var a = A();
+        var margins = a.pageMargins || {};
+        var writableHeight = Math.max(80, ph - (margins.top || 0) - (margins.bottom || 0));
+        var kids = editor.children;
+        var i, child;
+        for (i = 0; i < kids.length; i++) {
+            child = kids[i];
+            if (!child || !child.classList || child.classList.contains('abene-page-flow')) continue;
+            if (child.offsetHeight > writableHeight + 4) return false;
+        }
         return heightsKey(editor) === lastHeights;
     }
 
