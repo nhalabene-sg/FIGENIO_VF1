@@ -12,6 +12,31 @@
         }
         return fb || key;
     }
+    var BUSINESS_SHEETS = {
+        clients: ['CLIENTES', 'CLIENTS', 'CLIENTS', 'CLIENTES'],
+        articles: ['ARTIGOS', 'ARTICLES', 'ITEMS', 'ARTÍCULOS'],
+        quotes: ['ORÇAMENTOS', 'DEVIS', 'QUOTES', 'PRESUPUESTOS'],
+        quoteLines: ['LINHAS_ORÇAMENTO', 'LIGNES_DEVIS', 'QUOTE_LINES', 'LÍNEAS_PRESUPUESTO']
+    };
+    var BUSINESS_LEGACY = {
+        clients: ['CLIENTS'], articles: ['ARTICLES'], quotes: ['DEVIS'], quoteLines: ['DEVIS_LIGNES']
+    };
+    function languageIndex_() {
+        var lang = localStorage.getItem('abeneLanguage') || 'pt-PT';
+        return /^fr/i.test(lang) ? 1 : /^en/i.test(lang) ? 2 : /^es/i.test(lang) ? 3 : 0;
+    }
+    function businessSheetName_(key) {
+        var names = BUSINESS_SHEETS[key] || [key];
+        return names[languageIndex_()] || names[0] || key;
+    }
+    function businessSheetAliases_(key) {
+        var seen = {}, out = [];
+        (BUSINESS_SHEETS[key] || []).concat(BUSINESS_LEGACY[key] || []).forEach(function (name) {
+            var low = String(name || '').toLocaleLowerCase();
+            if (name && !seen[low]) { seen[low] = true; out.push(name); }
+        });
+        return out;
+    }
     function toast(msg) { if (typeof showToast === 'function') showToast(msg); }
     function company() {
         return (window.abene && window.abene.companyData) || {};
@@ -101,7 +126,11 @@
     function callApi(action, extra) {
         var url = execUrl();
         if (!url) return Promise.reject(new Error('no-url'));
-        var body = Object.assign({ action: action, token: token() }, extra || {});
+        var body = Object.assign({
+            action: action,
+            token: token(),
+            language: localStorage.getItem('abeneLanguage') || 'pt-PT'
+        }, extra || {});
         return fetch(url, {
             method: 'POST',
             mode: 'cors',
@@ -154,9 +183,12 @@
     }
     function collectMetier(wb) {
         if (!wb || !wb.sheets) return null;
-        function rowsOf(name) {
+        function rowsOf(key) {
             var i, sh, r, c, headers = [], rows = [], rec, k, ce;
-            for (i = 0; i < wb.sheets.length; i++) if (wb.sheets[i].name === name) { sh = wb.sheets[i]; break; }
+            var aliases = businessSheetAliases_(key).map(function (name) { return String(name).toLocaleLowerCase(); });
+            for (i = 0; i < wb.sheets.length; i++) {
+                if (aliases.indexOf(String(wb.sheets[i].name || '').toLocaleLowerCase()) >= 0) { sh = wb.sheets[i]; break; }
+            }
             if (!sh) return [];
             for (c = 0; c < Math.min(sh.cols, 16); c++) {
                 ce = sh.cells[(window.AbeneExcelEngine && window.AbeneExcelEngine.a1(c, 0)) || ('')];
@@ -175,10 +207,10 @@
             return rows;
         }
         return {
-            clients: rowsOf('CLIENTS'),
-            articles: rowsOf('ARTICLES'),
-            devis: rowsOf('DEVIS'),
-            lignes: rowsOf('DEVIS_LIGNES')
+            clients: rowsOf('clients'),
+            articles: rowsOf('articles'),
+            devis: rowsOf('quotes'),
+            lignes: rowsOf('quoteLines')
         };
     }
     function deriveFolders(arquivo, catalog) {
@@ -415,22 +447,23 @@
         try { wb = JSON.parse(localStorage.getItem('abeneExcelWorkbook') || 'null'); } catch (eW) { wb = null; }
         if (!wb || typeof wb !== 'object') wb = { name: 'Livro1', sheets: [], active: 0 };
         if (!wb.sheets) wb.sheets = [];
-        function replaceSheet(name, rows) {
-            var sh, i;
+        function replaceSheet(key, rows) {
+            var sh, i, name = businessSheetName_(key);
+            var aliases = businessSheetAliases_(key).map(function (item) { return String(item).toLocaleLowerCase(); });
             if (!rows || !rows.length) return;
             sh = rowsToExcelSheet_(name, rows);
             for (i = 0; i < wb.sheets.length; i++) {
-                if (wb.sheets[i] && wb.sheets[i].name === name) {
+                if (wb.sheets[i] && aliases.indexOf(String(wb.sheets[i].name || '').toLocaleLowerCase()) >= 0) {
                     wb.sheets[i] = sh;
                     return;
                 }
             }
             wb.sheets.push(sh);
         }
-        replaceSheet('CLIENTS', metier.clients);
-        replaceSheet('ARTICLES', metier.articles);
-        replaceSheet('DEVIS', metier.devis);
-        replaceSheet('DEVIS_LIGNES', metier.lignes);
+        replaceSheet('clients', metier.clients);
+        replaceSheet('articles', metier.articles);
+        replaceSheet('quotes', metier.devis);
+        replaceSheet('quoteLines', metier.lignes);
         try { localStorage.setItem('abeneExcelWorkbook', JSON.stringify(wb)); } catch (eS) {}
     }
     function pull(opts) {

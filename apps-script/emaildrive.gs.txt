@@ -1,0 +1,1685 @@
+/**
+ * ╔══════════════════════════════════════════════════════════════════════════════╗
+ * ║  emaildrive  —  GENIUS RAROS                                                ║
+ * ║  Google Sheets + Drive (compte DU CLIENT) + e-mail (Gmail DU CLIENT)        ║
+ * ║                                                                              ║
+ * ║  À INSTALLER SUR LE COMPTE GOOGLE DU CLIENT (pas le vôtre).                 ║
+ * ║  Nommer le projet Apps Script :  emaildrive                                 ║
+ * ║                                                                              ║
+ * ║  1. Compte Google du client → créer une Sheet vide (ex. Genius Raros)       ║
+ * ║  2. Extensions → Apps Script → coller CE fichier → Enregistrer              ║
+ * ║     Projet → Renommer : emaildrive                                          ║
+ * ║  3. Remplir CFG.INSTALLER_EMAIL (votre Gmail) si vous devez accéder Drive   ║
+ * ║  4. Exécuter  initialiserSysteme  → Autoriser Sheets + Drive + Gmail        ║
+ * ║  5. Déployer → Application web → Exécuter : Moi / Accès : Tous              ║
+ * ║  6. Copier l’URL /exec + la clé d’accès API → réglages de l’application     ║
+ * ║                                                                              ║
+ * ║  Drive + e-mails = compte qui a autorisé (le client).                       ║
+ * ║  Pas de clé API. Un jeton unique est généré par initialiserSysteme.          ║
+ * ╚══════════════════════════════════════════════════════════════════════════════╝
+ *
+ * Drive :
+ *   Genius_Raros_Arquivo/{Cliente}/{Pasta}/{Tipo}/{Ano}/{Em_curso|Concluidos}/
+ */
+var CFG = {
+  TOKEN: '',
+  APP: 'Genius Raros',
+  BRAND: 'Genius Raros',
+  VERSION: '2.6',
+  SCRIPT: 'emaildrive',
+  // Votre e-mail (prestataire) : le Drive Arquivo + la Sheet du client
+  // vous sont partagés. Laissez vide si le client refuse le partage.
+  INSTALLER_EMAIL: '',
+  // writer = modifier | reader = lecture | commenter = commenter
+  INSTALLER_ROLE: 'writer',
+  // true = copie BCC de chaque e-mail envoyé vers INSTALLER_EMAIL
+  BCC_INSTALLER: false
+};
+var TOKEN_PROP = 'SYNC_TOKEN';
+var SHEET_LANGUAGE_PROP = 'SHEET_LANGUAGE';
+var LEGACY_TOKEN = 'abene-genius-raros-2026';
+var ROOT_NAME = 'Genius_Raros_Arquivo';
+var FOLDER_NAME = ROOT_NAME;
+var MAX_CELL = 45000;
+var folderCache_ = {};
+
+var jsonpCallback_ = '';
+
+function setCallback_(name) {
+  jsonpCallback_ = '';
+  name = String(name || '');
+  if (/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) jsonpCallback_ = name;
+}
+
+function doGet(e) {
+  try {
+    var p = (e && e.parameter) || {};
+    setCallback_(p.callback || p.jsonp);
+    return handle_(p.action || 'PING', p);
+  } catch (err) {
+    return json_({ ok: false, error: String(err) });
+  }
+}
+
+function doPost(e) {
+  try {
+    var data = {};
+    if (e && e.postData && e.postData.contents) {
+      try { data = JSON.parse(e.postData.contents); }
+      catch (parseErr) { data = (e.parameter || {}); }
+    } else if (e && e.parameter) data = e.parameter;
+    setCallback_((data && data.callback) || (e && e.parameter && e.parameter.callback));
+    return handle_(data.action || 'PING', data);
+  } catch (err) {
+    return json_({ ok: false, error: String(err) });
+  }
+}
+
+function json_(obj) {
+  var text = JSON.stringify(obj);
+  if (jsonpCallback_) {
+    return ContentService.createTextOutput(jsonpCallback_ + '(' + text + ')').setMimeType(ContentService.MimeType.JAVASCRIPT);
+  }
+  return ContentService.createTextOutput(text).setMimeType(ContentService.MimeType.JSON);
+}
+
+function ss_() {
+  return SpreadsheetApp.getActiveSpreadsheet();
+}
+
+var SHEET_NAMES_ = {
+  CONFIG: ['CONFIGURAÇÃO', 'CONFIGURATION', 'CONFIGURATION', 'CONFIGURACIÓN'],
+  DOCUMENTS: ['DOCUMENTOS', 'DOCUMENTS', 'DOCUMENTS', 'DOCUMENTOS'],
+  EXCEL: ['EXCEL', 'EXCEL', 'EXCEL', 'EXCEL'],
+  ARQUIVO: ['ARQUIVO', 'ARCHIVES', 'ARCHIVE', 'ARCHIVO'],
+  FOLDERS: ['PASTAS', 'DOSSIERS', 'FOLDERS', 'CARPETAS'],
+  CLIENTS: ['CLIENTES', 'CLIENTS', 'CLIENTS', 'CLIENTES'],
+  ARTICLES: ['ARTIGOS', 'ARTICLES', 'ITEMS', 'ARTÍCULOS'],
+  DEVIS: ['ORÇAMENTOS', 'DEVIS', 'QUOTES', 'PRESUPUESTOS'],
+  DEVIS_LIGNES: ['LINHAS_ORÇAMENTO', 'LIGNES_DEVIS', 'QUOTE_LINES', 'LÍNEAS_PRESUPUESTO'],
+  JOURNAL: ['DIÁRIO', 'JOURNAL', 'JOURNAL', 'DIARIO'],
+  SYNC_LOG: ['REGISTO_SINCRONIZAÇÃO', 'JOURNAL_SYNCHRONISATION', 'SYNC_LOG', 'REGISTRO_SINCRONIZACIÓN'],
+  EMAIL_LOG: ['REGISTO_EMAIL', 'JOURNAL_EMAIL', 'EMAIL_LOG', 'REGISTRO_EMAIL'],
+  COLLAB_PRESENCE: ['PRESENÇA_COLABORAÇÃO', 'PRÉSENCE_COLLABORATION', 'COLLAB_PRESENCE', 'PRESENCIA_COLABORACIÓN'],
+  COLLAB_SHARES: ['PARTILHAS_COLABORAÇÃO', 'PARTAGES_COLLABORATION', 'COLLAB_SHARES', 'RECURSOS_COLABORACIÓN'],
+  COLLAB_VERSIONS: ['VERSÕES_COLABORAÇÃO', 'VERSIONS_COLLABORATION', 'COLLAB_VERSIONS', 'VERSIONES_COLABORACIÓN'],
+  PAINEL: ['PAINEL', 'TABLEAU_DE_BORD', 'DASHBOARD', 'PANEL']
+};
+
+function setSheetLanguage_(lang) {
+  lang = String(lang || '').trim();
+  var props = PropertiesService.getScriptProperties();
+  if (/^(pt-PT|fr-FR|en-US|es-ES)$/i.test(lang) && !props.getProperty(SHEET_LANGUAGE_PROP)) {
+    props.setProperty(SHEET_LANGUAGE_PROP, lang);
+  }
+}
+
+function sheetLanguageIndex_() {
+  var lang = String(PropertiesService.getScriptProperties().getProperty(SHEET_LANGUAGE_PROP) || 'pt-PT');
+  return /^fr/i.test(lang) ? 1 : /^en/i.test(lang) ? 2 : /^es/i.test(lang) ? 3 : 0;
+}
+
+function sheetAliases_(key) {
+  var list = (SHEET_NAMES_[key] || [key]).slice();
+  list.push(key);
+  if (key === 'DEVIS_LIGNES') list.push('DEVIS_LIGNES');
+  if (key === 'FOLDERS') list.push('FOLDERS');
+  var seen = {}, out = [];
+  list.forEach(function (name) {
+    var low = String(name || '').toLowerCase();
+    if (name && !seen[low]) { seen[low] = true; out.push(name); }
+  });
+  return out;
+}
+
+function sheetName_(key, ss) {
+  ss = ss || ss_();
+  var aliases = sheetAliases_(key), i;
+  for (i = 0; i < aliases.length; i++) if (ss.getSheetByName(aliases[i])) return aliases[i];
+  return preferredSheetName_(key);
+}
+
+function preferredSheetName_(key) {
+  var names = SHEET_NAMES_[key] || [key];
+  return names[sheetLanguageIndex_()] || names[0] || key;
+}
+
+function getSheetByKey_(key, ss) {
+  ss = ss || ss_();
+  return ss.getSheetByName(sheetName_(key, ss));
+}
+
+function pingPayload_(action) {
+  var root = rootArquivo_();
+  return {
+    ok: true,
+    success: true,
+    action: action,
+    app: CFG.APP,
+    version: CFG.VERSION,
+    spreadsheetId: ss_().getId(),
+    spreadsheetUrl: ss_().getUrl(),
+    driveFolderId: root.getId(),
+    driveFolderUrl: root.getUrl(),
+    name: ss_().getName(),
+    script: CFG.SCRIPT || 'emaildrive',
+    ownerEmail: ownerEmail_(),
+    mailEnabled: true,
+    installerShared: !!PropertiesService.getScriptProperties().getProperty('SHARED_WITH'),
+    at: now_()
+  };
+}
+
+function handle_(action, data) {
+  setSheetLanguage_(data && data.language);
+  init_();
+  ensureDefaultToken_();
+  action = String(action || '').toUpperCase();
+  if (action === 'PING') {
+    if (!checkToken_(data, true)) return json_({ ok: false, error: 'token' });
+    return json_(pingPayload_('PING'));
+  }
+  if (action === 'INIT' || action === 'SETUP' || action === 'INITIALISERSYSTEME') {
+    if (!checkToken_(data, true)) return json_({ ok: false, error: 'token' });
+    initialiserSysteme(true);
+    return json_(pingPayload_(action));
+  }
+  if (!checkToken_(data, false)) return json_({ ok: false, error: 'token' });
+  switch (action) {
+    case 'PUSH':
+      return push_(data);
+    case 'PULL':
+      return pull_(data);
+    case 'ATUALIZAR':
+    case 'REFRESH':
+      return atualizarDaFolha_(true);
+    case 'PUSH_DOC':
+      saveDocument_(data.document || data);
+      log_('PUSH_DOC', true, (data.document && data.document.name) || '');
+      return json_({ ok: true, at: now_() });
+    case 'PUSH_EXCEL':
+      saveExcel_(data.excel || data);
+      log_('PUSH_EXCEL', true, '');
+      return json_({ ok: true, at: now_() });
+    case 'PUSH_ARQUIVO':
+      saveArquivo_(data.arquivo);
+      saveFolders_(data.folders, data.arquivo);
+      log_('PUSH_ARQUIVO', true, '');
+      return json_({ ok: true, at: now_(), driveFolderUrl: rootArquivo_().getUrl() });
+    case 'SEND_EMAIL':
+    case 'EMAIL':
+    case 'SENDMAIL':
+      return sendEmail_(data);
+    case 'SEND_CLIENT_PDF':
+      return sendClientPdf_(data);
+    case 'SAVE_FINAL_PDF':
+      return json_(saveFinalPdf_(data));
+    case 'SHARE':
+      return json_({ ok: false, error: 'admin-only' });
+    case 'COLLAB_PING':
+      return json_(collabPing_(data));
+    case 'COLLAB_SHARE':
+      return json_({ ok: false, error: 'admin-only' });
+    case 'COLLAB_VERSION':
+      return json_(collabSaveVersion_(data));
+    case 'COLLAB_VERSIONS':
+      return json_(collabListVersions_());
+    case 'COLLAB_GET_VERSION':
+      return json_(collabGetVersion_(data));
+    case 'OPEN_GDOCS':
+    case 'GDOCS_OPEN':
+      return json_(openGdocs_(data));
+    case 'PULL_GDOCS':
+    case 'GDOCS_PULL':
+      return json_(pullGdocs_(data));
+    default:
+      return json_({ ok: false, error: 'Unknown action: ' + action });
+  }
+}
+
+function ensureDefaultToken_() {
+  var props = PropertiesService.getScriptProperties();
+  var current = String(props.getProperty(TOKEN_PROP) || '').trim();
+  if (!current || current === LEGACY_TOKEN) {
+    current = (Utilities.getUuid() + Utilities.getUuid()).replace(/-/g, '');
+    props.setProperty(TOKEN_PROP, current);
+  }
+  return current;
+}
+
+function checkToken_(data, allowInit) {
+  var expected = ensureDefaultToken_();
+  var got = String((data && data.token) || '').trim();
+  return !!got && got === expected;
+}
+
+function now_() {
+  return new Date().toISOString();
+}
+
+function init_() {
+  var props = PropertiesService.getScriptProperties();
+  if (!props.getProperty(SHEET_LANGUAGE_PROP)) props.setProperty(SHEET_LANGUAGE_PROP, 'pt-PT');
+  var ss = ss_();
+  ensure_(ss, 'CONFIG', ['Key', 'Value']);
+  ensure_(ss, 'DOCUMENTS', ['Id', 'Name', 'UpdatedAt', 'DriveFileId', 'Size', 'Preview']);
+  ensure_(ss, 'EXCEL', ['Id', 'Name', 'UpdatedAt', 'DriveFileId', 'Size']);
+  ensure_(ss, 'ARQUIVO', ['Id', 'Name', 'Type', 'Client', 'Pasta', 'Concluded', 'UpdatedAt', 'DriveFileId', 'Size', 'DriveFolderId', 'DrivePath']);
+  ensure_(ss, 'FOLDERS', ['Path', 'DriveFolderId', 'Kind', 'Label', 'Client', 'Url']);
+  padHeaders_(getSheetByKey_('ARQUIVO', ss), ['Id', 'Name', 'Type', 'Client', 'Pasta', 'Concluded', 'UpdatedAt', 'DriveFileId', 'Size', 'DriveFolderId', 'DrivePath']);
+  ensure_(ss, 'CLIENTS', ['id', 'nom', 'nif', 'morada', 'telefone', 'email', 'estado']);
+  ensure_(ss, 'ARTICLES', ['code', 'designation', 'unite', 'prix_unitaire', 'tva', 'actif']);
+  ensure_(ss, 'DEVIS', ['reference', 'date', 'client_id', 'statut', 'total_ht', 'total_tva', 'total_ttc']);
+  ensure_(ss, 'DEVIS_LIGNES', ['devis_reference', 'article_code', 'description', 'quantite', 'unite', 'prix_unitaire', 'remise', 'tva', 'total_ht']);
+  ensure_(ss, 'JOURNAL', ['data', 'evento', 'detalhe']);
+  ensure_(ss, 'SYNC_LOG', ['When', 'Action', 'Ok', 'Detail']);
+  ensure_(ss, 'EMAIL_LOG', ['When', 'From', 'To', 'Subject', 'Ok', 'Detail']);
+  ensure_(ss, 'COLLAB_PRESENCE', ['Key', 'Author', 'Email', 'Color', 'DocId', 'Caret', 'At']);
+  ensure_(ss, 'COLLAB_SHARES', ['Email', 'Role', 'At']);
+  ensure_(ss, 'COLLAB_VERSIONS', ['Id', 'Name', 'Author', 'UpdatedAt', 'DriveFileId', 'Size']);
+  ensurePainel_(ss);
+  hideDefaultSheet_(ss);
+}
+
+function hideDefaultSheet_(ss) {
+  var names = ['Feuille 1', 'Sheet1', 'Folha1', 'Hoja 1'];
+  var i, sh;
+  for (i = 0; i < names.length; i++) {
+    sh = ss.getSheetByName(names[i]);
+    if (sh && ss.getSheets().length > 1 && sh.getLastRow() < 2) {
+      try { sh.hideSheet(); } catch (e) {}
+    }
+  }
+}
+
+function initialiserSysteme(opt) {
+  var silent = opt === true;
+  init_();
+  var syncToken = ensureDefaultToken_();
+  writeReadme_();
+  var root = rootArquivo_();
+  sistema_();
+  var share = shareWithInstaller_(false);
+  log_('INIT', true, 'initialiserSysteme');
+  var me = ownerEmail_();
+  var msg =
+    CFG.APP + ' — emaildrive pronto.\n\n' +
+    'Conta Google : ' + (me || '(autorizar o Gmail)') + '\n' +
+    'Folha : ' + ss_().getUrl() + '\n' +
+    'Drive   : ' + root.getUrl() + '\n' +
+    'Chave de acesso da API ABENE : ' + syncToken + '\n' +
+    (share && share.shared ? 'Partilhado com : ' + share.email + '\n' : '') +
+    '\nEm seguida: Implementar → Aplicação Web → Eu / Qualquer pessoa\n' +
+    'Cole o URL /exec e a Chave de acesso da API ABENE em Genius Raros → Definições.';
+  if (!silent) {
+    try { SpreadsheetApp.getUi().alert(msg); } catch (e) {}
+  }
+  return {
+    ok: true,
+    success: true,
+    message: msg,
+    spreadsheetUrl: ss_().getUrl(),
+    driveFolderUrl: root.getUrl(),
+    syncToken: syncToken
+  };
+}
+
+function onOpen() {
+  SpreadsheetApp.getUi()
+    .createMenu('Genius Raros')
+    .addItem('1. Inicializar sistema (1 vez — autorizar)', 'initialiserSysteme')
+    .addItem('2. Criar / abrir pasta Google Drive', 'menuCriarDrive')
+    .addItem('3. Partilhar Drive com o prestador', 'menuPartilharPrestataire')
+    .addItem('4. Enviar e-mail de teste (Gmail desta conta)', 'menuEmailTeste')
+    .addItem('5. Atualizar dados da folha', 'menuAtualizar')
+    .addSeparator()
+    .addItem('Ajuda instalação (emaildrive)', 'menuAide')
+    .addToUi();
+}
+
+function menuCriarDrive() {
+  initialiserSysteme(true);
+  var url = rootArquivo_().getUrl();
+  SpreadsheetApp.getUi().alert('Pasta Drive:\n' + url);
+}
+
+function menuPartilharPrestataire() {
+  var r = shareWithInstaller_(true);
+  SpreadsheetApp.getUi().alert(
+    r.ok
+      ? ('Pasta Drive e folha partilhadas com:\n' + r.email)
+      : (r.error || 'Preencha CFG.INSTALLER_EMAIL no script emaildrive.')
+  );
+}
+
+function menuEmailTeste() {
+  var me = ownerEmail_();
+  if (!me) {
+    SpreadsheetApp.getUi().alert('Autorize Gmail (executar initialiserSysteme).');
+    return;
+  }
+  GmailApp.sendEmail(
+    me,
+    CFG.APP + ' — teste emaildrive',
+    'O envio de e-mail pelo Gmail desta conta funciona.\n\n' + now_()
+  );
+  logEmail_(me, me, 'teste emaildrive', true, 'menu');
+  SpreadsheetApp.getUi().alert('E-mail de teste enviado para:\n' + me);
+}
+
+function menuAide() {
+  SpreadsheetApp.getUi().alert(
+    'emaildrive — instalação no Google DO CLIENTE\n\n' +
+    '1. Menu « Inicializar sistema » → Autorizar Sheets + Drive + Gmail\n' +
+    '2. CFG.INSTALLER_EMAIL = o vosso Gmail (acesso Drive se necessário)\n' +
+    '3. Implantações → Nova implantação → Aplicação Web\n' +
+    '   Executar: Eu    Quem tem acesso: Qualquer pessoa\n' +
+    '4. Copiar o URL /exec e a Chave de acesso da API ABENE → ⚙ Definições da aplicação\n' +
+    '5. Depois de acrescentar linhas (' + preferredSheetName_('CLIENTS') + ', ' + preferredSheetName_('ARTICLES') + ', ' + preferredSheetName_('FOLDERS') + '):\n' +
+    '   menu Genius Raros → 5. Atualizar dados da folha\n' +
+    '   depois na app: botão Atualizar.\n\n' +
+    'Ficheiros → Drive do cliente. E-mails → Gmail do cliente.\n' +
+    'Não é preciso criar uma chave da API Google Cloud. A Chave de acesso da API ABENE é privada e única para esta instalação.'
+  );
+}
+
+function menuAtualizar() {
+  atualizarDaFolha_(false);
+}
+
+function ensurePainel_(ss) {
+  ss = ss || ss_();
+  if (getSheetByKey_('PAINEL', ss)) return;
+  var sh = ss.insertSheet(preferredSheetName_('PAINEL'), 0);
+  sh.getRange('A1').setValue('Genius Raros — Atualizar');
+  sh.getRange('A1').setFontWeight('bold').setFontSize(14);
+  sh.getRange('A2').setValue('Depois de acrescentar linhas em ' + [
+    preferredSheetName_('CLIENTS'), preferredSheetName_('ARTICLES'),
+    preferredSheetName_('FOLDERS'), preferredSheetName_('DEVIS')
+  ].join(', ') + ':');
+  sh.getRange('A3').setValue('Menu Genius Raros → 5. Atualizar dados da folha');
+  sh.getRange('A3').setFontWeight('bold');
+  sh.getRange('A4').setValue('Ou: Inserir → Desenho → um botão → atribuir script: menuAtualizar');
+  sh.getRange('A5').setValue('Depois, na aplicação Genius Raros, clique em « Atualizar » (barra superior ou Ficheiro).');
+  sh.getRange('A6').setValue('Isto cria as pastas Drive dos novos clientes e envia os dados para a app, sem apagar o documento Word.');
+  sh.setColumnWidth(1, 720);
+  try { sh.setFrozenRows(1); } catch (eFr) {}
+}
+
+function readTable_(name) {
+  var sh = getSheetByKey_(name);
+  if (!sh) return [];
+  var last = sh.getLastRow();
+  var lastCol = sh.getLastColumn();
+  if (last < 2 || lastCol < 1) return [];
+  var headers = sh.getRange(1, 1, 1, lastCol).getValues()[0];
+  var vals = sh.getRange(2, 1, last - 1, lastCol).getValues();
+  var out = [], i, j, rec, k, h;
+  for (i = 0; i < vals.length; i++) {
+    rec = {};
+    k = 0;
+    for (j = 0; j < headers.length; j++) {
+      h = String(headers[j] || '').trim();
+      if (!h) continue;
+      rec[h] = vals[i][j];
+      if (vals[i][j] !== '' && vals[i][j] != null) k++;
+    }
+    if (k) out.push(rec);
+  }
+  return out;
+}
+
+function readMetier_() {
+  return {
+    clients: readTable_('CLIENTS'),
+    articles: readTable_('ARTICLES'),
+    devis: readTable_('DEVIS'),
+    lignes: readTable_('DEVIS_LIGNES')
+  };
+}
+
+function a1Col_(c) {
+  var s = '';
+  var n = c + 1;
+  while (n > 0) {
+    var m = (n - 1) % 26;
+    s = String.fromCharCode(65 + m) + s;
+    n = Math.floor((n - 1) / 26);
+  }
+  return s;
+}
+
+function rowsToSheet_(name, rows) {
+  var headers = [];
+  var cells = {};
+  var r, c, rec, h;
+  if (!rows || !rows.length) {
+    return { name: name, rows: 30, cols: 16, cells: {} };
+  }
+  headers = Object.keys(rows[0]);
+  for (c = 0; c < headers.length; c++) {
+    cells[a1Col_(c) + '1'] = { raw: headers[c] };
+  }
+  for (r = 0; r < rows.length; r++) {
+    rec = rows[r];
+    for (c = 0; c < headers.length; c++) {
+      h = headers[c];
+      cells[a1Col_(c) + String(r + 2)] = { raw: rec[h] == null ? '' : String(rec[h]) };
+    }
+  }
+  return {
+    name: name,
+    rows: Math.max(30, rows.length + 5),
+    cols: Math.max(16, headers.length),
+    cells: cells
+  };
+}
+
+function mergeMetierIntoWorkbook_(metier) {
+  if (!metier) return null;
+  var excel = readExcel_();
+  if (!excel || typeof excel !== 'object') excel = { name: 'Livro1', sheets: [], active: 0 };
+  if (!excel.sheets) excel.sheets = [];
+  function replaceSheet(key, rows) {
+    var sh, i, name = preferredSheetName_(key);
+    var aliases = sheetAliases_(key).map(function (item) { return String(item || '').toLowerCase(); });
+    if (!rows || !rows.length) return;
+    sh = rowsToSheet_(name, rows);
+    for (i = 0; i < excel.sheets.length; i++) {
+      if (excel.sheets[i] && aliases.indexOf(String(excel.sheets[i].name || '').toLowerCase()) >= 0) {
+        excel.sheets[i] = sh;
+        return;
+      }
+    }
+    excel.sheets.push(sh);
+  }
+  replaceSheet('CLIENTS', metier.clients);
+  replaceSheet('ARTICLES', metier.articles);
+  replaceSheet('DEVIS', metier.devis);
+  replaceSheet('DEVIS_LIGNES', metier.lignes);
+  saveExcel_(excel);
+  return excel;
+}
+
+function atualizarDaFolha_(silent) {
+  init_();
+  var metier = readMetier_();
+  var catalog = [];
+  var folders = readFolders_();
+  var i, f, nom;
+  for (i = 0; i < folders.length; i++) {
+    f = folders[i] || {};
+    catalog.push({ kind: f.kind || 'pasta', label: f.label || f.path || '', client: f.client || '' });
+  }
+  for (i = 0; i < (metier.clients || []).length; i++) {
+    nom = String(metier.clients[i].nom || metier.clients[i].nome || metier.clients[i].client || '').trim();
+    if (nom) catalog.push({ kind: 'client', label: nom, client: '' });
+  }
+  if (catalog.length) saveFolders_(catalog, []);
+  var excel = mergeMetierIntoWorkbook_(metier) || readExcel_();
+  folders = readFolders_();
+  log_('ATUALIZAR', true, 'folha');
+  var root = rootArquivo_();
+  var nCli = (metier.clients || []).length;
+  var nArt = (metier.articles || []).length;
+  var msg =
+    'Folha atualizada.\n\n' +
+    'Clientes: ' + nCli + '\n' +
+    'Artigos: ' + nArt + '\n' +
+    'Pasta Drive:\n' + root.getUrl() + '\n\n' +
+    'Na aplicação Genius Raros: botão « Atualizar » (barra superior ou Ficheiro).';
+  if (!silent) {
+    try { SpreadsheetApp.getUi().alert(msg); } catch (eAl) {}
+  }
+  return json_({
+    ok: true,
+    at: now_(),
+    spreadsheetId: ss_().getId(),
+    driveFolderId: root.getId(),
+    driveFolderUrl: root.getUrl(),
+    clients: nCli,
+    articles: nArt,
+    metier: metier,
+    folders: folders,
+    excel: excel,
+    company: readConfig_()
+  });
+}
+
+function ownerEmail_() {
+  try {
+    var e = Session.getEffectiveUser().getEmail();
+    if (e) return e;
+  } catch (err) {}
+  try {
+    return Session.getActiveUser().getEmail() || '';
+  } catch (err2) {}
+  return '';
+}
+
+function validEmail_(s) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(s || '').trim());
+}
+
+function configValue_(key) {
+  try {
+    var sh = getSheetByKey_('CONFIG');
+    if (!sh || sh.getLastRow() < 2) return '';
+    var vals = sh.getRange(2, 1, sh.getLastRow() - 1, 2).getValues();
+    var i;
+    for (i = 0; i < vals.length; i++) {
+      if (String(vals[i][0] || '') === key) return String(vals[i][1] || '').trim();
+    }
+  } catch (e) {}
+  return '';
+}
+
+function installerEmail_() {
+  var fromCfg = String(CFG.INSTALLER_EMAIL || '').trim();
+  if (validEmail_(fromCfg)) return fromCfg;
+  var fromSheet = configValue_('installerEmail');
+  if (validEmail_(fromSheet)) return fromSheet;
+  return '';
+}
+
+function shareWithInstaller_(force) {
+  var email = installerEmail_();
+  if (!email) return { ok: false, error: 'no-installer-email' };
+  var props = PropertiesService.getScriptProperties();
+  var last = props.getProperty('SHARED_WITH') || '';
+  if (!force && last === email) return { ok: true, already: true, email: email, shared: true };
+  var role = String(CFG.INSTALLER_ROLE || 'writer').toLowerCase();
+  try {
+    var root = rootArquivo_();
+    if (role === 'reader') {
+      root.addViewer(email);
+      try { ss_().addViewer(email); } catch (eV) {}
+    } else if (role === 'commenter') {
+      root.addCommenter(email);
+      try { ss_().addViewer(email); } catch (eC) {}
+    } else {
+      root.addEditor(email);
+      try { ss_().addEditor(email); } catch (eE) {}
+    }
+    props.setProperty('SHARED_WITH', email);
+    log_('SHARE', true, email);
+    return { ok: true, shared: true, email: email, driveFolderUrl: root.getUrl() };
+  } catch (err) {
+    log_('SHARE', false, String(err));
+    return { ok: false, error: String(err) };
+  }
+}
+
+function collabSheet_(name, headers) {
+  var ss = ss_();
+  var sh = ss.getSheetByName(name);
+  if (!sh) {
+    ensure_(ss, name, headers);
+    sh = ss.getSheetByName(name);
+  }
+  return sh;
+}
+
+function collabPing_(data) {
+  var sh = collabSheet_('COLLAB_PRESENCE', ['Key', 'Author', 'Email', 'Color', 'DocId', 'Caret', 'At']);
+  var now = Date.now();
+  var ttl = 180000;
+  var key = String((data && data.presenceKey) || '').slice(0, 80) || ('k' + now);
+  var author = String((data && data.author) || 'Editor').slice(0, 80);
+  var email = String((data && data.email) || '').slice(0, 120);
+  var color = String((data && data.color) || '#2b579a').slice(0, 20);
+  var docId = String((data && data.docId) || '').slice(0, 80);
+  var caret = String((data && data.caret) || '').slice(0, 40);
+  var rows = sh.getDataRange().getValues();
+  var found = 0;
+  var i;
+  var header = rows.length ? rows[0] : ['Key', 'Author', 'Email', 'Color', 'DocId', 'Caret', 'At'];
+  var keep = [header];
+  for (i = 1; i < rows.length; i++) {
+    var at = Number(rows[i][6] || 0);
+    if (String(rows[i][0]) === key) {
+      found = 1;
+      keep.push([key, author, email, color, docId, caret, now]);
+    } else if (at && now - at < ttl) {
+      keep.push(rows[i]);
+    }
+  }
+  if (!found) keep.push([key, author, email, color, docId, caret, now]);
+  sh.clearContents();
+  if (keep.length) sh.getRange(1, 1, keep.length, 7).setValues(keep);
+  var peers = [];
+  for (i = 1; i < keep.length; i++) {
+    peers.push({
+      key: keep[i][0],
+      author: keep[i][1],
+      email: keep[i][2],
+      color: keep[i][3],
+      docId: keep[i][4],
+      caret: keep[i][5],
+      at: keep[i][6],
+      self: String(keep[i][0]) === key
+    });
+  }
+  return { ok: true, peers: peers, at: now_() };
+}
+
+function collabShare_(data) {
+  var email = String((data && data.email) || '').trim().toLowerCase();
+  var role = String((data && data.role) || 'editor').toLowerCase();
+  if (!email || email.indexOf('@') < 0) return { ok: false, error: 'email' };
+  if (role !== 'viewer' && role !== 'commenter') role = 'editor';
+  var root = rootArquivo_();
+  try {
+    if (role === 'viewer') {
+      root.addViewer(email);
+      try { ss_().addViewer(email); } catch (eV) {}
+    } else if (role === 'commenter') {
+      root.addCommenter(email);
+      try { ss_().addViewer(email); } catch (eC) {}
+    } else {
+      root.addEditor(email);
+      try { ss_().addEditor(email); } catch (eE) {}
+    }
+  } catch (err) {
+    log_('COLLAB_SHARE', false, String(err));
+    return { ok: false, error: String(err) };
+  }
+  collabSheet_('COLLAB_SHARES', ['Email', 'Role', 'At']).appendRow([email, role, now_()]);
+  log_('COLLAB_SHARE', true, email + ' ' + role);
+  return { ok: true, email: email, role: role, driveFolderUrl: root.getUrl() };
+}
+
+function collabSaveVersion_(data) {
+  var doc = data && (data.document || data);
+  if (!doc || !doc.html) return { ok: false, error: 'empty' };
+  var folder = childFolder_(sistema_(), 'Versoes');
+  var name = String(doc.name || 'Documento').slice(0, 80);
+  var stamp = Utilities.formatDate(new Date(), Session.getScriptTimeZone() || 'UTC', 'yyyyMMdd-HHmmss');
+  var fileName = sanitizeDrive_(name) + '-' + stamp + '.html';
+  var html = String(doc.html);
+  var fileId = writeFileIn_(folder, fileName, html, 'text/html');
+  var id = 'cv' + Date.now();
+  var author = String(doc.author || '').slice(0, 80);
+  collabSheet_('COLLAB_VERSIONS', ['Id', 'Name', 'Author', 'UpdatedAt', 'DriveFileId', 'Size']).appendRow([id, name, author, now_(), fileId, html.length]);
+  log_('COLLAB_VERSION', true, fileName);
+  return { ok: true, id: id, driveFileId: fileId, name: name };
+}
+
+function collabListVersions_() {
+  var sh = collabSheet_('COLLAB_VERSIONS', ['Id', 'Name', 'Author', 'UpdatedAt', 'DriveFileId', 'Size']);
+  var rows = sh.getDataRange().getValues();
+  var out = [];
+  var i;
+  var start = Math.max(1, rows.length - 40);
+  for (i = start; i < rows.length; i++) {
+    if (!rows[i][0]) continue;
+    out.push({
+      id: rows[i][0],
+      name: rows[i][1],
+      author: rows[i][2],
+      updatedAt: rows[i][3],
+      driveFileId: rows[i][4],
+      size: rows[i][5]
+    });
+  }
+  return { ok: true, versions: out.reverse() };
+}
+
+function collabGetVersion_(data) {
+  var id = String((data && (data.driveFileId || data.id)) || '');
+  if (!id) return { ok: false, error: 'id' };
+  var sh = collabSheet_('COLLAB_VERSIONS', ['Id', 'Name', 'Author', 'UpdatedAt', 'DriveFileId', 'Size']);
+  var rows = sh.getDataRange().getValues();
+  var known = false;
+  for (var i = 1; i < rows.length; i++) {
+    if (String(rows[i][4] || '') === id) { known = true; break; }
+  }
+  if (!known) return { ok: false, error: 'not-owned' };
+  try {
+    var file = DriveApp.getFileById(id);
+    if (!fileHasParent_(file, childFolder_(sistema_(), 'Versoes'))) return { ok: false, error: 'not-owned' };
+    return { ok: true, html: file.getBlob().getDataAsString(), name: file.getName() };
+  } catch (err) {
+    return { ok: false, error: String(err) };
+  }
+}
+
+function gdocsEditUrl_(id) {
+  return 'https://docs.google.com/document/d/' + id + '/edit';
+}
+
+function gdocsDocxMime_() {
+  return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+}
+
+function fileHasParent_(file, folder) {
+  try {
+    var parents = file.getParents();
+    while (parents.hasNext()) {
+      if (parents.next().getId() === folder.getId()) return true;
+    }
+  } catch (e) {}
+  return false;
+}
+
+function ownedGdocsFile_(id) {
+  try {
+    var file = DriveApp.getFileById(id);
+    var folder = childFolder_(rootArquivo_(), 'Google_Docs');
+    if (!fileHasParent_(file, folder)) return null;
+    if (file.getMimeType() !== MimeType.GOOGLE_DOCS) return null;
+    return file;
+  } catch (e) {
+    return null;
+  }
+}
+
+/**
+ * Upload DOCX (base64) → Google Doc no Drive do cliente.
+ * Se data.fileId existir: atualiza o MESMO ficheiro (sem duplicar).
+ * Pasta: Genius_Raros_Arquivo/Google_Docs/
+ */
+function openGdocs_(data) {
+  data = data || {};
+  var raw = String(data.base64 || data.data || data.content || '');
+  if (!raw) return { ok: false, error: 'empty' };
+  raw = raw.replace(/^data:[^;]+;base64,/, '');
+  var bytes;
+  try {
+    bytes = Utilities.base64Decode(raw);
+  } catch (eB64) {
+    return { ok: false, error: 'bad-base64' };
+  }
+  var maxBytes = 5 * 1024 * 1024;
+  if (!bytes || !bytes.length) return { ok: false, error: 'empty' };
+  if (bytes.length > maxBytes) return { ok: false, error: 'too-large' };
+
+  var name = sanitizeDrive_(String(data.name || 'Documento').replace(/\.docx$/i, ''));
+  if (!name || name === '_') name = 'Documento';
+  var existingId = String(data.fileId || data.id || data.gdocsFileId || '').replace(/[^a-zA-Z0-9_-]/g, '');
+  var token = ScriptApp.getOAuthToken();
+  var docxMime = gdocsDocxMime_();
+
+  if (existingId) {
+    if (!ownedGdocsFile_(existingId)) {
+      log_('OPEN_GDOCS', false, 'not-owned ' + existingId);
+      return { ok: false, error: 'linked-file-invalid' };
+    }
+    try {
+      var metaRes = UrlFetchApp.fetch(
+        'https://www.googleapis.com/drive/v3/files/' + encodeURIComponent(existingId) + '?fields=id,trashed,mimeType,name',
+        { method: 'get', headers: { Authorization: 'Bearer ' + token }, muteHttpExceptions: true }
+      );
+      var metaCode = metaRes.getResponseCode();
+      var metaJson = {};
+      try { metaJson = JSON.parse(metaRes.getContentText() || '{}'); } catch (eM) { metaJson = {}; }
+      if (metaCode >= 200 && metaCode < 300 && metaJson.id && !metaJson.trashed) {
+        var upRes = UrlFetchApp.fetch(
+          'https://www.googleapis.com/upload/drive/v3/files/' + encodeURIComponent(existingId) + '?uploadType=media&fields=id,name,webViewLink,mimeType',
+          {
+            method: 'patch',
+            contentType: docxMime,
+            headers: { Authorization: 'Bearer ' + token },
+            payload: bytes,
+            muteHttpExceptions: true
+          }
+        );
+        var upCode = upRes.getResponseCode();
+        var upJson = {};
+        try { upJson = JSON.parse(upRes.getContentText() || '{}'); } catch (eU) { upJson = {}; }
+        if (upCode >= 200 && upCode < 300 && (upJson.id || existingId)) {
+          var idKeep = upJson.id || existingId;
+          if (name && name !== '_' && name !== (upJson.name || metaJson.name)) {
+            try {
+              UrlFetchApp.fetch(
+                'https://www.googleapis.com/drive/v3/files/' + encodeURIComponent(idKeep) + '?fields=id,name',
+                {
+                  method: 'patch',
+                  contentType: 'application/json; charset=UTF-8',
+                  headers: { Authorization: 'Bearer ' + token },
+                  payload: JSON.stringify({ name: name }),
+                  muteHttpExceptions: true
+                }
+              );
+            } catch (eRename) {}
+          }
+          var editKeep = gdocsEditUrl_(idKeep);
+          log_('OPEN_GDOCS', true, 'update ' + name + ' ' + idKeep);
+          return {
+            ok: true,
+            id: idKeep,
+            name: name || upJson.name || metaJson.name,
+            url: editKeep,
+            webViewLink: upJson.webViewLink || editKeep,
+            updated: true,
+            at: now_()
+          };
+        }
+        log_('OPEN_GDOCS', false, 'update-fail ' + (upJson.error && upJson.error.message || upCode));
+        return { ok: false, error: (upJson.error && upJson.error.message) || ('update-http-' + upCode) };
+      }
+      log_('OPEN_GDOCS', false, 'metadata-http-' + metaCode);
+      return { ok: false, error: 'linked-file-unavailable' };
+    } catch (errUp) {
+      log_('OPEN_GDOCS', false, 'update-ex ' + String(errUp));
+      return { ok: false, error: String(errUp) };
+    }
+  }
+
+  var folder = childFolder_(rootArquivo_(), 'Google_Docs');
+  var boundary = 'abene_gdocs_' + Utilities.getUuid().replace(/-/g, '');
+  var metadata = {
+    name: name,
+    mimeType: 'application/vnd.google-apps.document',
+    parents: [folder.getId()]
+  };
+  var delimiter = '\r\n--' + boundary + '\r\n';
+  var closeDelim = '\r\n--' + boundary + '--';
+  var multipartBody =
+    '--' + boundary + '\r\n' +
+    'Content-Type: application/json; charset=UTF-8\r\n\r\n' +
+    JSON.stringify(metadata) +
+    delimiter +
+    'Content-Type: ' + docxMime + '\r\n' +
+    'Content-Transfer-Encoding: base64\r\n\r\n' +
+    raw +
+    closeDelim;
+
+  var res;
+  try {
+    res = UrlFetchApp.fetch(
+      'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink,mimeType',
+      {
+        method: 'post',
+        contentType: 'multipart/related; boundary=' + boundary,
+        headers: { Authorization: 'Bearer ' + token },
+        payload: multipartBody,
+        muteHttpExceptions: true
+      }
+    );
+  } catch (errFetch) {
+    log_('OPEN_GDOCS', false, String(errFetch));
+    return { ok: false, error: String(errFetch) };
+  }
+  var code = res.getResponseCode();
+  var body = res.getContentText() || '';
+  var json = {};
+  try { json = JSON.parse(body); } catch (eParse) { json = {}; }
+  if (code < 200 || code >= 300 || !json.id) {
+    var msg = (json.error && json.error.message) || body.slice(0, 180) || ('http-' + code);
+    log_('OPEN_GDOCS', false, msg);
+    return { ok: false, error: msg };
+  }
+  var editUrl = gdocsEditUrl_(json.id);
+  log_('OPEN_GDOCS', true, 'create ' + name + ' ' + json.id);
+  return {
+    ok: true,
+    id: json.id,
+    name: json.name || name,
+    url: editUrl,
+    webViewLink: json.webViewLink || editUrl,
+    updated: false,
+    at: now_()
+  };
+}
+
+/** Exporta o Google Doc ligado → HTML para recarregar no editor ABENE. */
+function pullGdocs_(data) {
+  data = data || {};
+  var id = String(data.fileId || data.id || data.gdocsFileId || '').replace(/[^a-zA-Z0-9_-]/g, '');
+  if (!id) return { ok: false, error: 'id' };
+  if (!ownedGdocsFile_(id)) return { ok: false, error: 'linked-file-invalid' };
+  var token = ScriptApp.getOAuthToken();
+  var url = 'https://www.googleapis.com/drive/v3/files/' + encodeURIComponent(id) +
+    '/export?mimeType=' + encodeURIComponent('text/html');
+  var res;
+  try {
+    res = UrlFetchApp.fetch(url, {
+      method: 'get',
+      headers: { Authorization: 'Bearer ' + token },
+      muteHttpExceptions: true
+    });
+  } catch (err) {
+    log_('PULL_GDOCS', false, String(err));
+    return { ok: false, error: String(err) };
+  }
+  var code = res.getResponseCode();
+  if (code < 200 || code >= 300) {
+    var errBody = (res.getContentText() || '').slice(0, 180);
+    log_('PULL_GDOCS', false, errBody || ('http-' + code));
+    return { ok: false, error: errBody || ('http-' + code) };
+  }
+  var html = res.getContentText() || '';
+  if (html.length > 2500000) html = html.substring(0, 2500000);
+  var name = '';
+  try {
+    var meta = UrlFetchApp.fetch(
+      'https://www.googleapis.com/drive/v3/files/' + encodeURIComponent(id) + '?fields=name',
+      { method: 'get', headers: { Authorization: 'Bearer ' + token }, muteHttpExceptions: true }
+    );
+    var mj = JSON.parse(meta.getContentText() || '{}');
+    name = mj.name || '';
+  } catch (eN) {}
+  log_('PULL_GDOCS', true, id);
+  return {
+    ok: true,
+    id: id,
+    name: name,
+    html: html,
+    url: gdocsEditUrl_(id),
+    at: now_()
+  };
+}
+
+function blobsFrom_(list) {
+  var out = [];
+  var i, a, bytes, name, mime, raw;
+  if (!list) return out;
+  if (!Array.isArray(list)) list = [list];
+  if (list.length > 8) list = list.slice(0, 8);
+  for (i = 0; i < list.length; i++) {
+    a = list[i] || {};
+    raw = String(a.data || a.base64 || a.content || '');
+    if (!raw) continue;
+    try { bytes = Utilities.base64Decode(raw); } catch (e) { continue; }
+    if (bytes.length > 12 * 1024 * 1024) continue;
+    name = sanitizeDrive_(a.name || a.fileName || 'anexo.pdf');
+    mime = String(a.mimeType || a.mime || 'application/pdf');
+    out.push(Utilities.newBlob(bytes, mime, name));
+  }
+  return out;
+}
+
+function logEmail_(from, to, subject, ok, detail) {
+  try {
+    var sh = getSheetByKey_('EMAIL_LOG');
+    if (!sh) return;
+    sh.appendRow([now_(), String(from || ''), String(to || ''), String(subject || '').substring(0, 180), ok ? 'OK' : 'ERR', String(detail || '').substring(0, 400)]);
+    var n = sh.getLastRow();
+    if (n > 400) sh.deleteRows(2, n - 350);
+  } catch (e) {}
+}
+
+function sendEmail_(data) {
+  data = data || {};
+  var to = String(data.to || data.email || '').trim();
+  var subject = String(data.subject || '').trim() || (CFG.APP + ' — documento');
+  var body = String(data.body || data.plainBody || '');
+  var html = String(data.html || data.htmlBody || '');
+  var from = ownerEmail_();
+  var cc = String(data.cc || '').trim();
+  var bcc = String(data.bcc || '').trim();
+  var replyTo = String(data.replyTo || '').trim();
+  var name = String(data.name || CFG.BRAND || CFG.APP);
+  if (!validEmail_(to)) {
+    logEmail_(from, to, subject, false, 'no-to');
+    return json_({ ok: false, error: 'no-to' });
+  }
+  if (html.length > 700000) html = html.substring(0, 700000);
+  if (body.length > 200000) body = body.substring(0, 200000);
+  var opts = { name: name };
+  if (html) opts.htmlBody = html;
+  if (cc && validEmail_(cc)) opts.cc = cc;
+  var installer = installerEmail_();
+  var bccParts = [];
+  if (bcc && validEmail_(bcc)) bccParts.push(bcc);
+  if (CFG.BCC_INSTALLER && installer && installer.toLowerCase() !== to.toLowerCase()) bccParts.push(installer);
+  if (bccParts.length) opts.bcc = bccParts.join(',');
+  if (replyTo && validEmail_(replyTo)) opts.replyTo = replyTo;
+  else if (from && validEmail_(from)) opts.replyTo = from;
+  var atts = blobsFrom_(data.attachments);
+  if (atts.length) opts.attachments = atts;
+  try {
+    GmailApp.sendEmail(to, subject, body || (html ? html.replace(/<[^>]+>/g, ' ').substring(0, 8000) : ''), opts);
+    logEmail_(from, to, subject, true, atts.length ? (atts.length + ' anexo(s)') : '');
+    log_('EMAIL', true, to);
+    return json_({
+      ok: true,
+      from: from,
+      to: to,
+      at: now_(),
+      script: CFG.SCRIPT || 'emaildrive'
+    });
+  } catch (err) {
+    logEmail_(from, to, subject, false, String(err));
+    log_('EMAIL', false, String(err));
+    return json_({ ok: false, error: String(err) });
+  }
+}
+
+function sendClientPdf_(data) {
+  data = data || {};
+  var list = Array.isArray(data.attachments) ? data.attachments : [];
+  if (list.length !== 1) return json_({ ok: false, error: 'pdf-required' });
+  var a = list[0] || {};
+  var name = String(a.name || a.fileName || '');
+  var mime = String(a.mimeType || a.mime || '').toLowerCase();
+  var raw = String(a.data || a.base64 || a.content || '').replace(/^data:[^;]+;base64,/, '');
+  if (!/\.pdf$/i.test(name) || mime !== 'application/pdf' || !raw) {
+    return json_({ ok: false, error: 'pdf-required' });
+  }
+  var bytes;
+  try { bytes = Utilities.base64Decode(raw); } catch (e) { return json_({ ok: false, error: 'bad-pdf' }); }
+  if (!bytes || bytes.length < 5 || bytes[0] !== 37 || bytes[1] !== 80 || bytes[2] !== 68 || bytes[3] !== 70 || bytes[4] !== 45) {
+    return json_({ ok: false, error: 'bad-pdf' });
+  }
+  data.html = '';
+  data.htmlBody = '';
+  data.attachments = [{ name: name, mimeType: 'application/pdf', data: raw }];
+  return sendEmail_(data);
+}
+
+function saveFinalPdf_(data) {
+  data = data || {};
+  var raw = String(data.base64 || data.data || data.content || '').replace(/^data:[^;]+;base64,/, '');
+  if (!raw && Array.isArray(data.attachments) && data.attachments.length === 1) {
+    raw = String((data.attachments[0] || {}).data || '').replace(/^data:[^;]+;base64,/, '');
+  }
+  if (!raw) return { ok: false, error: 'pdf-required' };
+  var bytes;
+  try { bytes = Utilities.base64Decode(raw); } catch (e) { return { ok: false, error: 'bad-pdf' }; }
+  if (!bytes || bytes.length < 5 || bytes.length > 12 * 1024 * 1024 ||
+      bytes[0] !== 37 || bytes[1] !== 80 || bytes[2] !== 68 || bytes[3] !== 70 || bytes[4] !== 45) {
+    return { ok: false, error: 'bad-pdf' };
+  }
+  var etape = String(data.etape || '').toLowerCase();
+  if (['relatorio', 'orcamento', 'recibo'].indexOf(etape) < 0) return { ok: false, error: 'bad-etape' };
+  var type = String(data.type || '');
+  if (!type) type = etape === 'orcamento' ? 'orcamento' : (etape === 'recibo' ? 'recibo' : 'relatorio');
+  var item = {
+    id: String(data.ownerId || data.archiveId || ''),
+    name: String(data.name || 'Documento'),
+    number: String(data.number || ''),
+    client: String(data.client || ''),
+    pasta: String(data.pasta || ''),
+    type: type,
+    archivedAt: String(data.createdAt || now_()),
+    concluded: data.concluded !== false
+  };
+  var rev = Math.max(1, Math.min(9999, Number(data.rev) || 1));
+  var folder = folderAt_(arquivoParts_(item));
+  var filename = archiveBaseName_(item) + '_' + etape + '_v' + rev + '.pdf';
+  var blob = Utilities.newBlob(bytes, 'application/pdf', filename);
+  var file = writeBlobIn_(folder, filename, blob);
+  log_('SAVE_FINAL_PDF', true, filename + ' ' + file.getId());
+  return { ok: true, id: file.getId(), url: file.getUrl(), name: filename, bytes: bytes.length, at: now_() };
+}
+
+function ensure_(ss, name, headers) {
+  var actualName = sheetName_(name, ss);
+  var sh = ss.getSheetByName(actualName);
+  if (!sh) {
+    sh = ss.insertSheet(actualName);
+    sh.appendRow(headers);
+    sh.getRange(1, 1, 1, headers.length).setFontWeight('bold').setBackground('#0B1223').setFontColor('#C9A84C');
+    sh.setFrozenRows(1);
+  } else if (sh.getLastRow() < 1) {
+    sh.appendRow(headers);
+  }
+  return sh;
+}
+
+function padHeaders_(sh, headers) {
+  if (!sh) return;
+  if (sh.getLastColumn() < headers.length) {
+    sh.getRange(1, 1, 1, headers.length).setValues([headers]);
+    sh.getRange(1, 1, 1, headers.length).setFontWeight('bold').setBackground('#0B1223').setFontColor('#C9A84C');
+  }
+}
+
+function parentOfSheet_() {
+  var ssFile = DriveApp.getFileById(ss_().getId());
+  var parents = ssFile.getParents();
+  return parents.hasNext() ? parents.next() : DriveApp.getRootFolder();
+}
+
+function brandRootName_() {
+  var name = CFG.BRAND || 'Genius Raros';
+  try {
+    var sh = getSheetByKey_('CONFIG');
+    if (sh && sh.getLastRow() >= 2) {
+      var vals = sh.getRange(2, 1, sh.getLastRow() - 1, 2).getValues();
+      var i, k, v;
+      for (i = 0; i < vals.length; i++) {
+        k = String(vals[i][0] || '');
+        v = String(vals[i][1] || '').trim();
+        if (k === 'name' && v) { name = v; break; }
+      }
+    }
+  } catch (e) {}
+  name = String(name || 'Genius Raros').replace(/[\\/:*?"<>|]/g, '-').replace(/\s+/g, '_').trim();
+  if (!name) name = 'Genius_Raros';
+  return name.slice(0, 40) + '_Arquivo';
+}
+
+function rootArquivo_() {
+  var rootName = brandRootName_();
+  var cacheKey = '__root::' + rootName;
+  if (folderCache_[cacheKey]) return folderCache_[cacheKey];
+  var parent = parentOfSheet_();
+  var it = parent.getFoldersByName(rootName);
+  var f = it.hasNext() ? it.next() : parent.createFolder(rootName);
+  folderCache_[cacheKey] = f;
+  folderCache_['__root'] = f;
+  return f;
+}
+
+function folder_() {
+  return sistema_();
+}
+
+function sistema_() {
+  return childFolder_(rootArquivo_(), '_Sistema');
+}
+
+function childFolder_(parent, name) {
+  name = sanitizeDrive_(name);
+  var key = parent.getId() + '::' + name;
+  if (folderCache_[key]) return folderCache_[key];
+  var it = parent.getFoldersByName(name);
+  var f = it.hasNext() ? it.next() : parent.createFolder(name);
+  folderCache_[key] = f;
+  return f;
+}
+
+function sanitizeDrive_(name) {
+  var s = String(name == null ? '' : name).replace(/[\\/:*?"<>|]/g, '-').replace(/\s+/g, ' ').trim();
+  if (!s) return '_';
+  return s.slice(0, 80);
+}
+
+function typeFolderName_(type) {
+  var map = {
+    relatorio: '01_Relatorios',
+    orcamento: '02_Orcamentos',
+    recibo: '03_Recibos',
+    completo: '04_Completos',
+    documento: '05_Outros'
+  };
+  return map[String(type || '')] || '05_Outros';
+}
+
+function arquivoParts_(it) {
+  var client = sanitizeDrive_(it.client);
+  var pasta = sanitizeDrive_(it.pasta);
+  if (client === '_') client = '00_Sem_cliente';
+  if (pasta === '_') pasta = '00_Sem_pasta';
+  var year = String(it.archivedAt || it.updatedAt || '').slice(0, 4);
+  if (!/^\d{4}$/.test(year)) year = String(new Date().getFullYear());
+  var status = it.concluded ? 'Concluidos' : 'Em_curso';
+  return [client, pasta, typeFolderName_(it.type), year, status];
+}
+
+function folderAt_(parts) {
+  var cur = rootArquivo_();
+  var i;
+  for (i = 0; i < parts.length; i++) cur = childFolder_(cur, parts[i]);
+  return cur;
+}
+
+function writeFileIn_(folder, name, content, mime) {
+  name = sanitizeDrive_(name);
+  var it = folder.getFilesByName(name);
+  var blob = Utilities.newBlob(String(content || ''), mime || 'text/plain', name);
+  while (it.hasNext()) it.next().setTrashed(true);
+  return folder.createFile(blob).getId();
+}
+
+function writeBlobIn_(folder, name, blob) {
+  name = sanitizeDrive_(name);
+  var it = folder.getFilesByName(name);
+  while (it.hasNext()) it.next().setTrashed(true);
+  blob.setName(name);
+  return folder.createFile(blob);
+}
+
+function trashId_(id) {
+  if (!id) return;
+  try { DriveApp.getFileById(id).setTrashed(true); } catch (e) {}
+}
+
+function writeFile_(name, content, mime) {
+  return writeFileIn_(sistema_(), name, content, mime);
+}
+
+function readFile_(id) {
+  if (!id) return '';
+  try {
+    return DriveApp.getFileById(id).getBlob().getDataAsString();
+  } catch (e) {
+    return '';
+  }
+}
+
+function readByName_(name) {
+  var folder = sistema_();
+  var it = folder.getFilesByName(name);
+  if (it.hasNext()) return it.next().getBlob().getDataAsString();
+  return '';
+}
+
+function upsertRow_(sh, idCol, id, values) {
+  var last = sh.getLastRow();
+  var row = last + 1;
+  if (last >= 2) {
+    var ids = sh.getRange(2, idCol, last - 1, 1).getValues();
+    var i;
+    for (i = 0; i < ids.length; i++) {
+      if (String(ids[i][0]) === String(id)) {
+        row = i + 2;
+        break;
+      }
+    }
+  }
+  sh.getRange(row, 1, 1, values.length).setValues([values]);
+  return row;
+}
+
+function clearData_(sh) {
+  var last = sh.getLastRow();
+  var lastCol = Math.max(1, sh.getLastColumn());
+  if (last > 1) sh.getRange(2, 1, last - 1, lastCol).clearContent();
+}
+
+function log_(action, ok, detail) {
+  var sh = getSheetByKey_('SYNC_LOG');
+  if (!sh) return;
+  sh.appendRow([now_(), action, ok ? 'OK' : 'ERR', String(detail || '').substring(0, 500)]);
+  var n = sh.getLastRow();
+  if (n > 400) sh.deleteRows(2, n - 350);
+}
+
+function push_(data) {
+  var lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    if (data.company) saveConfig_(data.company);
+    if (data.document) saveDocument_(data.document);
+    if (data.excel) saveExcel_(data.excel);
+    if (data.arquivo) saveArquivo_(data.arquivo);
+    saveFolders_(data.folders, data.arquivo);
+    writeReadme_();
+    writeIndexCsv_(data.arquivo);
+    if (data.metier) saveMetier_(data.metier);
+    if (data.journal) saveJournal_(data.journal);
+    log_('PUSH', true, (data.reason || ''));
+    var root = rootArquivo_();
+    return json_({
+      ok: true,
+      at: now_(),
+      spreadsheetId: ss_().getId(),
+      driveFolderId: root.getId(),
+      driveFolderUrl: root.getUrl()
+    });
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function saveConfig_(company) {
+  var sh = getSheetByKey_('CONFIG');
+  var skip = { apiKey: 1, sheetsApiKey: 1, appsScriptUrl: 1, googleSheetsUrl: 1, syncToken: 1 };
+  var keys = Object.keys(company || {});
+  var i, k, v;
+  for (i = 0; i < keys.length; i++) {
+    k = keys[i];
+    if (skip[k]) continue;
+    v = company[k];
+    if (v != null && typeof v === 'object') v = JSON.stringify(v);
+    upsertRow_(sh, 1, k, [k, String(v == null ? '' : v)]);
+  }
+  upsertRow_(sh, 1, '_updatedAt', ['_updatedAt', now_()]);
+  try {
+    writeFile_('empresa.json', JSON.stringify(company || {}), 'application/json');
+  } catch (e) {}
+  try { shareWithInstaller_(false); } catch (eS) {}
+}
+
+function saveDocument_(doc) {
+  if (!doc) return;
+  var html = String(doc.html || '');
+  var id = String(doc.id || 'current');
+  var fileId = writeFile_(id + '.html', html, 'text/html');
+  var sh = getSheetByKey_('DOCUMENTS');
+  upsertRow_(sh, 1, id, [
+    id,
+    String(doc.name || 'Documento'),
+    now_(),
+    fileId,
+    html.length,
+    html.substring(0, 180).replace(/\s+/g, ' ')
+  ]);
+  if (doc.settings) {
+    writeFile_(id + '.settings.json', typeof doc.settings === 'string' ? doc.settings : JSON.stringify(doc.settings), 'application/json');
+  }
+}
+
+function saveExcel_(excel) {
+  var raw = typeof excel === 'string' ? excel : JSON.stringify(excel || {});
+  var fileId = writeFile_('workbook.json', raw, 'application/json');
+  var sh = getSheetByKey_('EXCEL');
+  var name = 'Livro1';
+  try { name = (typeof excel === 'object' && excel && excel.name) || 'Livro1'; } catch (e) {}
+  upsertRow_(sh, 1, 'workbook', ['workbook', name, now_(), fileId, raw.length]);
+}
+
+function archiveBaseName_(it) {
+  it = it || {};
+  var n = sanitizeDrive_(it.name);
+  if (n === '_') n = 'documento';
+  n = n.slice(0, 38);
+  var number = sanitizeDrive_(it.number);
+  if (number === '_') number = '';
+  number = number.slice(0, 20);
+  var stamp = String(it.archivedAt || it.updatedAt || '').replace(/[^0-9]/g, '').slice(0, 14);
+  var suffix = String(it.id || '').replace(/[^a-zA-Z0-9_-]/g, '').slice(-12);
+  return sanitizeDrive_([n, number, stamp, suffix].filter(Boolean).join('_'));
+}
+
+function fileNameFor_(it) {
+  return archiveBaseName_(it) + '.html';
+}
+
+function saveArquivo_(list) {
+  var sh = getSheetByKey_('ARQUIVO');
+  if (!Array.isArray(list) || !sh) return;
+  var prev = {};
+  var last = sh.getLastRow();
+  var i, it, html, fileId, folder, parts, path, old, vals;
+  if (last >= 2) {
+    vals = sh.getRange(2, 1, last - 1, Math.max(11, sh.getLastColumn())).getValues();
+    for (i = 0; i < vals.length; i++) {
+      prev[String(vals[i][0])] = { fileId: String(vals[i][7] || ''), path: String(vals[i][10] || '') };
+    }
+  }
+  for (i = 0; i < list.length; i++) {
+    it = list[i] || {};
+    if (!it.id) continue;
+    html = String(it.html || it.content || '');
+    parts = arquivoParts_(it);
+    folder = folderAt_(parts);
+    path = parts.join('/');
+    old = prev[String(it.id)] || {};
+    fileId = '';
+    if (html) {
+      if (old.fileId && old.path && old.path !== path) trashId_(old.fileId);
+      fileId = writeFileIn_(folder, fileNameFor_(it), html, 'text/html');
+    } else {
+      fileId = old.fileId || '';
+    }
+    upsertRow_(sh, 1, it.id, [
+      String(it.id || ''),
+      String(it.name || ''),
+      String(it.type || ''),
+      String(it.client || ''),
+      String(it.pasta || ''),
+      it.concluded ? '1' : '0',
+      String(it.updatedAt || it.archivedAt || now_()),
+      fileId,
+      html.length,
+      folder.getId(),
+      path
+    ]);
+  }
+}
+
+function typeSkeleton_() {
+  return ['01_Relatorios', '02_Orcamentos', '03_Recibos', '04_Completos', '05_Outros'];
+}
+
+function ensurePastaOrg_(client, pasta) {
+  var c = sanitizeDrive_(client);
+  var p = sanitizeDrive_(pasta);
+  if (c === '_') c = '00_Sem_cliente';
+  if (p === '_') p = '00_Sem_pasta';
+  var base = folderAt_([c, p]);
+  var types = typeSkeleton_();
+  var year = String(new Date().getFullYear());
+  var i, typeF, yearF;
+  for (i = 0; i < types.length; i++) {
+    typeF = childFolder_(base, types[i]);
+    yearF = childFolder_(typeF, year);
+    childFolder_(yearF, 'Em_curso');
+    childFolder_(yearF, 'Concluidos');
+  }
+  return base;
+}
+
+function saveFolders_(catalog, arquivo) {
+  var merged = [];
+  var seen = {};
+  function add(kind, label, client) {
+    label = String(label || '').trim();
+    if (!label) return;
+    client = String(client || '').trim();
+    var key = kind + '|' + label + '|' + client;
+    if (seen[key]) return;
+    seen[key] = 1;
+    merged.push({ kind: kind, label: label, client: client });
+  }
+  var i, f, it, folder, path, sh, rows;
+  if (Array.isArray(catalog)) {
+    for (i = 0; i < catalog.length; i++) {
+      f = catalog[i] || {};
+      add(f.kind || 'pasta', f.label || f.path || '', f.client || '');
+    }
+  }
+  if (Array.isArray(arquivo)) {
+    for (i = 0; i < arquivo.length; i++) {
+      it = arquivo[i] || {};
+      if (it.client) add('client', it.client, '');
+      if (it.pasta) add('pasta', it.pasta, it.client || '');
+    }
+  }
+  sh = getSheetByKey_('FOLDERS');
+  if (sh) clearData_(sh);
+  rows = [];
+  for (i = 0; i < merged.length; i++) {
+    f = merged[i];
+    if (f.kind === 'client') {
+      folder = folderAt_([sanitizeDrive_(f.label) === '_' ? '00_Sem_cliente' : sanitizeDrive_(f.label)]);
+      path = folder.getName();
+    } else {
+      folder = ensurePastaOrg_(f.client, f.label);
+      path = sanitizeDrive_(f.client || '00_Sem_cliente') + '/' + folder.getName();
+    }
+    rows.push([path, folder.getId(), f.kind, f.label, f.client || '', folder.getUrl()]);
+  }
+  if (sh && rows.length) sh.getRange(2, 1, rows.length, 6).setValues(rows);
+}
+
+function writeReadme_() {
+  var root = rootArquivo_();
+  var name = '00_Leia-me.txt';
+  var it = root.getFilesByName(name);
+  if (it.hasNext()) return;
+  var folder = brandRootName_();
+  var brand = folder.replace(/_Arquivo$/, '');
+  var txt = brand + ' Arquivo — pastas no Google Drive\n\n' +
+    folder + '/\n' +
+    '  _Sistema/                 documento Word atual, Excel, empresa\n' +
+    '  {Cliente}/{Pasta}/\n' +
+    '    01_Relatorios | 02_Orcamentos | 03_Recibos | 04_Completos | 05_Outros\n' +
+    '      {Ano}/{Em_curso|Concluidos}/ficheiro.html\n\n' +
+    'As pastas de cliente e de obra sao criadas mesmo vazias, para manter a organizacao.\n';
+  root.createFile(Utilities.newBlob(txt, 'text/plain', name));
+}
+
+function writeIndexCsv_(list) {
+  var lines = ['Nome;Tipo;Cliente;Pasta;Ano;Estado;Caminho'];
+  var i, it, parts;
+  if (Array.isArray(list)) {
+    for (i = 0; i < list.length; i++) {
+      it = list[i] || {};
+      parts = arquivoParts_(it);
+      lines.push([
+        String(it.name || '').replace(/;/g, ','),
+        String(it.type || ''),
+        String(it.client || ''),
+        String(it.pasta || ''),
+        parts[3] || '',
+        it.concluded ? 'Concluido' : 'Em_curso',
+        parts.join('/')
+      ].join(';'));
+    }
+  }
+  writeFileIn_(rootArquivo_(), '00_Indice.csv', '\uFEFF' + lines.join('\r\n'), 'text/csv');
+}
+
+function saveJournal_(list) {
+  var sh = getSheetByKey_('JOURNAL');
+  if (!Array.isArray(list)) return;
+  clearData_(sh);
+  var i, it;
+  for (i = 0; i < Math.min(list.length, 250); i++) {
+    it = list[i] || {};
+    if (Array.isArray(it)) sh.appendRow(it);
+    else sh.appendRow([it.data || it.date || '', it.evento || it.event || '', it.detalhe || it.detail || '']);
+  }
+}
+
+function saveMetier_(metier) {
+  if (!metier) return;
+  writeTable_('CLIENTS', metier.clients);
+  writeTable_('ARTICLES', metier.articles);
+  writeTable_('DEVIS', metier.devis);
+  writeTable_('DEVIS_LIGNES', metier.lignes);
+}
+
+function writeTable_(name, rows) {
+  var sh = getSheetByKey_(name);
+  if (!sh || !Array.isArray(rows) || !rows.length) return;
+  clearData_(sh);
+  var headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
+  var out = [], i, r, line, h;
+  for (i = 0; i < rows.length; i++) {
+    r = rows[i];
+    if (Array.isArray(r)) {
+      out.push(r);
+    } else {
+      line = [];
+      for (h = 0; h < headers.length; h++) line.push(r[headers[h]] != null ? r[headers[h]] : '');
+      out.push(line);
+    }
+  }
+  if (out.length) sh.getRange(2, 1, out.length, headers.length).setValues(out);
+}
+
+function pull_(data) {
+  var company = readConfig_();
+  var document = readDocument_('current');
+  var excel = readExcel_();
+  var arquivo = readArquivo_();
+  var folders = readFolders_();
+  var metier = readMetier_();
+  var root = rootArquivo_();
+  log_('PULL', true, '');
+  return json_({
+    ok: true,
+    at: now_(),
+    spreadsheetId: ss_().getId(),
+    driveFolderId: root.getId(),
+    driveFolderUrl: root.getUrl(),
+    company: company,
+    document: document,
+    excel: excel,
+    arquivo: arquivo,
+    folders: folders,
+    metier: metier
+  });
+}
+
+function readConfig_() {
+  var sh = getSheetByKey_('CONFIG');
+  var last = sh.getLastRow();
+  var out = {};
+  if (last < 2) return out;
+  var vals = sh.getRange(2, 1, last - 1, 2).getValues();
+  var i, k, v;
+  for (i = 0; i < vals.length; i++) {
+    k = String(vals[i][0] || '');
+    if (!k || k.charAt(0) === '_') continue;
+    v = vals[i][1];
+    out[k] = v;
+  }
+  return out;
+}
+
+function readDocument_(id) {
+  var sh = getSheetByKey_('DOCUMENTS');
+  var last = sh.getLastRow();
+  if (last < 2) return null;
+  var vals = sh.getRange(2, 1, last - 1, 6).getValues();
+  var i, row;
+  for (i = 0; i < vals.length; i++) {
+    if (String(vals[i][0]) === String(id || 'current')) {
+      row = vals[i];
+      return {
+        id: row[0],
+        name: row[1],
+        updatedAt: row[2],
+        html: readFile_(row[3]),
+        settings: readByName_(String(row[0]) + '.settings.json')
+      };
+    }
+  }
+  return null;
+}
+
+function readExcel_() {
+  var sh = getSheetByKey_('EXCEL');
+  var last = sh.getLastRow();
+  if (last < 2) return null;
+  var row = sh.getRange(2, 1, 1, 5).getValues()[0];
+  var raw = readFile_(row[3]);
+  if (!raw) return null;
+  try { return JSON.parse(raw); } catch (e) { return { raw: raw }; }
+}
+
+function readArquivo_() {
+  var sh = getSheetByKey_('ARQUIVO');
+  var last = sh.getLastRow();
+  if (last < 2) return [];
+  var vals = sh.getRange(2, 1, last - 1, Math.max(11, sh.getLastColumn())).getValues();
+  var out = [], i, row;
+  for (i = 0; i < vals.length; i++) {
+    row = vals[i];
+    if (!row[0]) continue;
+    out.push({
+      id: row[0],
+      name: row[1],
+      type: row[2],
+      client: row[3],
+      pasta: row[4],
+      concluded: String(row[5]) === '1',
+      updatedAt: row[6],
+      archivedAt: row[6],
+      html: readFile_(row[7]),
+      driveFolderId: row[9] || '',
+      drivePath: row[10] || ''
+    });
+  }
+  return out;
+}
+
+function readFolders_() {
+  var sh = getSheetByKey_('FOLDERS');
+  if (!sh) return [];
+  var last = sh.getLastRow();
+  if (last < 2) return [];
+  var vals = sh.getRange(2, 1, last - 1, 6).getValues();
+  var out = [], i, row;
+  for (i = 0; i < vals.length; i++) {
+    row = vals[i];
+    if (!row[0] && !row[3]) continue;
+    out.push({
+      path: row[0],
+      driveFolderId: row[1],
+      kind: row[2] || 'pasta',
+      label: row[3],
+      client: row[4] || '',
+      url: row[5] || ''
+    });
+  }
+  return out;
+}

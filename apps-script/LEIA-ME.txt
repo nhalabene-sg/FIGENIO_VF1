@@ -1,0 +1,70 @@
+emaildrive — Genius Raros
+=========================
+
+Instalar no GOOGLE DO CLIENTE (não no vosso).
+Nome do projeto Apps Script:  emaildrive
+
+Ficheiro a colar:  emaildrive.gs.txt
+(Code.gs.txt é o mesmo código, nome antigo.)
+
+O que faz
+---------
+- Pastas e ficheiros do Arquivo → Google Drive DO CLIENTE
+- Folha Google (base) → conta DO CLIENTE
+- E-mails (orçamento / recibo) → Gmail DO CLIENTE (GmailApp)
+- PDF finais → pasta correta do Arquivo no Google Drive DO CLIENTE
+- Se CFG.INSTALLER_EMAIL estiver preenchido, a pasta Drive e a folha
+  são partilhadas convosco (acesso se for necessário)
+
+Antes de colar
+--------------
+No topo do script, preencher se quiserem acesso ao Drive do cliente:
+
+  INSTALLER_EMAIL: 'vosso@gmail.com'
+  INSTALLER_ROLE:  'writer'    (ou 'reader')
+  BCC_INSTALLER:   false       (true = cópia de cada e-mail enviado)
+  A Chave de acesso da API ABENE é criada automaticamente por initialiserSysteme.
+
+Instalação (conta Google do cliente)
+------------------------------------
+1. Criar uma Folha Google vazia.
+2. Extensões → Apps Script → colar emaildrive.gs.txt → Guardar (Ctrl+S).
+3. Ícone do projeto → Renomear: emaildrive
+4. Função  initialiserSysteme  → ▶ Executar → Autorizar
+   (Sheets + Drive + Gmail — uma vez).
+5. Menu da folha « Genius Raros » → 4. Enviar e-mail de teste
+   (confirma que o Gmail desta conta envia).
+   Depois de acrescentar linhas (CLIENTES, ARTIGOS, PASTAS):
+   menu « Genius Raros » → 5. Atualizar dados da folha
+   e na aplicação: botão ↻ Atualizar.
+6. Implementar → Nova implementação → Aplicação Web
+     Executar como : Eu
+     Quem tem acesso : Qualquer pessoa
+7. Copiar o URL que termina em /exec
+8. Colar o URL /exec e a Chave de acesso da API ABENE apresentada por
+   initialiserSysteme nas Definições ⚙ da aplicação.
+
+Não é necessário criar uma chave da API Google Cloud. O URL /exec é o
+endereço da API; a Chave de acesso da API ABENE é a palavra-passe privada
+que autoriza esta instalação. A variável API_URL do index.html continua a
+funcionar como configuração automática opcional.
+
+Depois de alterar o script: colar de novo e
+Implementar → Gerir implementações → lápis → Nova versão.
+
+Colaboração (P13, CFG.VERSION 2.3+): Rever → Modo Docs + Partilhar.
+Cria as folhas COLLAB_* no primeiro PING. Sem internet o Word não muda.
+Atualizar: menu Genius Raros → 5. Atualizar dados da folha (e botão ↻ na app).
+
+Google Docs (CFG.VERSION 2.6+): Ficheiro → Abrir no Google Docs
+ou Rever → Google Docs / Atualizar Docs.
+Cria OU atualiza o MESMO ficheiro em Drive (pasta Google_Docs).
+Atualizar desde Google Docs traz o HTML de volta para o Word ABENE.
+Enviar ao cliente = sempre PDF (não definitivo).
+PDF finais (CFG.VERSION 2.6+): são preservados localmente e enviados
+para a pasta Cliente/Pasta/Tipo/Ano/Concluidos no Drive. Se estiver
+temporariamente offline, a aplicação tenta novamente quando a ligação voltar.
+Depois de colar o script 2.6: Gerir implementações → lápis → Nova versão.
+
+Nunca publique o URL /exec no GitHub.
+Conta gratuita Gmail: cerca de 100 e-mails / dia.

@@ -46,6 +46,47 @@
     function L4(pt, fr, en, es) {
         return [pt, fr, en, es][locI()] || pt;
     }
+    var BUSINESS_SHEETS = {
+        config: ['CONFIGURAÇÃO', 'CONFIGURATION', 'CONFIGURATION', 'CONFIGURACIÓN'],
+        clients: ['CLIENTES', 'CLIENTS', 'CLIENTS', 'CLIENTES'],
+        articles: ['ARTIGOS', 'ARTICLES', 'ITEMS', 'ARTÍCULOS'],
+        quotes: ['ORÇAMENTOS', 'DEVIS', 'QUOTES', 'PRESUPUESTOS'],
+        quoteLines: ['LINHAS_ORÇAMENTO', 'LIGNES_DEVIS', 'QUOTE_LINES', 'LÍNEAS_PRESUPUESTO'],
+        receipts: ['RECIBOS', 'REÇUS', 'RECEIPTS', 'RECIBOS'],
+        vat: ['IVA', 'TVA', 'VAT', 'IVA'],
+        control: ['CONTROLO', 'CONTRÔLE', 'CONTROL', 'CONTROL'],
+        journal: ['DIÁRIO', 'JOURNAL', 'JOURNAL', 'DIARIO'],
+        parameters: ['PARÂMETROS', 'PARAMÈTRES', 'PARAMETERS', 'PARÁMETROS']
+    };
+    var BUSINESS_SHEET_LEGACY = {
+        config: ['CONFIG'], clients: ['CLIENTS'], articles: ['ARTICLES'], quotes: ['DEVIS'],
+        quoteLines: ['DEVIS_LIGNES'], receipts: ['RECUS'], vat: ['TVA'], control: ['CONTROLE'],
+        journal: ['JOURNAL'], parameters: ['PARAMETRES']
+    };
+    function businessSheetName(key) {
+        var names = BUSINESS_SHEETS[key] || [key];
+        return names[locI()] || names[0] || key;
+    }
+    function businessSheetAliases(key) {
+        var seen = {}, out = [];
+        (BUSINESS_SHEETS[key] || []).concat(BUSINESS_SHEET_LEGACY[key] || []).forEach(function (name) {
+            var k = String(name || '').toLocaleLowerCase();
+            if (name && !seen[k]) { seen[k] = true; out.push(name); }
+        });
+        return out;
+    }
+    function findBusinessSheet(key) {
+        var aliases = businessSheetAliases(key), i, sh;
+        for (i = 0; i < aliases.length; i++) {
+            sh = findSheet(aliases[i]);
+            if (sh) return sh;
+        }
+        return null;
+    }
+    function formulaSheetName(name) {
+        var n = String(name || '');
+        return /^[A-Za-zÀ-ÿ_][A-Za-zÀ-ÿ0-9_]*$/.test(n) ? n : "'" + n.replace(/'/g, "''") + "'";
+    }
     function listSep() { return /^en/i.test(locale()) ? ',' : ';'; }
     function decSep() { return /^en/i.test(locale()) ? '.' : ','; }
     function formulaDisplay(raw) {
@@ -840,9 +881,22 @@
     function renderSheetTabs() {
         var bar = document.getElementById('excelSheetTabs');
         if (!bar) return;
-        bar.innerHTML = wb.sheets.map(function (s, i) {
+        bar.innerHTML = '<button type="button" class="excel-sheet-scroll prev" id="excelSheetsPrev" aria-label="' +
+            esc(tt('xlPrevSheet', 'Folha anterior')) + '" title="' + esc(tt('xlPrevSheet', 'Folha anterior')) + '">‹</button>' +
+            wb.sheets.map(function (s, i) {
             return '<button type="button" class="excel-sht' + (i === wb.active ? ' on' : '') + '" data-i="' + i + '">' + esc(s.name) + '</button>';
-        }).join('') + '<button type="button" class="excel-sht add" id="excelAddSheet">+</button>';
+        }).join('') + '<button type="button" class="excel-sht add" id="excelAddSheet">+</button>' +
+            '<button type="button" class="excel-sheet-scroll next" id="excelSheetsNext" aria-label="' +
+            esc(tt('xlNextSheet', 'Folha seguinte')) + '" title="' + esc(tt('xlNextSheet', 'Folha seguinte')) + '">›</button>';
+        function scrollTabs(direction) {
+            var amount = Math.max(150, Math.round(bar.clientWidth * 0.72));
+            if (typeof bar.scrollBy === 'function') bar.scrollBy({ left: direction * amount, behavior: 'smooth' });
+            else bar.scrollLeft += direction * amount;
+        }
+        var previous = document.getElementById('excelSheetsPrev');
+        var next = document.getElementById('excelSheetsNext');
+        if (previous) previous.onclick = function () { scrollTabs(-1); };
+        if (next) next.onclick = function () { scrollTabs(1); };
         bar.querySelectorAll('button[data-i]').forEach(function (b) {
             b.onclick = function () { wb.active = Number(b.getAttribute('data-i')); sel = { r: 0, c: 0, r2: 0, c2: 0 }; persist(); render(); };
             b.ondblclick = function () {
@@ -871,8 +925,15 @@
             persist(); render();
         };
         var on = bar.querySelector('.excel-sht.on');
-        if (on && typeof on.scrollIntoView === 'function') {
-            try { on.scrollIntoView({ inline: 'nearest', block: 'nearest' }); } catch (e) {}
+        if (on) {
+            try {
+                var safeLeft = bar.scrollLeft + 42;
+                var safeRight = bar.scrollLeft + bar.clientWidth - 42;
+                if (on.offsetLeft < safeLeft) bar.scrollLeft = Math.max(0, on.offsetLeft - 42);
+                else if (on.offsetLeft + on.offsetWidth > safeRight) {
+                    bar.scrollLeft = on.offsetLeft + on.offsetWidth - bar.clientWidth + 42;
+                }
+            } catch (e) {}
         }
     }
     function renameSheet(i) {
@@ -2578,7 +2639,16 @@
         var yes = L4('SIM', 'OUI', 'YES', 'SÍ');
         var check = L4('VERIFICAR', 'VÉRIFIER', 'CHECK', 'VERIFICAR');
         var gap = L4('DESVIO', 'ECART', 'GAP', 'DESVIO');
-        var cfg = blankSheet('CONFIG');
+        var sheetNames = {
+            config: businessSheetName('config'), clients: businessSheetName('clients'),
+            articles: businessSheetName('articles'), quotes: businessSheetName('quotes'),
+            quoteLines: businessSheetName('quoteLines'), receipts: businessSheetName('receipts'),
+            vat: businessSheetName('vat'), control: businessSheetName('control'),
+            journal: businessSheetName('journal'), parameters: businessSheetName('parameters')
+        };
+        var quoteRef = formulaSheetName(sheetNames.quotes);
+        var lineRef = formulaSheetName(sheetNames.quoteLines);
+        var cfg = blankSheet(sheetNames.config);
         fillHeaders(cfg, [L4('parametro', 'paramètre', 'parameter', 'parámetro'), L4('valor', 'valeur', 'value', 'valor')]);
         [['empresa', co.name || 'Genius Raros'], ['nif', co.nif || ''], ['moeda', co.currency || 'EUR'],
             ['iva', vat], ['serie_orcamento', 'ORC'], ['serie_recibo', 'REC'],
@@ -2586,13 +2656,13 @@
             ensure(cfg, 0, i + 1).raw = p[0];
             ensure(cfg, 1, i + 1).raw = p[1];
         });
-        var cli = blankSheet('CLIENTS');
+        var cli = blankSheet(sheetNames.clients);
         fillHeaders(cli, ['id', L4('nome', 'nom', 'name', 'nombre'), 'nif', L4('morada', 'adresse', 'address', 'dirección'), L4('telefone', 'téléphone', 'phone', 'teléfono'), 'email', L4('estado', 'état', 'status', 'estado'), 'nif_ok']);
         ensure(cli, 0, 1).raw = 'C001';
         ensure(cli, 1, 1).raw = L4('Cliente exemplo', 'Client exemple', 'Sample client', 'Cliente de ejemplo');
         ensure(cli, 2, 1).raw = co.nif || '';
         ensure(cli, 7, 1).raw = nifPtOk(co.nif) ? 'OK' : check;
-        var art = blankSheet('ARTICLES');
+        var art = blankSheet(sheetNames.articles);
         fillHeaders(art, [L4('código', 'code', 'code', 'código'), L4('designação', 'designation', 'designation', 'designación'), L4('unidade', 'unite', 'unit', 'unidad'), L4('preço_unitário', 'prix_unitaire', 'unit_price', 'precio_unitario'), L4('iva', 'tva', 'vat', 'iva'), L4('ativo', 'actif', 'active', 'activo')]);
         ensure(art, 0, 1).raw = 'SRV-001';
         ensure(art, 1, 1).raw = labour;
@@ -2600,16 +2670,16 @@
         ensure(art, 3, 1).raw = '35'; ensure(art, 3, 1).fmt = 'eur';
         ensure(art, 4, 1).raw = vat;
         ensure(art, 5, 1).raw = yes;
-        var dv = blankSheet('DEVIS');
+        var dv = blankSheet(sheetNames.quotes);
         fillHeaders(dv, [L4('referência', 'reference', 'reference', 'referencia'), L4('data', 'date', 'date', 'fecha'), 'client_id', L4('estado', 'statut', 'status', 'estado'), 'total_ht', 'total_tva', 'total_ttc']);
         ensure(dv, 0, 1).raw = 'ORC-0001';
         ensure(dv, 1, 1).raw = new Date().toISOString().slice(0, 10);
         ensure(dv, 2, 1).raw = 'C001';
         ensure(dv, 3, 1).raw = draft;
-        ensure(dv, 4, 1).raw = '=SUMIF(DEVIS_LIGNES!A:A;A2;DEVIS_LIGNES!I:I)';
-        ensure(dv, 5, 1).raw = '=SUMIF(DEVIS_LIGNES!A:A;A2;DEVIS_LIGNES!J:J)';
+        ensure(dv, 4, 1).raw = '=SUMIF(' + lineRef + '!A:A;A2;' + lineRef + '!I:I)';
+        ensure(dv, 5, 1).raw = '=SUMIF(' + lineRef + '!A:A;A2;' + lineRef + '!J:J)';
         ensure(dv, 6, 1).raw = '=E2+F2';
-        var dl = blankSheet('DEVIS_LIGNES');
+        var dl = blankSheet(sheetNames.quoteLines);
         fillHeaders(dl, ['devis_reference', 'article_code', L4('descrição', 'description', 'description', 'descripción'), L4('quantidade', 'quantite', 'quantity', 'cantidad'), L4('unidade', 'unite', 'unit', 'unidad'), L4('preço_unitário', 'prix_unitaire', 'unit_price', 'precio_unitario'), L4('desconto', 'remise', 'discount', 'descuento'), L4('iva', 'tva', 'vat', 'iva'), 'total_ht', 'total_tva', 'total_ttc']);
         ensure(dl, 0, 1).raw = 'ORC-0001';
         ensure(dl, 1, 1).raw = 'SRV-001';
@@ -2622,34 +2692,34 @@
         ensure(dl, 8, 1).raw = '=D2*(F2-G2)'; ensure(dl, 8, 1).fmt = 'eur';
         ensure(dl, 9, 1).raw = '=I2*H2/100'; ensure(dl, 9, 1).fmt = 'eur';
         ensure(dl, 10, 1).raw = '=I2+J2'; ensure(dl, 10, 1).fmt = 'eur';
-        var rec = blankSheet('RECUS');
+        var rec = blankSheet(sheetNames.receipts);
         fillHeaders(rec, [L4('referência', 'reference', 'reference', 'referencia'), L4('data', 'date', 'date', 'fecha'), 'client_id', L4('montante_ttc', 'montant_ttc', 'amount_ttc', 'importe_ttc'), L4('iva', 'tva', 'vat', 'iva'), L4('estado', 'statut', 'status', 'estado')]);
-        var tva = blankSheet('TVA');
+        var tva = blankSheet(sheetNames.vat);
         fillHeaders(tva, [L4('taxa', 'taux', 'rate', 'tasa'), 'base_ht', L4('montante_tva', 'montant_tva', 'vat_amount', 'importe_iva'), 'ttc']);
         ensure(tva, 0, 1).raw = vat;
-        ensure(tva, 1, 1).raw = '=SUMIF(DEVIS_LIGNES!H:H;A2;DEVIS_LIGNES!I:I)';
-        ensure(tva, 2, 1).raw = '=SUMIF(DEVIS_LIGNES!H:H;A2;DEVIS_LIGNES!J:J)';
+        ensure(tva, 1, 1).raw = '=SUMIF(' + lineRef + '!H:H;A2;' + lineRef + '!I:I)';
+        ensure(tva, 2, 1).raw = '=SUMIF(' + lineRef + '!H:H;A2;' + lineRef + '!J:J)';
         ensure(tva, 3, 1).raw = '=B2+C2';
-        var ctl = blankSheet('CONTROLE');
+        var ctl = blankSheet(sheetNames.control);
         fillHeaders(ctl, [L4('tipo', 'type', 'type', 'tipo'), L4('referência', 'reference', 'reference', 'referencia'), L4('resultado', 'resultat', 'result', 'resultado'), L4('detalhe', 'détail', 'detail', 'detalle')]);
         ensure(ctl, 0, 1).raw = L4('totais', 'totaux', 'totals', 'totales');
         ensure(ctl, 1, 1).raw = 'ORC-0001';
-        ensure(ctl, 2, 1).raw = '=IF(ABS(DEVIS!G2-SUMIF(DEVIS_LIGNES!A:A;B2;DEVIS_LIGNES!K:K))<0.02;"OK";"' + gap + '")';
+        ensure(ctl, 2, 1).raw = '=IF(ABS(' + quoteRef + '!G2-SUMIF(' + lineRef + '!A:A;B2;' + lineRef + '!K:K))<0.02;"OK";"' + gap + '")';
         ensure(ctl, 3, 1).raw = L4('TTC orçamento vs linhas', 'TTC devis vs lignes', 'TTC quote vs lines', 'TTC presupuesto vs líneas');
-        var jour = blankSheet('JOURNAL');
+        var jour = blankSheet(sheetNames.journal);
         fillHeaders(jour, [L4('data', 'date', 'date', 'fecha'), L4('evento', 'événement', 'event', 'evento'), L4('detalhe', 'détail', 'detail', 'detalle')]);
         ensure(jour, 0, 1).raw = new Date().toISOString().slice(0, 10);
         ensure(jour, 1, 1).raw = L4('modelo', 'modèle', 'template', 'modelo');
-        ensure(jour, 2, 1).raw = L4('Livro métier criado', 'Classeur métier créé', 'Business workbook created', 'Libro de negocio creado');
-        var par = blankSheet('PARAMETRES');
+        ensure(jour, 2, 1).raw = L4('Livro de negócio criado', 'Classeur métier créé', 'Business workbook created', 'Libro de negocio creado');
+        var par = blankSheet(sheetNames.parameters);
         fillHeaders(par, [L4('chave', 'clé', 'key', 'clave'), L4('valor', 'valeur', 'value', 'valor')]);
         ensure(par, 0, 1).raw = L4('lingua', 'langue', 'language', 'idioma');
         ensure(par, 1, 1).raw = locale();
         wb.sheets = [cfg, cli, art, dv, dl, rec, tva, ctl, jour, par];
         wb.active = 0;
-        wb.name = ((typeof window.abeneBrandName === 'function') ? window.abeneBrandName() : 'Genius Raros').replace(/\s+/g, '_') + '_Metier';
+        wb.name = ((typeof window.abeneBrandName === 'function') ? window.abeneBrandName() : 'Genius Raros').replace(/\s+/g, '_') + '_' + L4('Negócio', 'Métier', 'Business', 'Negocio');
         recalc(); persist(); render();
-        toast(tt('xlBiz', 'Modelo métier carregado.'));
+        toast(tt('xlBiz', 'Modelo de negócio carregado.'));
     }
     function importQuoteToExcel() {
         var editor = document.getElementById('editor');
@@ -2675,8 +2745,8 @@
         }
         if (!items.length) { toast(tt('xlNoQuote', 'Nenhuma tabela de orçamento encontrada.')); return; }
         enter();
-        var sh = findSheet('DEVIS_LIGNES') || blankSheet('DEVIS_LIGNES');
-        if (!findSheet('DEVIS_LIGNES')) {
+        var sh = findBusinessSheet('quoteLines') || blankSheet(businessSheetName('quoteLines'));
+        if (!findBusinessSheet('quoteLines')) {
             fillHeaders(sh, ['devis_reference', 'article_code', L4('descrição', 'description', 'description', 'descripción'), L4('quantidade', 'quantite', 'quantity', 'cantidad'), L4('unidade', 'unite', 'unit', 'unidad'), L4('preço_unitário', 'prix_unitaire', 'unit_price', 'precio_unitario'), L4('desconto', 'remise', 'discount', 'descuento'), L4('iva', 'tva', 'vat', 'iva'), 'total_ht', 'total_tva', 'total_ttc']);
             wb.sheets.push(sh);
         }
@@ -2698,7 +2768,7 @@
         toast(tt('xlQuoteIn', 'Linhas do orçamento importadas para Excel.'));
     }
     function excelToQuote() {
-        var sh = findSheet('DEVIS_LIGNES') || sheet();
+        var sh = findBusinessSheet('quoteLines') || sheet();
         var editor = document.getElementById('editor');
         if (!editor) return;
         var table = editor.querySelector('table');
@@ -3392,6 +3462,40 @@
     function applyExcelLanguage() {
         if (!wb) return;
         if (/^(Livro1|Classeur1|Book1|Libro1)$/i.test(String(wb.name || ''))) wb.name = defaultBookName();
+        var renames = {};
+        Object.keys(BUSINESS_SHEETS).forEach(function (key) {
+            var target = businessSheetName(key);
+            var aliases = businessSheetAliases(key).map(function (name) { return String(name).toLocaleLowerCase(); });
+            wb.sheets.forEach(function (sh) {
+                var old = String(sh.name || '');
+                if (aliases.indexOf(old.toLocaleLowerCase()) >= 0 && old !== target) {
+                    renames[old] = target;
+                    sh.name = target;
+                }
+            });
+        });
+        if (Object.keys(renames).length) {
+            wb.sheets.forEach(function (sh) {
+                Object.keys(sh.cells || {}).forEach(function (cellKey) {
+                    var ce = sh.cells[cellKey];
+                    if (!ce || String(ce.raw || '').charAt(0) !== '=') return;
+                    Object.keys(renames).forEach(function (old) {
+                        var next = renames[old];
+                        var escaped = old.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                        ce.raw = String(ce.raw)
+                            .replace(new RegExp("'" + escaped + "'!", 'gi'), formulaSheetName(next) + '!')
+                            .replace(new RegExp('(^|[^A-Za-zÀ-ÿ0-9_])' + escaped + '!', 'gi'), function (_, lead) {
+                                return lead + formulaSheetName(next) + '!';
+                            });
+                    });
+                });
+            });
+            if (/_(Metier|Métier|Negócio|Negocio|Business)$/i.test(String(wb.name || ''))) {
+                wb.name = String(wb.name).replace(/_(Metier|Métier|Negócio|Negocio|Business)$/i,
+                    '_' + L4('Negócio', 'Métier', 'Business', 'Negocio'));
+            }
+            try { recalc(); } catch (eR) {}
+        }
         wb.sheets.forEach(function (sh, i) {
             if (/^(Folha|Feuille|Sheet|Hoja)\d+$/i.test(String(sh.name || ''))) {
                 var num = parseInt(String(sh.name).replace(/\D/g, ''), 10) || (i + 1);
