@@ -343,10 +343,13 @@
         if (json.document && json.document.html && !opts.skipDocument) {
             var editor = document.getElementById('editor');
             if (editor) {
-                editor.innerHTML = json.document.html;
+                var safeDocumentHtml = typeof window.abeneSanitizeHtml === 'function'
+                    ? window.abeneSanitizeHtml(json.document.html)
+                    : json.document.html;
+                editor.innerHTML = safeDocumentHtml;
                 try {
-                    localStorage.setItem('docContent', json.document.html);
-                    localStorage.setItem('abeneAutosave', json.document.html);
+                    localStorage.setItem('docContent', safeDocumentHtml);
+                    localStorage.setItem('abeneAutosave', safeDocumentHtml);
                     if (json.document.name) {
                         localStorage.setItem('abeneDocName', json.document.name);
                         var title = document.getElementById('docTitle');

@@ -12,12 +12,24 @@
         query: '',
         type: 'all',
         concludedOnly: false,
+        dateFrom: '',
+        dateTo: '',
+        selectedIds: {},
         selectedId: null,
         previewSource: null,
         previewTab: 'doc',
         selectedPdfId: null,
+        mobilePane: 'folders',
         eventsBound: false
     };
+
+    function isMobileArchive() {
+        try {
+            return window.matchMedia('(max-width:820px), (max-width:960px) and (pointer:coarse), (max-width:960px) and (max-height:480px) and (orientation:landscape)').matches;
+        } catch (e) {
+            return window.innerWidth <= 820;
+        }
+    }
 
     var STR = {
         'pt-PT': {
@@ -34,6 +46,7 @@
             typeDoc: 'Outro documento',
             onlyDone: 'Só concluídos',
             folders: 'Pastas',
+            files: 'Ficheiros',
             all: 'Todos',
             done: 'Concluídos',
             byType: 'Por tipo',
@@ -78,7 +91,7 @@
             zipOk: 'Conjunto descarregado ({n} ficheiro(s)).',
             zipEmpty: 'Nada a descarregar nesta vista.',
             packOk: 'Pack contabilista PT descarregado ({n} documento(s)).',
-            packEmpty: 'Não há orçamento nem recibo nesta vista para o contabilista.',
+            packEmpty: 'Não há relatórios, orçamentos nem recibos disponíveis para o contabilista.',
             noZip: 'JSZip indisponível — a descarregar HTML um a um.',
             needBlock: 'Este documento não tem essa parte para copiar.',
             none: 'Sem pasta',
@@ -114,6 +127,7 @@
             typeDoc: 'Autre document',
             onlyDone: 'Conclus seulement',
             folders: 'Dossiers',
+            files: 'Fichiers',
             all: 'Tous',
             done: 'Conclus',
             byType: 'Par type',
@@ -158,7 +172,7 @@
             zipOk: 'Ensemble téléchargé ({n} fichier(s)).',
             zipEmpty: 'Rien à télécharger dans cette vue.',
             packOk: 'Pack comptable PT téléchargé ({n} document(s)).',
-            packEmpty: 'Aucun devis ni reçu dans cette vue pour le comptable.',
+            packEmpty: 'Aucun rapport, devis ou reçu n’est disponible pour le comptable.',
             noZip: 'JSZip indisponible — téléchargement HTML un par un.',
             needBlock: 'Ce document n’a pas cette partie à copier.',
             none: 'Sans dossier',
@@ -194,6 +208,7 @@
             typeDoc: 'Other document',
             onlyDone: 'Concluded only',
             folders: 'Folders',
+            files: 'Files',
             all: 'All',
             done: 'Concluded',
             byType: 'By type',
@@ -238,7 +253,7 @@
             zipOk: 'Set downloaded ({n} file(s)).',
             zipEmpty: 'Nothing to download in this view.',
             packOk: 'PT accounting pack downloaded ({n} document(s)).',
-            packEmpty: 'No quote or receipt in this view for the accountant.',
+            packEmpty: 'No reports, quotes or receipts are available for the accountant.',
             noZip: 'JSZip unavailable — downloading HTML one by one.',
             needBlock: 'This document does not have that part to copy.',
             none: 'No folder',
@@ -274,6 +289,7 @@
             typeDoc: 'Otro documento',
             onlyDone: 'Solo concluidos',
             folders: 'Carpetas',
+            files: 'Ficheros',
             all: 'Todos',
             done: 'Concluidos',
             byType: 'Por tipo',
@@ -318,7 +334,7 @@
             zipOk: 'Conjunto descargado ({n} fichero(s)).',
             zipEmpty: 'Nada que descargar en esta vista.',
             packOk: 'Pack contable PT descargado ({n} documento(s)).',
-            packEmpty: 'No hay presupuesto ni recibo en esta vista para el contable.',
+            packEmpty: 'No hay informes, presupuestos ni recibos disponibles para el contable.',
             noZip: 'JSZip no disponible — descarga HTML uno a uno.',
             needBlock: 'Este documento no tiene esa parte para copiar.',
             none: 'Sin carpeta',
@@ -418,6 +434,60 @@
     };
     Object.keys(PDFSTR).forEach(function (l) {
         if (STR[l]) Object.assign(STR[l], PDFSTR[l]);
+    });
+
+    var SELECTSTR = {
+        'pt-PT': {
+            dateFrom: 'Data desde', dateTo: 'Data até', clearPeriod: 'Limpar período',
+            selectAll: 'Selecionar visíveis', clearSelection: 'Limpar seleção', selectedCount: '{n} selecionado(s)',
+            downloadSelected: 'Descarregar selecionados', packSelected: 'Pack contabilista selecionado',
+            finalizeSelected: 'Criar finais (PDF)', documentDate: 'Data do documento', archiveDate: 'Arquivado em',
+            selectedEmpty: 'Selecione pelo menos um documento.',
+            finalizeConfirm: 'Criar e guardar os PDFs finais de {n} documento(s)? Os originais e os PDFs existentes ficam intactos.',
+            finalizeBusy: 'A criar versões finais de {n} documento(s)…',
+            finalizeOk: 'Versões finais verificadas para {n} documento(s).',
+            finalizePartial: '{ok} documento(s) finalizado(s); {fail} sem etapa válida ou com erro.',
+            finalizeArchiveOnly: 'A finalização em lote aplica-se apenas aos documentos arquivados.'
+        },
+        'fr-FR': {
+            dateFrom: 'Date de début', dateTo: 'Date de fin', clearPeriod: 'Effacer la période',
+            selectAll: 'Sélectionner les visibles', clearSelection: 'Effacer la sélection', selectedCount: '{n} sélectionné(s)',
+            downloadSelected: 'Télécharger la sélection', packSelected: 'Pack comptable sélectionné',
+            finalizeSelected: 'Créer les versions finales (PDF)', documentDate: 'Date du document', archiveDate: 'Archivé le',
+            selectedEmpty: 'Sélectionnez au moins un document.',
+            finalizeConfirm: 'Créer et conserver les PDF finaux de {n} document(s) ? Les originaux et les PDF existants resteront intacts.',
+            finalizeBusy: 'Création des versions finales de {n} document(s)…',
+            finalizeOk: 'Versions finales vérifiées pour {n} document(s).',
+            finalizePartial: '{ok} document(s) finalisé(s) ; {fail} sans étape valable ou en erreur.',
+            finalizeArchiveOnly: 'La finalisation groupée concerne uniquement les documents archivés.'
+        },
+        'en-US': {
+            dateFrom: 'Start date', dateTo: 'End date', clearPeriod: 'Clear period',
+            selectAll: 'Select visible', clearSelection: 'Clear selection', selectedCount: '{n} selected',
+            downloadSelected: 'Download selected', packSelected: 'Selected accounting pack',
+            finalizeSelected: 'Create finals (PDF)', documentDate: 'Document date', archiveDate: 'Archived on',
+            selectedEmpty: 'Select at least one document.',
+            finalizeConfirm: 'Create and retain final PDFs for {n} document(s)? Originals and existing PDFs will remain intact.',
+            finalizeBusy: 'Creating final versions for {n} document(s)…',
+            finalizeOk: 'Final versions verified for {n} document(s).',
+            finalizePartial: '{ok} document(s) finalized; {fail} had no valid stage or failed.',
+            finalizeArchiveOnly: 'Bulk finalization applies only to archived documents.'
+        },
+        'es-ES': {
+            dateFrom: 'Fecha inicial', dateTo: 'Fecha final', clearPeriod: 'Limpiar período',
+            selectAll: 'Seleccionar visibles', clearSelection: 'Limpiar selección', selectedCount: '{n} seleccionado(s)',
+            downloadSelected: 'Descargar selección', packSelected: 'Pack contable seleccionado',
+            finalizeSelected: 'Crear finales (PDF)', documentDate: 'Fecha del documento', archiveDate: 'Archivado el',
+            selectedEmpty: 'Seleccione al menos un documento.',
+            finalizeConfirm: '¿Crear y conservar los PDF finales de {n} documento(s)? Los originales y los PDF existentes quedarán intactos.',
+            finalizeBusy: 'Creando versiones finales de {n} documento(s)…',
+            finalizeOk: 'Versiones finales verificadas para {n} documento(s).',
+            finalizePartial: '{ok} documento(s) finalizado(s); {fail} sin etapa válida o con error.',
+            finalizeArchiveOnly: 'La finalización en lote se aplica solo a documentos archivados.'
+        }
+    };
+    Object.keys(SELECTSTR).forEach(function (l) {
+        if (STR[l]) Object.assign(STR[l], SELECTSTR[l]);
     });
 
     function lang() {
@@ -806,6 +876,16 @@
         d.innerHTML = html || '';
         return d;
     }
+    function normalizeEntryDate(value) {
+        var raw = String(value || '').trim();
+        if (!raw) return '';
+        var iso = raw.match(/^(\d{4}-\d{2}-\d{2})/);
+        if (iso) return iso[1];
+        var local = raw.match(/^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{4})$/);
+        if (local) return local[3] + '-' + ('0' + local[2]).slice(-2) + '-' + ('0' + local[1]).slice(-2);
+        var d = new Date(raw);
+        return isNaN(d.getTime()) ? '' : d.toISOString().slice(0, 10);
+    }
     function detectMeta(html) {
         var d = parseHtml(html);
         var devis = d.querySelector('[data-abene-block="devis"]');
@@ -825,6 +905,8 @@
             (receipt && receipt.getAttribute('data-abene-number')) ||
             pay.number || '';
         var total = (devis && devis.getAttribute('data-abene-total')) || '';
+        var documentDate = (devis && devis.getAttribute('data-abene-date')) ||
+            (receipt && receipt.getAttribute('data-abene-date')) || pay.date || '';
         var pasta = String(pay.site || pay.pasta || '').trim();
         var nif = String(pay.clientNif || pay.payerNif || (devis && devis.getAttribute('data-abene-nif')) || '').trim();
         return {
@@ -834,6 +916,7 @@
             nif: nif,
             number: String(number || '').trim(),
             total: String(total || '').trim(),
+            documentDate: normalizeEntryDate(documentDate),
             hasDevis: !!devis,
             hasReceipt: !!receipt,
             hasReport: hasReport || (!devis && !receipt)
@@ -957,6 +1040,7 @@
             nif: meta.nif || '',
             number: meta.number,
             total: meta.total,
+            documentDate: meta.documentDate,
             concluded: false,
             archivedAt: new Date().toISOString(),
             hasDevis: meta.hasDevis,
@@ -983,6 +1067,7 @@
                     pasta: '',
                     number: meta.number,
                     total: meta.total,
+                    documentDate: meta.documentDate || normalizeEntryDate(v && v.date),
                     concluded: false,
                     archivedAt: (v && v.date) || '',
                     hasDevis: meta.hasDevis,
@@ -1002,6 +1087,12 @@
             return e;
         });
     }
+    function entryDate(e) {
+        if (!e) return '';
+        var date = normalizeEntryDate(e.documentDate);
+        if (!date && e.html) date = detectMeta(e.html).documentDate;
+        return date || normalizeEntryDate(e.archivedAt);
+    }
     function visibleEntries() {
         var folder = state.folder;
         var list;
@@ -1013,8 +1104,11 @@
         }
         var q = (state.query || '').trim().toLowerCase();
         return list.filter(function (e) {
+            var docDate = entryDate(e);
             if (state.concludedOnly && !e.concluded) return false;
             if (state.type !== 'all' && e.type !== state.type) return false;
+            if (state.dateFrom && (!docDate || docDate < state.dateFrom)) return false;
+            if (state.dateTo && (!docDate || docDate > state.dateTo)) return false;
             if (folder === 'done' && !e.concluded) return false;
             if (folder.indexOf('type:') === 0 && e.type !== folder.slice(5)) return false;
             if (folder.indexOf('clientpasta:') === 0) {
@@ -1024,10 +1118,10 @@
             }
             if (folder.indexOf('client:') === 0 && folder.indexOf('clientpasta:') !== 0 && (e.client || tr('noClient')) !== folder.slice(7)) return false;
             if (folder.indexOf('pasta:') === 0 && (e.pasta || tr('none')) !== folder.slice(6)) return false;
-            if (folder.indexOf('year:') === 0 && String(e.archivedAt || '').slice(0, 4) !== folder.slice(5)) return false;
-            if (folder.indexOf('month:') === 0 && String(e.archivedAt || '').slice(0, 7) !== folder.slice(6)) return false;
+            if (folder.indexOf('year:') === 0 && docDate.slice(0, 4) !== folder.slice(5)) return false;
+            if (folder.indexOf('month:') === 0 && docDate.slice(0, 7) !== folder.slice(6)) return false;
             if (q) {
-                var blob = [e.name, e.client, e.pasta, e.number, e.type, typeLabel(e.type)].join(' ').toLowerCase();
+                var blob = [e.name, e.client, e.pasta, e.number, e.type, typeLabel(e.type), docDate].join(' ').toLowerCase();
                 if (blob.indexOf(q) === -1) return false;
             }
             return true;
@@ -1060,11 +1154,19 @@
             '.arq-top-actions{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap;}' +
             '.arq-btn{border:1px solid #c5c5c5;background:#fff;color:#1a1a1a;padding:6px 10px;font-size:12px;cursor:pointer;border-radius:3px;}' +
             '.arq-btn:hover{background:#e8f0fe;}' +
+            '.arq-btn:disabled{opacity:.48;cursor:not-allowed;background:#f1f5f9;}' +
             '.arq-btn.primary{background:' + NAVY + ';color:#fff;border-color:' + NAVY + ';}' +
             '.arq-btn.gold{background:' + GOLD + ';border-color:' + GOLD + ';color:' + NAVY + ';font-weight:700;}' +
             '.arq-tools{display:flex;gap:8px;align-items:center;padding:8px 16px;background:#fff;border-bottom:1px solid #d9d9d9;flex-wrap:wrap;}' +
+            '.arq-tool-filters,.arq-tool-actions{display:contents;}' +
             '.arq-tools input,.arq-tools select{border:1px solid #c5c5c5;padding:6px 8px;font-size:12px;min-width:180px;}' +
+            '.arq-tools input[type=checkbox]{min-width:auto;width:auto;min-height:auto;padding:0;}' +
             '.arq-tools label{font-size:12px;display:flex;align-items:center;gap:6px;}' +
+            '.arq-date-filter{display:grid!important;grid-template-columns:auto 132px;gap:6px!important;white-space:nowrap;}' +
+            '.arq-date-filter input{min-width:132px!important;}' +
+            '.arq-selection-bar{display:flex;align-items:center;gap:10px;padding:7px 16px;background:#eef2f7;border-bottom:1px solid #cbd5e1;}' +
+            '.arq-selection-summary{font-size:12px;font-weight:700;color:' + NAVY + ';white-space:nowrap;}' +
+            '.arq-selection-actions{display:flex;align-items:center;gap:6px;min-width:0;flex-wrap:wrap;}' +
             '.arq-archive-panel{display:none;grid-template-columns:1fr 1fr auto auto auto;gap:8px;align-items:end;padding:10px 16px;background:#fff8e8;border-bottom:1px solid ' + GOLD + ';}' +
             '.arq-archive-panel.open{display:grid;}' +
             '.arq-archive-panel label{font-size:12px;display:flex;flex-direction:column;gap:4px;}' +
@@ -1072,6 +1174,7 @@
             '.arq-archive-panel .arq-check{flex-direction:row;align-items:center;gap:6px;}' +
             '.arq-archive-panel .arq-panel-title{grid-column:1/-1;font-size:12px;font-weight:700;color:' + NAVY + ';}' +
             '.arq-body{flex:1;display:grid;grid-template-columns:260px minmax(260px,1fr) minmax(340px,1.25fr);min-height:0;}' +
+            '.arq-mobile-nav{display:none;}' +
             '.arq-col{overflow:auto;background:#fff;border-right:1px solid #e5e5e5;min-height:0;}' +
             '.arq-col.arq-list-col{display:flex;flex-direction:column;}' +
             '.arq-list{flex:1;overflow:auto;outline:none;}' +
@@ -1079,6 +1182,10 @@
             '.arq-crumb button{border:0;background:none;color:' + NAVY + ';cursor:pointer;font-size:12px;padding:0 2px;text-decoration:underline;}' +
             '.arq-col h3{margin:0;padding:10px 12px;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:#64748b;background:#f8f8f8;border-bottom:1px solid #eee;}' +
             '.arq-tree button,.arq-list button.arq-row{display:block;width:100%;text-align:left;border:0;background:none;padding:7px 12px;font-size:12px;cursor:pointer;}' +
+            '.arq-row-wrap{display:grid;grid-template-columns:42px minmax(0,1fr);align-items:stretch;border-bottom:1px solid #f1f5f9;}' +
+            '.arq-row-select{display:flex;align-items:center;justify-content:center;background:#fff;cursor:pointer;}' +
+            '.arq-row-select input{width:18px;height:18px;accent-color:' + NAVY + ';}' +
+            '.arq-row-wrap.selected{box-shadow:inset 4px 0 ' + GOLD + ';background:#fff8e8;}' +
             '.arq-tree button:hover,.arq-list button.arq-row:hover{background:#e8f0fe;}' +
             '.arq-tree button.on,.arq-list button.arq-row.on{background:#0B1223;color:#fff;font-weight:600;}' +
             '.arq-tree button.on .arq-hint,.arq-list button.arq-row.on .arq-meta{color:#cbd5e1;}' +
@@ -1104,7 +1211,50 @@
             '.arq-pdf h4{margin:0 0 6px;font-size:12px;}' +
             '.arq-pdf-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:4px 0;border-top:1px solid #eee;font-size:12px;}' +
             '.arq-pdf-row.on{background:#fff;}' +
-            '@media(max-width:900px){.arq-body{grid-template-columns:1fr;}.arq-archive-panel{grid-template-columns:1fr;}}';
+            '@media(max-width:900px){.arq-body{grid-template-columns:1fr;}.arq-archive-panel{grid-template-columns:1fr;}}' +
+            '@media(max-width:820px),(max-width:960px) and (max-height:480px) and (orientation:landscape){' +
+            '#arqOverlay{height:100dvh;max-height:100dvh;overflow:hidden;}' +
+            '.arq-top{flex-wrap:wrap;gap:8px;padding:8px 12px;padding-top:max(8px,env(safe-area-inset-top,0px));}' +
+            '.arq-top>div:nth-child(2){min-width:0;flex:1;}' +
+            '.arq-top h2{font-size:15px;}' +
+            '.arq-top p{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}' +
+            '.arq-top-actions{margin-left:0;width:100%;display:grid;grid-template-columns:minmax(0,1fr) auto;}' +
+            '.arq-btn{min-height:44px;min-width:44px;padding:8px 12px;font-size:13px;}' +
+            '.arq-tools{display:block;padding:8px 12px;}' +
+            '.arq-tool-filters{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center;}' +
+            '.arq-tool-filters #arqSearch{grid-column:1/-1;}' +
+            '.arq-tool-filters label{min-height:44px;white-space:nowrap;}' +
+            '.arq-date-filter{grid-template-columns:1fr!important;gap:3px!important;white-space:normal!important;}' +
+            '.arq-date-filter input{min-width:0!important;}' +
+            '.arq-tools input,.arq-tools select{min-width:0;width:100%;max-width:100%;font-size:16px;min-height:44px;}' +
+            '.arq-tool-actions{display:flex;gap:8px;overflow-x:auto;padding-top:8px;-webkit-overflow-scrolling:touch;scrollbar-width:thin;}' +
+            '.arq-tool-actions .arq-btn{flex:0 0 auto;}' +
+            '.arq-selection-bar{padding:6px 8px;gap:6px;overflow-x:auto;-webkit-overflow-scrolling:touch;}' +
+            '.arq-selection-actions{flex-wrap:nowrap;}' +
+            '.arq-selection-actions .arq-btn{flex:0 0 auto;}' +
+            '.arq-mobile-nav{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));background:#fff;border-bottom:1px solid #d9d9d9;flex:0 0 46px;}' +
+            '.arq-mobile-nav button{min-width:0;min-height:46px;border:0;border-bottom:3px solid transparent;background:#fff;color:#475569;font-size:13px;font-weight:600;padding:6px 4px;}' +
+            '.arq-mobile-nav button.on{color:' + NAVY + ';border-bottom-color:' + GOLD + ';background:#fff8e8;}' +
+            '.arq-body{display:block;min-height:0;overflow:hidden;}' +
+            '.arq-body>.arq-col{display:none!important;height:100%;border-right:0;}' +
+            '.arq-body[data-mobile-pane="folders"]>.arq-folders-col{display:block!important;}' +
+            '.arq-body[data-mobile-pane="files"]>.arq-list-col{display:flex!important;}' +
+            '.arq-body[data-mobile-pane="preview"]>.arq-preview{display:flex!important;}' +
+            '.arq-tree button,.arq-list button.arq-row{min-height:44px;padding:10px 12px;}' +
+            '.arq-row-wrap{grid-template-columns:48px minmax(0,1fr);}' +
+            '.arq-preview iframe,#arqPdfFrame,#arqPdfFrame.show{min-height:180px;}' +
+            '.arq-preview{padding-bottom:max(12px,env(safe-area-inset-bottom,0px));}' +
+            '}' +
+            '@media(max-width:960px) and (max-height:480px) and (orientation:landscape){' +
+            '.arq-top{flex-wrap:nowrap;padding:5px 8px;}.arq-top p{display:none;}.arq-top-actions{width:auto;margin-left:auto;display:flex;flex-wrap:nowrap;}' +
+            '.arq-tools{display:flex;flex-wrap:nowrap;overflow-x:auto;padding:4px 8px;-webkit-overflow-scrolling:touch;}' +
+            '.arq-tool-filters,.arq-tool-actions{display:flex;flex:0 0 auto;gap:6px;padding:0;align-items:center;}' +
+            '.arq-tool-filters #arqSearch{grid-column:auto;width:180px;}.arq-tool-filters label{min-height:36px;}' +
+            '.arq-tools input,.arq-tools select{width:150px;min-height:36px;font-size:14px;}.arq-date-filter{display:flex!important;grid-template-columns:none!important;gap:4px!important;}' +
+            '.arq-date-filter input{width:138px!important;}.arq-btn{min-height:36px;padding:6px 10px;}' +
+            '.arq-selection-bar{min-height:40px;padding:4px 8px;}.arq-mobile-nav{flex-basis:40px;}.arq-mobile-nav button{min-height:40px;}' +
+            '}' +
+            '@media(max-width:400px){.arq-top p{display:none;}.arq-top-actions{width:auto;margin-left:auto;}.arq-top-actions .arq-btn{padding:6px 9px;font-size:12px;}.arq-tools{padding:6px 8px;}.arq-tool-actions{padding-top:6px;}.arq-selection-summary{position:sticky;left:0;background:#eef2f7;padding-right:4px;}}';
     }
     function archivePanelHtml() {
         return '<div class="arq-archive-panel" id="arqArchivePanel">' +
@@ -1198,6 +1348,64 @@
         renderList();
         renderPreview();
     }
+    function selectedEntries(list) {
+        list = list || visibleEntries();
+        return list.filter(function (e) { return !!state.selectedIds[e.id]; });
+    }
+    function pruneSelection(list) {
+        var allowed = {};
+        (list || []).forEach(function (e) { allowed[e.id] = true; });
+        Object.keys(state.selectedIds).forEach(function (id) {
+            if (!allowed[id]) delete state.selectedIds[id];
+        });
+    }
+    function clearSelection() {
+        state.selectedIds = {};
+        renderList();
+    }
+    function renderSelectionBar(list) {
+        list = list || visibleEntries();
+        pruneSelection(list);
+        var selected = selectedEntries(list);
+        var count = document.getElementById('arqSelectedCount');
+        if (count) count.textContent = tr('selectedCount', { n: String(selected.length) });
+        var allBtn = document.getElementById('arqSelectAllBtn');
+        if (allBtn) {
+            allBtn.disabled = !list.length;
+            allBtn.setAttribute('aria-pressed', list.length && selected.length === list.length ? 'true' : 'false');
+        }
+        ['arqClearSelectionBtn', 'arqDownloadSelectedBtn', 'arqPackSelectedBtn', 'arqFinalizeSelectedBtn'].forEach(function (id) {
+            var btn = document.getElementById(id);
+            if (btn) btn.disabled = !selected.length;
+        });
+    }
+    function toggleSelectAll() {
+        var list = visibleEntries();
+        var chosen = selectedEntries(list);
+        var select = chosen.length !== list.length;
+        list.forEach(function (e) {
+            if (select) state.selectedIds[e.id] = true;
+            else delete state.selectedIds[e.id];
+        });
+        renderList();
+    }
+    function applyDateFilters() {
+        var fromEl = document.getElementById('arqDateFrom');
+        var toEl = document.getElementById('arqDateTo');
+        var from = normalizeEntryDate(fromEl && fromEl.value);
+        var to = normalizeEntryDate(toEl && toEl.value);
+        if (from && to && from > to) {
+            var swap = from;
+            from = to;
+            to = swap;
+        }
+        state.dateFrom = from;
+        state.dateTo = to;
+        if (fromEl) fromEl.value = from;
+        if (toEl) toEl.value = to;
+        renderList();
+        renderPreview();
+    }
     function bindArquivoEvents() {
         if (state.eventsBound) return;
         state.eventsBound = true;
@@ -1218,6 +1426,33 @@
             renderList();
             renderPreview();
         };
+        document.getElementById('arqDateFrom').onchange = applyDateFilters;
+        document.getElementById('arqDateTo').onchange = applyDateFilters;
+        document.getElementById('arqDateClearBtn').onclick = function () {
+            state.dateFrom = '';
+            state.dateTo = '';
+            document.getElementById('arqDateFrom').value = '';
+            document.getElementById('arqDateTo').value = '';
+            renderList();
+            renderPreview();
+        };
+        document.getElementById('arqSelectAllBtn').onclick = toggleSelectAll;
+        document.getElementById('arqClearSelectionBtn').onclick = clearSelection;
+        document.getElementById('arqDownloadSelectedBtn').onclick = function () {
+            var list = selectedEntries();
+            if (!list.length) { toast(tr('selectedEmpty')); return; }
+            downloadEntries(list, 'Selecao');
+        };
+        document.getElementById('arqPackSelectedBtn').onclick = function () {
+            var list = selectedEntries();
+            if (!list.length) { toast(tr('selectedEmpty')); return; }
+            if (typeof window.downloadPackContabilistaSelect === 'function') {
+                window.downloadPackContabilistaSelect({ entries: list });
+            } else if (typeof window.downloadPackContabilista === 'function') {
+                window.downloadPackContabilista({ select: true, entries: list });
+            } else toast(tr('packEmpty'));
+        };
+        document.getElementById('arqFinalizeSelectedBtn').onclick = finalizeSelectedEntries;
         document.getElementById('arqZipBtn').onclick = downloadSet;
         document.getElementById('arqPackBtn').onclick = function (ev) {
             if (typeof window.downloadPackContabilistaSelect === 'function') {
@@ -1229,6 +1464,9 @@
         document.getElementById('arqNewClientBtn').onclick = createClientFolder;
         document.getElementById('arqNewPastaBtn').onclick = createPastaFolder;
         document.getElementById('arqDriveBtn').onclick = openDriveRoot;
+        document.querySelectorAll('#arqMobileNav [data-pane]').forEach(function (btn) {
+            btn.onclick = function () { setMobilePane(btn.getAttribute('data-pane')); };
+        });
         var archGo = document.getElementById('arqArchGo');
         var archCancel = document.getElementById('arqArchCancel');
         if (archGo) archGo.onclick = commitArchivePanel;
@@ -1293,9 +1531,23 @@
         var wrap = document.getElementById('arqOverlay');
         if (!wrap) return;
         var tools = wrap.querySelector('.arq-tools');
+        var filters = tools && tools.querySelector('.arq-tool-filters');
+        if (filters && !document.getElementById('arqDateFrom')) {
+            filters.insertAdjacentHTML('beforeend', dateFiltersHtml());
+        }
         if (tools && !document.getElementById('arqArchivePanel')) {
             tools.insertAdjacentHTML('afterend', archivePanelHtml() + folderPanelHtml());
         }
+        if (tools && !document.getElementById('arqSelectionBar')) {
+            tools.insertAdjacentHTML('afterend', selectionBarHtml());
+        }
+        var body = wrap.querySelector('.arq-body');
+        if (body && !document.getElementById('arqMobileNav')) {
+            body.insertAdjacentHTML('beforebegin', mobileNavHtml());
+        }
+        var cols = body ? body.querySelectorAll(':scope > .arq-col') : [];
+        if (cols[0]) cols[0].classList.add('arq-folders-col');
+        if (body) body.setAttribute('data-mobile-pane', state.mobilePane);
         var listCol = wrap.querySelector('.arq-body .arq-col:nth-child(2)');
         if (listCol) {
             listCol.classList.add('arq-list-col');
@@ -1328,24 +1580,68 @@
             '<button type="button" class="arq-btn" id="arqCloseBtn"></button>' +
             '</div></div>' +
             '<div class="arq-tools">' +
+            '<div class="arq-tool-filters">' +
             '<input type="search" id="arqSearch" />' +
             '<select id="arqType"></select>' +
             '<label><input type="checkbox" id="arqDoneOnly" /> <span id="arqDoneLbl"></span></label>' +
+            dateFiltersHtml() +
+            '</div><div class="arq-tool-actions">' +
             '<button type="button" class="arq-btn primary" id="arqZipBtn"></button>' +
             '<button type="button" class="arq-btn gold" id="arqPackBtn"></button>' +
             '<button type="button" class="arq-btn" id="arqNewClientBtn"></button>' +
             '<button type="button" class="arq-btn" id="arqNewPastaBtn"></button>' +
             '<button type="button" class="arq-btn gold" id="arqDriveBtn"></button>' +
-            '</div>' +
+            '</div></div>' +
+            selectionBarHtml() +
             archivePanelHtml() +
             folderPanelHtml() +
+            mobileNavHtml() +
             '<div class="arq-body">' +
-            '<div class="arq-col"><h3 id="arqFoldersTitle"></h3><div class="arq-tree" id="arqTree"></div></div>' +
+            '<div class="arq-col arq-folders-col"><h3 id="arqFoldersTitle"></h3><div class="arq-tree" id="arqTree"></div></div>' +
             '<div class="arq-col arq-list-col"><h3 id="arqListTitle"></h3><div class="arq-crumb" id="arqCrumb"></div><div class="arq-list" id="arqList" tabindex="0"></div></div>' +
             '<div class="arq-col arq-preview" id="arqPreview"></div>' +
             '</div>';
         document.body.appendChild(wrap);
+        wrap.querySelector('.arq-body').setAttribute('data-mobile-pane', state.mobilePane);
         bindArquivoEvents();
+    }
+
+    function mobileNavHtml() {
+        return '<div class="arq-mobile-nav" id="arqMobileNav" role="tablist" aria-label="Arquivo">' +
+            '<button type="button" data-pane="folders" role="tab"></button>' +
+            '<button type="button" data-pane="files" role="tab"></button>' +
+            '<button type="button" data-pane="preview" role="tab"></button>' +
+            '</div>';
+    }
+
+    function dateFiltersHtml() {
+        return '<label class="arq-date-filter"><span id="arqDateFromLbl"></span><input type="date" id="arqDateFrom" /></label>' +
+            '<label class="arq-date-filter"><span id="arqDateToLbl"></span><input type="date" id="arqDateTo" /></label>' +
+            '<button type="button" class="arq-btn" id="arqDateClearBtn"></button>';
+    }
+
+    function selectionBarHtml() {
+        return '<div class="arq-selection-bar" id="arqSelectionBar" aria-live="polite">' +
+            '<span class="arq-selection-summary" id="arqSelectedCount"></span>' +
+            '<div class="arq-selection-actions">' +
+            '<button type="button" class="arq-btn" id="arqSelectAllBtn"></button>' +
+            '<button type="button" class="arq-btn" id="arqClearSelectionBtn"></button>' +
+            '<button type="button" class="arq-btn primary" id="arqDownloadSelectedBtn"></button>' +
+            '<button type="button" class="arq-btn gold" id="arqPackSelectedBtn"></button>' +
+            '<button type="button" class="arq-btn" id="arqFinalizeSelectedBtn"></button>' +
+            '</div></div>';
+    }
+
+    function setMobilePane(pane) {
+        if (['folders', 'files', 'preview'].indexOf(pane) < 0) pane = 'folders';
+        state.mobilePane = pane;
+        var body = document.querySelector('#arqOverlay .arq-body');
+        if (body) body.setAttribute('data-mobile-pane', pane);
+        document.querySelectorAll('#arqMobileNav [data-pane]').forEach(function (btn) {
+            var on = btn.getAttribute('data-pane') === pane;
+            btn.classList.toggle('on', on);
+            btn.setAttribute('aria-selected', on ? 'true' : 'false');
+        });
     }
     function fillChrome() {
         document.getElementById('arqTitle').textContent = tr('title');
@@ -1354,7 +1650,17 @@
         document.getElementById('arqCloseBtn').textContent = tr('close');
         document.getElementById('arqSearch').placeholder = tr('search');
         document.getElementById('arqDoneLbl').textContent = tr('onlyDone');
+        document.getElementById('arqDateFromLbl').textContent = tr('dateFrom');
+        document.getElementById('arqDateToLbl').textContent = tr('dateTo');
+        document.getElementById('arqDateFrom').value = state.dateFrom;
+        document.getElementById('arqDateTo').value = state.dateTo;
+        document.getElementById('arqDateClearBtn').textContent = tr('clearPeriod');
         document.getElementById('arqZipBtn').textContent = tr('dlSet');
+        document.getElementById('arqSelectAllBtn').textContent = tr('selectAll');
+        document.getElementById('arqClearSelectionBtn').textContent = tr('clearSelection');
+        document.getElementById('arqDownloadSelectedBtn').textContent = tr('downloadSelected');
+        document.getElementById('arqPackSelectedBtn').textContent = tr('packSelected');
+        document.getElementById('arqFinalizeSelectedBtn').textContent = tr('finalizeSelected');
         var packBtn = document.getElementById('arqPackBtn');
         if (packBtn) packBtn.textContent = tr('packAcct');
         var nc = document.getElementById('arqNewClientBtn');
@@ -1368,6 +1674,11 @@
             drv.style.display = url ? '' : 'none';
         }
         document.getElementById('arqFoldersTitle').textContent = tr('folders');
+        var paneLabels = { folders: tr('folders'), files: tr('files'), preview: tr('preview') };
+        document.querySelectorAll('#arqMobileNav [data-pane]').forEach(function (btn) {
+            btn.textContent = paneLabels[btn.getAttribute('data-pane')] || '';
+        });
+        setMobilePane(state.mobilePane);
         var sel = document.getElementById('arqType');
         var types = [
             ['all', tr('typeAll')],
@@ -1381,6 +1692,7 @@
             return '<option value="' + p[0] + '"' + (state.type === p[0] ? ' selected' : '') + '>' + esc(p[1]) + '</option>';
         }).join('');
         document.getElementById('arqDoneOnly').checked = state.concludedOnly;
+        renderSelectionBar(visibleEntries());
         var archTitle = document.getElementById('arqArchTitle');
         if (archTitle) archTitle.textContent = tr('archivePanelTitle');
         var acl = document.getElementById('arqArchClientLbl');
@@ -1419,12 +1731,13 @@
         renderTree();
         renderList();
         renderPreview();
+        if (isMobileArchive()) setMobilePane('files');
     }
     function renderTree() {
         var items = allEntries();
         var clients = catalogClients();
         var pastas = catalogPastas();
-        var years = unique(items.map(function (e) { return String(e.archivedAt || '').slice(0, 4); }).filter(Boolean));
+        var years = unique(items.map(function (e) { return entryDate(e).slice(0, 4); }).filter(Boolean));
         var html = '';
         html += treeBtn('all', tr('all'), items.length);
         html += treeBtn('done', tr('done'), items.filter(function (e) { return e.concluded; }).length);
@@ -1457,8 +1770,8 @@
         html += '</details>';
         html += '<details><summary>' + esc(tr('byYear')) + '</summary>';
         years.forEach(function (y) {
-            var months = unique(items.filter(function (e) { return String(e.archivedAt || '').slice(0, 4) === y; })
-                .map(function (e) { return String(e.archivedAt || '').slice(0, 7); }));
+            var months = unique(items.filter(function (e) { return entryDate(e).slice(0, 4) === y; })
+                .map(function (e) { return entryDate(e).slice(0, 7); }));
             html += '<details open><summary>' + esc(y) + '</summary>';
             html += treeBtn('year:' + y, tr('all') + ' ' + y);
             months.forEach(function (m) {
@@ -1506,6 +1819,7 @@
     }
     function renderList() {
         var list = visibleEntries();
+        pruneSelection(list);
         if (list.length && !list.some(function (e) { return e.id === state.selectedId; })) {
             state.selectedId = list[0].id;
             state.previewTab = 'doc';
@@ -1518,19 +1832,34 @@
         var box = document.getElementById('arqList');
         if (!list.length) {
             box.innerHTML = '<p class="arq-hint" style="padding:12px;">' + esc(tr('empty')) + '</p>';
+            renderSelectionBar(list);
             return;
         }
         box.innerHTML = list.map(function (e) {
             var on = state.selectedId === e.id ? ' on' : '';
-            var date = e.archivedAt ? String(e.archivedAt).slice(0, 10) : '';
-            return '<button type="button" class="arq-row' + on + '" data-id="' + esc(e.id) + '">' +
+            var checked = !!state.selectedIds[e.id];
+            var date = entryDate(e);
+            var archived = normalizeEntryDate(e.archivedAt);
+            var dateMeta = date ? (tr('documentDate') + ': ' + date) : '';
+            if (archived && archived !== date) dateMeta += (dateMeta ? ' · ' : '') + tr('archiveDate') + ': ' + archived;
+            return '<div class="arq-row-wrap' + (checked ? ' selected' : '') + '" data-id="' + esc(e.id) + '">' +
+                '<label class="arq-row-select"><input type="checkbox" class="arq-select-cb" data-id="' + esc(e.id) + '"' + (checked ? ' checked' : '') + ' aria-label="' + esc(tr('selectAll') + ': ' + e.name) + '" /></label>' +
+                '<button type="button" class="arq-row' + on + '" data-id="' + esc(e.id) + '">' +
                 '<span class="arq-badge' + (e.concluded ? ' done' : '') + '">' + esc(e.concluded ? tr('concluded') : tr('notDone')) + '</span>' +
                 (e.sentToClient ? '<span class="arq-badge">' + esc(tr('sentBadge')) + '</span>' : '') +
                 '<span class="arq-badge">' + esc(typeLabel(e.type)) + '</span>' +
                 esc(e.name) +
-                '<span class="arq-meta">' + esc([e.client || tr('noClient'), e.pasta || tr('none'), date, e.number].filter(Boolean).join(' · ')) + '</span>' +
-                '</button>';
+                '<span class="arq-meta">' + esc([e.client || tr('noClient'), e.pasta || tr('none'), dateMeta, e.number].filter(Boolean).join(' · ')) + '</span>' +
+                '</button></div>';
         }).join('');
+        box.querySelectorAll('.arq-select-cb').forEach(function (cb) {
+            cb.onchange = function () {
+                var id = cb.getAttribute('data-id');
+                if (cb.checked) state.selectedIds[id] = true;
+                else delete state.selectedIds[id];
+                renderList();
+            };
+        });
         box.querySelectorAll('button.arq-row').forEach(function (btn) {
             btn.onclick = function () {
                 state.selectedId = btn.getAttribute('data-id');
@@ -1538,8 +1867,10 @@
                 state.selectedPdfId = null;
                 renderList();
                 renderPreview();
+                if (isMobileArchive()) setMobilePane('preview');
             };
         });
+        renderSelectionBar(list);
         var on = box.querySelector('.arq-row.on');
         if (on && typeof on.scrollIntoView === 'function') on.scrollIntoView({ block: 'nearest' });
     }
@@ -1623,6 +1954,7 @@
             form = '<div class="arq-form">' +
                 '<label>' + esc(tr('client')) + '<input id="arqEditClient" value="' + esc(e.client) + '" /></label>' +
                 '<label>' + esc(tr('pasta')) + '<input id="arqEditPasta" value="' + esc(e.pasta) + '" /></label>' +
+                '<label>' + esc(tr('documentDate')) + '<input type="date" id="arqEditDate" value="' + esc(entryDate(e)) + '" /></label>' +
                 '<button type="button" class="arq-btn gold" data-act="meta">' + esc(tr('saveFicha')) + '</button>' +
                 '</div>';
         }
@@ -1663,7 +1995,7 @@
         box.querySelectorAll('[data-act]').forEach(function (btn) {
             btn.onclick = function () { runAction(btn.getAttribute('data-act'), e); };
         });
-        ['arqEditClient', 'arqEditPasta'].forEach(function (fid) {
+        ['arqEditClient', 'arqEditPasta', 'arqEditDate'].forEach(function (fid) {
             var field = document.getElementById(fid);
             if (!field) return;
             field.addEventListener('change', function () { runAction('meta', e); });
@@ -1840,17 +2172,15 @@
         if (/[;"\n]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
         return s;
     }
-    function concludeWithPdfs(entry) {
+    function ensureFinalPdfs(entry) {
         var etapes = [];
         if (entry.hasReport && partHasContent(entry.html, 'relatorio')) etapes.push('relatorio');
         if (entry.hasDevis && partHasContent(entry.html, 'orcamento')) etapes.push('orcamento');
         if (entry.hasReceipt && partHasContent(entry.html, 'recibo')) etapes.push('recibo');
         if (!etapes.length) {
-            toast(tr('pdfNeed'));
-            return;
+            return Promise.reject(new Error('empty'));
         }
-        toast(tr('pdfBusy'));
-        listFinals(ownerIdOf(entry)).then(function (rows) {
+        return listFinals(ownerIdOf(entry)).then(function (rows) {
             return etapes.reduce(function (promise, etape) {
                 return promise.then(function () {
                     var exists = rows.some(function (r) { return r.etape === etape && r.blob; });
@@ -1868,10 +2198,41 @@
                 }
             });
             if (changed && saveStore(list)) {
-                renderTree();
-                renderList();
-                renderPreview();
+                entry.concluded = true;
             }
+            return entry;
+        });
+    }
+    function concludeWithPdfs(entry) {
+        toast(tr('pdfBusy'));
+        return ensureFinalPdfs(entry).then(function () {
+            renderTree();
+            renderList();
+            renderPreview();
+        }).catch(function (err) {
+            if (err && err.message === 'empty') toast(tr('pdfNeed'));
+            else toast(tr('pdfFail'));
+        });
+    }
+    function finalizeSelectedEntries() {
+        var chosen = selectedEntries();
+        if (!chosen.length) { toast(tr('selectedEmpty')); return; }
+        var list = chosen.filter(function (e) { return !e.readOnlyOrigin && e.source === 'archive'; });
+        if (!list.length) { toast(tr('finalizeArchiveOnly')); return; }
+        if (!confirm(tr('finalizeConfirm', { n: String(list.length) }))) return;
+        toast(tr('finalizeBusy', { n: String(list.length) }));
+        var ok = 0;
+        var fail = 0;
+        list.reduce(function (promise, entry) {
+            return promise.then(function () {
+                return ensureFinalPdfs(entry).then(function () { ok += 1; }).catch(function () { fail += 1; });
+            });
+        }, Promise.resolve()).then(function () {
+            renderTree();
+            renderList();
+            renderPreview();
+            if (fail) toast(tr('finalizePartial', { ok: String(ok), fail: String(fail) }));
+            else toast(tr('finalizeOk', { n: String(ok) }));
         }).catch(function () {
             toast(tr('pdfFail'));
         });
@@ -1922,11 +2283,13 @@
         if (act === 'meta' && !e.readOnlyOrigin) {
             var client = (document.getElementById('arqEditClient') || {}).value || '';
             var pasta = (document.getElementById('arqEditPasta') || {}).value || '';
+            var documentDate = normalizeEntryDate((document.getElementById('arqEditDate') || {}).value || '');
             var list2 = loadStore();
             list2.forEach(function (item) {
                 if (item.id === e.id) {
                     item.client = String(client).trim();
                     item.pasta = String(pasta).trim();
+                    item.documentDate = documentDate || item.documentDate || normalizeEntryDate(item.archivedAt);
                 }
             });
             if (saveStore(list2)) {
@@ -1963,6 +2326,7 @@
             existing.archivedAt = entry.archivedAt;
             existing.number = entry.number;
             existing.total = entry.total;
+            existing.documentDate = entry.documentDate || existing.documentDate;
             existing.hasDevis = entry.hasDevis;
             existing.hasReceipt = entry.hasReceipt;
             existing.hasReport = entry.hasReport;
@@ -2010,6 +2374,7 @@
             nif: String(opts.nif || meta.nif || job.nif || '').trim(),
             number: meta.number,
             total: meta.total,
+            documentDate: meta.documentDate,
             concluded: concluded || meta.type === 'completo',
             archivedAt: new Date().toISOString(),
             hasDevis: meta.hasDevis,
@@ -2027,12 +2392,12 @@
         refreshArquivoIfOpen();
         return state.selectedId;
     }
-    function downloadSet() {
-        var list = visibleEntries();
+    function downloadEntries(list, label) {
+        list = list || [];
         if (!list.length) { toast(tr('zipEmpty')); return; }
-        var csvHdr = ['Nome', 'Tipo', 'Concluido', 'Cliente', 'Pasta', 'Numero', 'Total', 'Data'].join(';');
+        var csvHdr = ['Nome', 'Tipo', 'Concluido', 'Cliente', 'Pasta', 'Numero', 'Total', 'Data_documento', 'Data_arquivo'].join(';');
         var csv = '\uFEFF' + csvHdr + '\r\n' + list.map(function (e) {
-            return [e.name, e.type, e.concluded ? 'sim' : 'nao', e.client, e.pasta, e.number, e.total, String(e.archivedAt || '').slice(0, 10)]
+            return [e.name, e.type, e.concluded ? 'sim' : 'nao', e.client, e.pasta, e.number, e.total, entryDate(e), normalizeEntryDate(e.archivedAt)]
                 .map(csvEsc).join(';');
         }).join('\r\n');
         if (!window.JSZip) {
@@ -2063,17 +2428,22 @@
         }).then(function (blob) {
             var a = document.createElement('a');
             a.href = URL.createObjectURL(blob);
-            a.download = ((typeof window.abeneBrandName === 'function') ? window.abeneBrandName() : 'Genius Raros').replace(/\s+/g, '-') + '-Arquivo.zip';
+            var brand = ((typeof window.abeneBrandName === 'function') ? window.abeneBrandName() : 'Genius Raros').replace(/\s+/g, '-');
+            a.download = brand + '-' + sanitizeName(label || 'Arquivo') + '-' + new Date().toISOString().slice(0, 10) + '.zip';
             a.click();
             URL.revokeObjectURL(a.href);
             toast(tr('zipOk', { n: String(list.length) }));
         }).catch(function () { toast(tr('quota')); });
+    }
+    function downloadSet() {
+        downloadEntries(visibleEntries(), 'Arquivo');
     }
     function openArquivo() {
         ensureDom();
         fillChrome();
         if (typeof closeAllDropdowns === 'function') closeAllDropdowns();
         document.getElementById('arqOverlay').classList.add('open');
+        if (isMobileArchive()) setMobilePane('folders');
         renderTree();
         renderList();
         renderPreview();
@@ -2114,6 +2484,7 @@
                 nif: snap.nif,
                 number: meta.number || snap.number,
                 total: snap.total,
+                documentDate: snap.documentDate,
                 concluded: false,
                 sentToClient: true,
                 sentAt: new Date().toISOString(),

@@ -23,13 +23,13 @@
     }
     function normClient(rec) {
         if (!rec || typeof rec !== 'object') return null;
-        var nom = field(rec, ['nom', 'name', 'Nome', 'cliente', 'Client', 'client']);
+        var nom = field(rec, ['nom', 'nome', 'nombre', 'name', 'Nome', 'cliente', 'Client', 'client']);
         if (!nom) return null;
         return {
             nom: nom,
             nif: field(rec, ['nif', 'NIF', 'siret', 'vat']),
-            morada: field(rec, ['morada', 'address', 'Adresse', 'addr']),
-            telefone: field(rec, ['telefone', 'phone', 'tel', 'Telephone']),
+            morada: field(rec, ['morada', 'adresse', 'address', 'dirección', 'Adresse', 'addr']),
+            telefone: field(rec, ['telefone', 'téléphone', 'phone', 'teléfono', 'tel', 'Telephone']),
             email: field(rec, ['email', 'Email', 'mail']),
             localidade: field(rec, ['localidade', 'city', 'ville', 'cidade']),
             postal: field(rec, ['postal', 'cp', 'zip', 'codigo_postal', 'código postal'])
@@ -80,7 +80,8 @@
             if (raw.client) add(raw);
             if (raw.nom) add(raw);
         } catch (e3) {}
-        out.sort(function (a, b) { return a.nom.localeCompare(b.nom, 'pt'); });
+        var locSort = (typeof localStorage !== 'undefined' && localStorage.getItem('abeneLanguage')) || 'pt-PT';
+        out.sort(function (a, b) { return a.nom.localeCompare(b.nom, locSort); });
         return out;
     }
     function collectArticles() {
@@ -88,16 +89,16 @@
         var seen = {};
         function add(rec) {
             if (!rec) return;
-            var d = field(rec, ['designation', 'description', 'desc', 'nome', 'name', 'Designation']);
+            var d = field(rec, ['designation', 'designação', 'designación', 'description', 'descrição', 'descripción', 'desc', 'nome', 'name', 'Designation']);
             if (!d) return;
             var key = d.toLowerCase();
             if (seen[key]) return;
             seen[key] = 1;
             out.push({
                 designation: d,
-                code: field(rec, ['code', 'codigo', 'sku']),
-                unite: field(rec, ['unite', 'unit', 'un']) || 'un',
-                prix: field(rec, ['prix_unitaire', 'price', 'preco', 'prix']),
+                code: field(rec, ['code', 'código', 'codigo', 'sku']),
+                unite: field(rec, ['unite', 'unidade', 'unidad', 'unit', 'un']) || 'un',
+                prix: field(rec, ['prix_unitaire', 'preço_unitário', 'precio_unitario', 'unit_price', 'price', 'preco', 'prix']),
                 tva: field(rec, ['tva', 'vat', 'iva']) || '23'
             });
         }

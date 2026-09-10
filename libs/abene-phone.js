@@ -1,8 +1,10 @@
 /* Genius Raros — adaptation téléphone (navigation, menus, zoom page). N’altère pas le bureau. */
 (function () {
-    var MQ = '(max-width: 820px), (max-width: 960px) and (pointer: coarse)';
+    var MQ = '(max-width: 820px), (max-width: 960px) and (pointer: coarse), (max-width: 960px) and (max-height: 480px) and (orientation: landscape)';
     var userZoomed = false;
     var origSetZoom = null;
+    var lastViewportWidth = 0;
+    var ribbonTouched = false;
 
     function isPhone() {
         try { return window.matchMedia(MQ).matches; } catch (e) { return window.innerWidth <= 820; }
@@ -27,7 +29,7 @@
         document.body.classList.toggle('abene-phone', on);
         var slider = document.getElementById('zoomSlider');
         if (slider) {
-            slider.min = '50';
+            slider.min = '30';
             slider.max = '200';
         }
         return on;
@@ -103,7 +105,7 @@
         var area = document.getElementById('editorArea');
         if (!area) return;
         var avail = Math.max(180, area.clientWidth - 16);
-        var pct = Math.max(55, Math.min(100, Math.floor((avail / pageW()) * 100)));
+        var pct = Math.max(30, Math.min(100, Math.floor((avail / pageW()) * 100)));
         userZoomed = false;
         if (typeof window.setZoom === 'function') window.setZoom(pct);
         else layoutPhoneZoom();
@@ -193,7 +195,7 @@
         window.setZoom = function (val) {
             if (zoomFrozen()) return;
             var n = parseInt(val, 10);
-            if (document.body.classList.contains('abene-phone')) n = Math.max(50, Math.min(200, n));
+            if (document.body.classList.contains('abene-phone')) n = Math.max(30, Math.min(200, n));
             origSetZoom(n);
             layoutPhoneZoom();
         };
@@ -208,7 +210,7 @@
         };
         window.zoomOut = function () {
             userZoomed = true;
-            var min = document.body.classList.contains('abene-phone') ? 50 : 50;
+            var min = document.body.classList.contains('abene-phone') ? 30 : 50;
             var cur = (window.abene && window.abene.currentZoom) || 100;
             window.setZoom(Math.max(min, cur - 10));
         };
@@ -252,6 +254,40 @@
         };
         window.showFileMenu._abenePhone = true;
     }
+    function scrollActiveNav() {
+        if (!document.body.classList.contains('abene-phone')) return;
+        var btn = document.querySelector('.menu-tabs button.active, .menu-tabs button[aria-selected="true"]');
+        if (btn && btn.scrollIntoView) {
+            try { btn.scrollIntoView({ inline: 'nearest', block: 'nearest', behavior: 'smooth' }); } catch (e) {}
+        }
+        var tab = document.querySelector('.ribbon-tab-content.active');
+        if (tab) {
+            try { tab.scrollLeft = 0; } catch (e2) {}
+        }
+    }
+    function wrapSwitchTab() {
+        if (typeof window.switchTab !== 'function' || window.switchTab._abenePhoneNav) return;
+        var orig = window.switchTab;
+        window.switchTab = function (name) {
+            if (document.body.classList.contains('abene-phone')) {
+                ribbonTouched = true;
+                document.body.classList.remove('abene-ribbon-collapsed');
+            }
+            var out = orig.apply(this, arguments);
+            scrollActiveNav();
+            return out;
+        };
+        window.switchTab._abenePhoneNav = true;
+    }
+    function wrapRibbonToggle() {
+        if (typeof window.toggleRibbonCollapse !== 'function' || window.toggleRibbonCollapse._abenePhone) return;
+        var orig = window.toggleRibbonCollapse;
+        window.toggleRibbonCollapse = function () {
+            if (document.body.classList.contains('abene-phone')) ribbonTouched = true;
+            return orig.apply(this, arguments);
+        };
+        window.toggleRibbonCollapse._abenePhone = true;
+    }
     function wrapExcelMode() {
         var ent = window.abeneExcelEnter;
         if (typeof ent === 'function' && !ent._abenePhone) {
@@ -283,10 +319,22 @@
     }
     function bind() {
         markPhone();
+        lastViewportWidth = visSize().w;
+        if (isPhone()) {
+            var savedRibbon = null;
+            try { savedRibbon = localStorage.getItem('abeneRibbonCollapsed'); } catch (e) {}
+            if (visSize().h <= 480 || (savedRibbon === null && visSize().h <= 740)) {
+                document.body.classList.add('abene-ribbon-collapsed');
+            }
+        }
         wrapZoom();
         wrapFileMenu();
         wrapExcelMode();
+        wrapSwitchTab();
+        wrapRibbonToggle();
+        setTimeout(wrapSwitchTab, 80);
         fitPageToPhone(false);
+        scrollActiveNav();
         bindLongPress(document.getElementById('editor'), function (ev) {
             if (typeof window.showContextMenu === 'function') {
                 ev.preventDefault();
@@ -317,12 +365,27 @@
         window.addEventListener('orientationchange', function () {
             if (zoomFrozen()) return;
             userZoomed = false;
-            setTimeout(function () { fitPageToPhone(true); }, 180);
+            setTimeout(function () {
+                if (isPhone() && visSize().h <= 480 && !ribbonTouched) {
+                    document.body.classList.add('abene-ribbon-collapsed');
+                }
+                fitPageToPhone(true);
+                scrollActiveNav();
+            }, 180);
         });
         window.addEventListener('resize', function () {
             if (zoomFrozen()) return;
             markPhone();
-            layoutPhoneZoom();
+            var nextWidth = visSize().w;
+            if (document.body.classList.contains('abene-phone') && visSize().h <= 480 && !ribbonTouched) {
+                document.body.classList.add('abene-ribbon-collapsed');
+            }
+            if (document.body.classList.contains('abene-phone') && !userZoomed && Math.abs(nextWidth - lastViewportWidth) > 8) {
+                fitPageToPhone(true);
+            } else {
+                layoutPhoneZoom();
+            }
+            lastViewportWidth = nextWidth;
             clampOpenUi();
         });
         if (window.visualViewport) {
