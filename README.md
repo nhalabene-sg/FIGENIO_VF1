@@ -49,6 +49,22 @@ A aplicação continua editável sem internet. Quando a ligação Google está
 configurada, os ficheiros são guardados no Drive do cliente e os e-mails são
 enviados pelo Gmail do cliente. Os documentos enviados ao cliente são PDFs.
 
+### Arquivo, Lixo e proteção individual
+
+- Só os documentos em **rascunho** podem ser movidos para o **Lixo**.
+- Um documento concluído/final nunca pode ser eliminado pelo Arquivo.
+- O Lixo conserva o documento para permitir a sua restauração.
+- A proteção é escolhida separadamente para cada rascunho. Enquanto estiver
+  protegido, esse documento abre em leitura e não pode ser movido para o Lixo.
+- Os documentos do Lixo não entram nos packs nem nos índices do contabilista.
+- Português de Portugal é o idioma predefinido; Lixo, Corbeille, Trash e
+  Papelera são apresentados conforme o idioma selecionado.
+
+Depois desta atualização, voltar a colar `apps-script/emaildrive.gs.txt` no
+Apps Script e criar uma **Nova versão** da implementação. O script acrescenta
+automaticamente as colunas `DeletedAt`, `Protected` e `ProtectedAt` à folha
+ARQUIVO, sem apagar os registos existentes.
+
 ## Licença
 
 Uso interno Genius Raros. Consultar `LICENSE`.

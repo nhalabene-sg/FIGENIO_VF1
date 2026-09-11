@@ -490,6 +490,72 @@
         if (STR[l]) Object.assign(STR[l], SELECTSTR[l]);
     });
 
+    var TRASHSTR = {
+        'pt-PT': {
+            trash: 'Lixo', trashEmpty: 'O Lixo está vazio.', deletedBadge: 'No Lixo', deletedOn: 'Eliminado em',
+            moveTrash: 'Mover para o Lixo', moveSelectedTrash: 'Mover rascunhos para o Lixo',
+            restore: 'Restaurar', restoreSelected: 'Restaurar selecionados',
+            trashConfirm: 'Mover «{name}» para o Lixo? Poderá restaurá-lo mais tarde.',
+            trashSelectedConfirm: 'Mover {n} rascunho(s) selecionado(s) para o Lixo? Poderá restaurá-los mais tarde.',
+            trashOk: '{n} rascunho(s) movido(s) para o Lixo.', restoredOk: '{n} documento(s) restaurado(s).',
+            trashDraftOnly: 'Só os documentos arquivados como rascunho podem ser movidos para o Lixo.',
+            protectedCannotTrash: 'Este rascunho está protegido. Retire a proteção antes de o mover para o Lixo.',
+            protect: 'Proteger documento', unprotect: 'Retirar proteção', protectedBadge: 'Protegido',
+            protectConfirm: 'Proteger apenas «{name}» contra alterações e eliminação?',
+            unprotectConfirm: 'Retirar a proteção de «{name}»?',
+            protectedOk: 'Proteção aplicada apenas a este documento.', unprotectedOk: 'Proteção retirada deste documento.',
+            protectedOpened: 'Documento protegido aberto apenas para consulta.'
+        },
+        'fr-FR': {
+            trash: 'Corbeille', trashEmpty: 'La Corbeille est vide.', deletedBadge: 'Dans la Corbeille', deletedOn: 'Supprimé le',
+            moveTrash: 'Mettre à la Corbeille', moveSelectedTrash: 'Mettre les brouillons à la Corbeille',
+            restore: 'Restaurer', restoreSelected: 'Restaurer la sélection',
+            trashConfirm: 'Mettre « {name} » à la Corbeille ? Vous pourrez le restaurer plus tard.',
+            trashSelectedConfirm: 'Mettre {n} brouillon(s) sélectionné(s) à la Corbeille ? Vous pourrez les restaurer plus tard.',
+            trashOk: '{n} brouillon(s) placé(s) dans la Corbeille.', restoredOk: '{n} document(s) restauré(s).',
+            trashDraftOnly: 'Seuls les documents archivés comme brouillons peuvent être placés dans la Corbeille.',
+            protectedCannotTrash: 'Ce brouillon est protégé. Retirez sa protection avant de le mettre à la Corbeille.',
+            protect: 'Protéger le document', unprotect: 'Retirer la protection', protectedBadge: 'Protégé',
+            protectConfirm: 'Protéger uniquement « {name} » contre les modifications et la suppression ?',
+            unprotectConfirm: 'Retirer la protection de « {name} » ?',
+            protectedOk: 'La protection est appliquée uniquement à ce document.', unprotectedOk: 'La protection de ce document a été retirée.',
+            protectedOpened: 'Document protégé ouvert uniquement en consultation.'
+        },
+        'en-US': {
+            trash: 'Trash', trashEmpty: 'Trash is empty.', deletedBadge: 'In Trash', deletedOn: 'Deleted on',
+            moveTrash: 'Move to Trash', moveSelectedTrash: 'Move drafts to Trash',
+            restore: 'Restore', restoreSelected: 'Restore selected',
+            trashConfirm: 'Move “{name}” to Trash? You can restore it later.',
+            trashSelectedConfirm: 'Move {n} selected draft(s) to Trash? You can restore them later.',
+            trashOk: '{n} draft(s) moved to Trash.', restoredOk: '{n} document(s) restored.',
+            trashDraftOnly: 'Only archived draft documents can be moved to Trash.',
+            protectedCannotTrash: 'This draft is protected. Remove protection before moving it to Trash.',
+            protect: 'Protect document', unprotect: 'Remove protection', protectedBadge: 'Protected',
+            protectConfirm: 'Protect only “{name}” against changes and deletion?',
+            unprotectConfirm: 'Remove protection from “{name}”?',
+            protectedOk: 'Protection was applied only to this document.', unprotectedOk: 'Protection was removed from this document.',
+            protectedOpened: 'Protected document opened for viewing only.'
+        },
+        'es-ES': {
+            trash: 'Papelera', trashEmpty: 'La Papelera está vacía.', deletedBadge: 'En la Papelera', deletedOn: 'Eliminado el',
+            moveTrash: 'Mover a la Papelera', moveSelectedTrash: 'Mover borradores a la Papelera',
+            restore: 'Restaurar', restoreSelected: 'Restaurar seleccionados',
+            trashConfirm: '¿Mover «{name}» a la Papelera? Podrá restaurarlo más tarde.',
+            trashSelectedConfirm: '¿Mover {n} borrador(es) seleccionado(s) a la Papelera? Podrá restaurarlos más tarde.',
+            trashOk: '{n} borrador(es) movido(s) a la Papelera.', restoredOk: '{n} documento(s) restaurado(s).',
+            trashDraftOnly: 'Solo los documentos archivados como borrador pueden moverse a la Papelera.',
+            protectedCannotTrash: 'Este borrador está protegido. Quite la protección antes de moverlo a la Papelera.',
+            protect: 'Proteger documento', unprotect: 'Quitar protección', protectedBadge: 'Protegido',
+            protectConfirm: '¿Proteger únicamente «{name}» contra cambios y eliminación?',
+            unprotectConfirm: '¿Quitar la protección de «{name}»?',
+            protectedOk: 'La protección se aplicó únicamente a este documento.', unprotectedOk: 'Se quitó la protección de este documento.',
+            protectedOpened: 'Documento protegido abierto solo para consulta.'
+        }
+    };
+    Object.keys(TRASHSTR).forEach(function (l) {
+        if (STR[l]) Object.assign(STR[l], TRASHSTR[l]);
+    });
+
     function lang() {
         var l = localStorage.getItem('abeneLanguage') || 'pt-PT';
         return STR[l] ? l : 'pt-PT';
@@ -648,6 +714,7 @@
         id = String(id || 'all');
         if (id === 'all') return tr('all');
         if (id === 'done') return tr('done');
+        if (id === 'trash') return tr('trash');
         if (id.indexOf('type:') === 0) return typeLabel(id.slice(5));
         if (id.indexOf('clientpasta:') === 0) {
             var cp = id.slice(12).split('|');
@@ -1042,6 +1109,7 @@
             total: meta.total,
             documentDate: meta.documentDate,
             concluded: false,
+            protected: !!docState().protected,
             archivedAt: new Date().toISOString(),
             hasDevis: meta.hasDevis,
             hasReceipt: meta.hasReceipt,
@@ -1080,12 +1148,30 @@
         return list;
     }
 
+    function decorateArchiveEntry(e) {
+        e = Object.assign({}, e || {});
+        e.source = 'archive';
+        e.readOnlyOrigin = false;
+        return e;
+    }
     function allEntries() {
-        return loadStore().map(function (e) {
-            e.source = 'archive';
-            e.readOnlyOrigin = false;
-            return e;
-        });
+        return loadStore().filter(function (e) {
+            return e && !e.deletedAt;
+        }).map(decorateArchiveEntry);
+    }
+    function trashedEntries() {
+        return loadStore().filter(function (e) {
+            return e && !!e.deletedAt && !e.concluded;
+        }).map(decorateArchiveEntry);
+    }
+    function isTrashedEntry(e) {
+        return !!(e && e.deletedAt);
+    }
+    function isProtectedEntry(e) {
+        return !!(e && e.protected);
+    }
+    function isDeletableDraft(e) {
+        return !!(e && e.source === 'archive' && !e.readOnlyOrigin && !e.concluded && !e.deletedAt && !e.protected);
     }
     function entryDate(e) {
         if (!e) return '';
@@ -1096,7 +1182,9 @@
     function visibleEntries() {
         var folder = state.folder;
         var list;
-        if (folder.indexOf('draft:') === 0) {
+        if (folder === 'trash') {
+            list = trashedEntries();
+        } else if (folder.indexOf('draft:') === 0) {
             if (folder === 'draft:current') list = [currentSnapshot()];
             else list = versionSnapshots();
         } else {
@@ -1105,7 +1193,7 @@
         var q = (state.query || '').trim().toLowerCase();
         return list.filter(function (e) {
             var docDate = entryDate(e);
-            if (state.concludedOnly && !e.concluded) return false;
+            if (folder !== 'trash' && state.concludedOnly && !e.concluded) return false;
             if (state.type !== 'all' && e.type !== state.type) return false;
             if (state.dateFrom && (!docDate || docDate < state.dateFrom)) return false;
             if (state.dateTo && (!docDate || docDate > state.dateTo)) return false;
@@ -1157,6 +1245,7 @@
             '.arq-btn:disabled{opacity:.48;cursor:not-allowed;background:#f1f5f9;}' +
             '.arq-btn.primary{background:' + NAVY + ';color:#fff;border-color:' + NAVY + ';}' +
             '.arq-btn.gold{background:' + GOLD + ';border-color:' + GOLD + ';color:' + NAVY + ';font-weight:700;}' +
+            '.arq-btn.danger{background:#fff1f2;border-color:#be123c;color:#9f1239;font-weight:700;}' +
             '.arq-tools{display:flex;gap:8px;align-items:center;padding:8px 16px;background:#fff;border-bottom:1px solid #d9d9d9;flex-wrap:wrap;}' +
             '.arq-tool-filters,.arq-tool-actions{display:contents;}' +
             '.arq-tools input,.arq-tools select{border:1px solid #c5c5c5;padding:6px 8px;font-size:12px;min-width:180px;}' +
@@ -1195,6 +1284,8 @@
             '.arq-row .arq-meta{display:block;font-size:11px;color:#64748b;font-weight:400;}' +
             '.arq-badge{display:inline-block;font-size:10px;padding:1px 6px;border:1px solid #d1d5db;margin-right:4px;border-radius:2px;}' +
             '.arq-badge.done{border-color:#166534;color:#166534;}' +
+            '.arq-badge.protected{border-color:#92400e;color:#92400e;background:#fffbeb;}' +
+            '.arq-badge.trashed{border-color:#9f1239;color:#9f1239;background:#fff1f2;}' +
             '.arq-row.on .arq-badge{border-color:#C9A84C;color:#C9A84C;}' +
             '.arq-preview{padding:12px;display:flex;flex-direction:column;gap:8px;min-height:0;overflow:auto;}' +
             '.arq-preview iframe{flex:1;min-height:240px;border:1px solid #e5e5e5;background:#fff;width:100%;}' +
@@ -1367,6 +1458,7 @@
         list = list || visibleEntries();
         pruneSelection(list);
         var selected = selectedEntries(list);
+        var inTrash = state.folder === 'trash';
         var count = document.getElementById('arqSelectedCount');
         if (count) count.textContent = tr('selectedCount', { n: String(selected.length) });
         var allBtn = document.getElementById('arqSelectAllBtn');
@@ -1374,10 +1466,24 @@
             allBtn.disabled = !list.length;
             allBtn.setAttribute('aria-pressed', list.length && selected.length === list.length ? 'true' : 'false');
         }
-        ['arqClearSelectionBtn', 'arqDownloadSelectedBtn', 'arqPackSelectedBtn', 'arqFinalizeSelectedBtn'].forEach(function (id) {
+        ['arqClearSelectionBtn', 'arqDownloadSelectedBtn'].forEach(function (id) {
             var btn = document.getElementById(id);
             if (btn) btn.disabled = !selected.length;
         });
+        var packBtn = document.getElementById('arqPackSelectedBtn');
+        if (packBtn) packBtn.disabled = !selected.length || inTrash;
+        var finalBtn = document.getElementById('arqFinalizeSelectedBtn');
+        if (finalBtn) finalBtn.disabled = !selected.some(function (e) {
+            return e.source === 'archive' && !e.deletedAt && !e.protected;
+        }) || inTrash;
+        var trashBtn = document.getElementById('arqTrashSelectedBtn');
+        if (trashBtn) {
+            trashBtn.textContent = tr(inTrash ? 'restoreSelected' : 'moveSelectedTrash');
+            trashBtn.classList.toggle('danger', !inTrash);
+            trashBtn.disabled = inTrash
+                ? !selected.some(isTrashedEntry)
+                : !selected.some(isDeletableDraft);
+        }
     }
     function toggleSelectAll() {
         var list = visibleEntries();
@@ -1405,6 +1511,83 @@
         if (toEl) toEl.value = to;
         renderList();
         renderPreview();
+    }
+    function refreshArchiveViews() {
+        renderTree();
+        renderList();
+        renderPreview();
+    }
+    function moveDraftsToTrash(entries, ask) {
+        var eligible = (entries || []).filter(isDeletableDraft);
+        if (!eligible.length) {
+            var protectedDraft = (entries || []).some(function (e) {
+                return e && e.source === 'archive' && !e.concluded && !e.deletedAt && e.protected;
+            });
+            toast(tr(protectedDraft ? 'protectedCannotTrash' : 'trashDraftOnly'));
+            return false;
+        }
+        var message = eligible.length === 1
+            ? tr('trashConfirm', { name: eligible[0].name || tr('typeDoc') })
+            : tr('trashSelectedConfirm', { n: String(eligible.length) });
+        if (ask !== false && !confirm(message)) return false;
+        var ids = {};
+        eligible.forEach(function (e) { ids[e.id] = true; });
+        var now = new Date().toISOString();
+        var list = loadStore();
+        list.forEach(function (item) {
+            if (!ids[item.id] || item.concluded || item.protected || item.deletedAt) return;
+            item.deletedAt = now;
+            item.updatedAt = now;
+        });
+        if (!saveStore(list)) return false;
+        state.folder = 'trash';
+        state.selectedId = eligible[0].id;
+        state.selectedIds = {};
+        eligible.forEach(function (e) { state.selectedIds[e.id] = true; });
+        toast(tr('trashOk', { n: String(eligible.length) }));
+        refreshArchiveViews();
+        if (isMobileArchive()) setMobilePane('files');
+        return true;
+    }
+    function restoreTrashedEntries(entries) {
+        var eligible = (entries || []).filter(isTrashedEntry);
+        if (!eligible.length) return false;
+        var ids = {};
+        eligible.forEach(function (e) { ids[e.id] = true; });
+        var now = new Date().toISOString();
+        var list = loadStore();
+        list.forEach(function (item) {
+            if (!ids[item.id] || !item.deletedAt || item.concluded) return;
+            item.deletedAt = '';
+            item.restoredAt = now;
+            item.updatedAt = now;
+        });
+        if (!saveStore(list)) return false;
+        state.folder = 'all';
+        state.selectedId = eligible[0].id;
+        state.selectedIds = {};
+        toast(tr('restoredOk', { n: String(eligible.length) }));
+        refreshArchiveViews();
+        if (isMobileArchive()) setMobilePane('files');
+        return true;
+    }
+    function toggleEntryProtection(entry) {
+        if (!entry || entry.source !== 'archive' || entry.concluded || entry.deletedAt) return false;
+        var next = !entry.protected;
+        var key = next ? 'protectConfirm' : 'unprotectConfirm';
+        if (!confirm(tr(key, { name: entry.name || tr('typeDoc') }))) return false;
+        var list = loadStore();
+        var now = new Date().toISOString();
+        list.forEach(function (item) {
+            if (item.id !== entry.id || item.concluded || item.deletedAt) return;
+            item.protected = next;
+            item.protectedAt = next ? now : '';
+            item.updatedAt = now;
+        });
+        if (!saveStore(list)) return false;
+        toast(tr(next ? 'protectedOk' : 'unprotectedOk'));
+        refreshArchiveViews();
+        return true;
     }
     function bindArquivoEvents() {
         if (state.eventsBound) return;
@@ -1453,6 +1636,12 @@
             } else toast(tr('packEmpty'));
         };
         document.getElementById('arqFinalizeSelectedBtn').onclick = finalizeSelectedEntries;
+        document.getElementById('arqTrashSelectedBtn').onclick = function () {
+            var list = selectedEntries();
+            if (!list.length) { toast(tr('selectedEmpty')); return; }
+            if (state.folder === 'trash') restoreTrashedEntries(list);
+            else moveDraftsToTrash(list, true);
+        };
         document.getElementById('arqZipBtn').onclick = downloadSet;
         document.getElementById('arqPackBtn').onclick = function (ev) {
             if (typeof window.downloadPackContabilistaSelect === 'function') {
@@ -1629,6 +1818,7 @@
             '<button type="button" class="arq-btn primary" id="arqDownloadSelectedBtn"></button>' +
             '<button type="button" class="arq-btn gold" id="arqPackSelectedBtn"></button>' +
             '<button type="button" class="arq-btn" id="arqFinalizeSelectedBtn"></button>' +
+            '<button type="button" class="arq-btn danger" id="arqTrashSelectedBtn"></button>' +
             '</div></div>';
     }
 
@@ -1661,6 +1851,7 @@
         document.getElementById('arqDownloadSelectedBtn').textContent = tr('downloadSelected');
         document.getElementById('arqPackSelectedBtn').textContent = tr('packSelected');
         document.getElementById('arqFinalizeSelectedBtn').textContent = tr('finalizeSelected');
+        document.getElementById('arqTrashSelectedBtn').textContent = tr(state.folder === 'trash' ? 'restoreSelected' : 'moveSelectedTrash');
         var packBtn = document.getElementById('arqPackBtn');
         if (packBtn) packBtn.textContent = tr('packAcct');
         var nc = document.getElementById('arqNewClientBtn');
@@ -1735,12 +1926,14 @@
     }
     function renderTree() {
         var items = allEntries();
+        var trashItems = trashedEntries();
         var clients = catalogClients();
         var pastas = catalogPastas();
         var years = unique(items.map(function (e) { return entryDate(e).slice(0, 4); }).filter(Boolean));
         var html = '';
         html += treeBtn('all', tr('all'), items.length);
         html += treeBtn('done', tr('done'), items.filter(function (e) { return e.concluded; }).length);
+        html += treeBtn('trash', tr('trash'), trashItems.length);
         html += '<details open><summary>' + esc(tr('byType')) + '</summary>';
         ['relatorio', 'orcamento', 'recibo', 'completo', 'documento'].forEach(function (tp) {
             var n = items.filter(function (e) { return e.type === tp; }).length;
@@ -1831,7 +2024,7 @@
         renderCrumb();
         var box = document.getElementById('arqList');
         if (!list.length) {
-            box.innerHTML = '<p class="arq-hint" style="padding:12px;">' + esc(tr('empty')) + '</p>';
+            box.innerHTML = '<p class="arq-hint" style="padding:12px;">' + esc(tr(state.folder === 'trash' ? 'trashEmpty' : 'empty')) + '</p>';
             renderSelectionBar(list);
             return;
         }
@@ -1840,13 +2033,17 @@
             var checked = !!state.selectedIds[e.id];
             var date = entryDate(e);
             var archived = normalizeEntryDate(e.archivedAt);
+            var deleted = normalizeEntryDate(e.deletedAt);
             var dateMeta = date ? (tr('documentDate') + ': ' + date) : '';
             if (archived && archived !== date) dateMeta += (dateMeta ? ' · ' : '') + tr('archiveDate') + ': ' + archived;
+            if (deleted) dateMeta += (dateMeta ? ' · ' : '') + tr('deletedOn') + ': ' + deleted;
             return '<div class="arq-row-wrap' + (checked ? ' selected' : '') + '" data-id="' + esc(e.id) + '">' +
                 '<label class="arq-row-select"><input type="checkbox" class="arq-select-cb" data-id="' + esc(e.id) + '"' + (checked ? ' checked' : '') + ' aria-label="' + esc(tr('selectAll') + ': ' + e.name) + '" /></label>' +
                 '<button type="button" class="arq-row' + on + '" data-id="' + esc(e.id) + '">' +
                 '<span class="arq-badge' + (e.concluded ? ' done' : '') + '">' + esc(e.concluded ? tr('concluded') : tr('notDone')) + '</span>' +
                 (e.sentToClient ? '<span class="arq-badge">' + esc(tr('sentBadge')) + '</span>' : '') +
+                (e.protected ? '<span class="arq-badge protected">🔒 ' + esc(tr('protectedBadge')) + '</span>' : '') +
+                (e.deletedAt ? '<span class="arq-badge trashed">' + esc(tr('deletedBadge')) + '</span>' : '') +
                 '<span class="arq-badge">' + esc(typeLabel(e.type)) + '</span>' +
                 esc(e.name) +
                 '<span class="arq-meta">' + esc([e.client || tr('noClient'), e.pasta || tr('none'), dateMeta, e.number].filter(Boolean).join(' · ')) + '</span>' +
@@ -1881,7 +2078,7 @@
         if (id.indexOf('ver-') === 0) {
             return versionSnapshots().filter(function (v) { return v.id === id; })[0] || null;
         }
-        return allEntries().filter(function (e) { return e.id === id; })[0] || null;
+        return allEntries().concat(trashedEntries()).filter(function (e) { return e.id === id; })[0] || null;
     }
     function previewDoc(html) {
         return '<!DOCTYPE html><html><head><meta charset="utf-8"><style>' +
@@ -1940,17 +2137,35 @@
         var canRel = !!e.hasReport && partHasContent(e.html, 'relatorio');
         var canOrc = !!e.hasDevis && partHasContent(e.html, 'orcamento');
         var canRec = !!e.hasReceipt && partHasContent(e.html, 'recibo');
-        var actions = '<div class="arq-actions">' +
-            '<button type="button" class="arq-btn primary" data-act="open">' + esc(e.concluded ? tr('openView') : tr('openModify')) + '</button>' +
-            '<button type="button" class="arq-btn gold" data-act="copy">' + esc(tr('copyAsNew')) + '</button>' +
-            (canRel ? '<button type="button" class="arq-btn" data-act="copy-rel">' + esc(tr('copyRel')) + '</button>' : '') +
-            (canOrc ? '<button type="button" class="arq-btn" data-act="copy-orc">' + esc(tr('copyOrc')) + '</button>' : '') +
-            (canRec ? '<button type="button" class="arq-btn" data-act="copy-rec">' + esc(tr('copyRec')) + '</button>' : '') +
-            '<button type="button" class="arq-btn" data-act="dl">' + esc(tr('dlOne')) + '</button>' +
-            (!e.readOnlyOrigin && !e.concluded ? '<button type="button" class="arq-btn" data-act="toggle">' + esc(tr('markDone')) + '</button>' : '') +
-            '</div>';
+        var trashed = isTrashedEntry(e);
+        var protectedEntry = isProtectedEntry(e);
+        var actions;
+        if (trashed) {
+            actions = '<div class="arq-actions">' +
+                '<button type="button" class="arq-btn gold" data-act="restore">' + esc(tr('restore')) + '</button>' +
+                '<button type="button" class="arq-btn" data-act="dl">' + esc(tr('dlOne')) + '</button>' +
+                '</div>';
+        } else {
+            actions = '<div class="arq-actions">' +
+                '<button type="button" class="arq-btn primary" data-act="open">' + esc((e.concluded || protectedEntry) ? tr('openView') : tr('openModify')) + '</button>' +
+                '<button type="button" class="arq-btn gold" data-act="copy">' + esc(tr('copyAsNew')) + '</button>' +
+                (canRel ? '<button type="button" class="arq-btn" data-act="copy-rel">' + esc(tr('copyRel')) + '</button>' : '') +
+                (canOrc ? '<button type="button" class="arq-btn" data-act="copy-orc">' + esc(tr('copyOrc')) + '</button>' : '') +
+                (canRec ? '<button type="button" class="arq-btn" data-act="copy-rec">' + esc(tr('copyRec')) + '</button>' : '') +
+                '<button type="button" class="arq-btn" data-act="dl">' + esc(tr('dlOne')) + '</button>' +
+                (!e.readOnlyOrigin && !e.concluded
+                    ? '<button type="button" class="arq-btn" data-act="protect">' + esc(tr(protectedEntry ? 'unprotect' : 'protect')) + '</button>'
+                    : '') +
+                (!e.readOnlyOrigin && !e.concluded && !protectedEntry
+                    ? '<button type="button" class="arq-btn" data-act="toggle">' + esc(tr('markDone')) + '</button>'
+                    : '') +
+                (!e.readOnlyOrigin && !e.concluded
+                    ? '<button type="button" class="arq-btn danger" data-act="trash"' + (protectedEntry ? ' disabled title="' + esc(tr('protectedCannotTrash')) + '"' : '') + '>' + esc(tr('moveTrash')) + '</button>'
+                    : '') +
+                '</div>';
+        }
         var form = '';
-        if (!e.readOnlyOrigin && !e.concluded) {
+        if (!e.readOnlyOrigin && !e.concluded && !protectedEntry && !trashed) {
             form = '<div class="arq-form">' +
                 '<label>' + esc(tr('client')) + '<input id="arqEditClient" value="' + esc(e.client) + '" /></label>' +
                 '<label>' + esc(tr('pasta')) + '<input id="arqEditPasta" value="' + esc(e.pasta) + '" /></label>' +
@@ -1959,9 +2174,9 @@
                 '</div>';
         }
         var pdfBtns = '<div class="arq-actions">' +
-            (canRel ? '<button type="button" class="arq-btn gold" data-act="final-relatorio">' + esc(tr('pdfGravarRel')) + '</button>' : '') +
-            (canOrc ? '<button type="button" class="arq-btn gold" data-act="final-orcamento">' + esc(tr('pdfGravarOrc')) + '</button>' : '') +
-            (canRec ? '<button type="button" class="arq-btn gold" data-act="final-recibo">' + esc(tr('pdfGravarRec')) + '</button>' : '') +
+            (!trashed && !protectedEntry && canRel ? '<button type="button" class="arq-btn gold" data-act="final-relatorio">' + esc(tr('pdfGravarRel')) + '</button>' : '') +
+            (!trashed && !protectedEntry && canOrc ? '<button type="button" class="arq-btn gold" data-act="final-orcamento">' + esc(tr('pdfGravarOrc')) + '</button>' : '') +
+            (!trashed && !protectedEntry && canRec ? '<button type="button" class="arq-btn gold" data-act="final-recibo">' + esc(tr('pdfGravarRec')) + '</button>' : '') +
             '</div>';
         var tab = state.previewTab === 'pdf' ? 'pdf' : 'doc';
         box.innerHTML = '<h3>' + esc(tr('preview')) + ' — ' + esc(e.name) + '</h3>' +
@@ -2217,7 +2432,9 @@
     function finalizeSelectedEntries() {
         var chosen = selectedEntries();
         if (!chosen.length) { toast(tr('selectedEmpty')); return; }
-        var list = chosen.filter(function (e) { return !e.readOnlyOrigin && e.source === 'archive'; });
+        var list = chosen.filter(function (e) {
+            return !e.readOnlyOrigin && e.source === 'archive' && !e.deletedAt && !e.protected;
+        });
         if (!list.length) { toast(tr('finalizeArchiveOnly')); return; }
         if (!confirm(tr('finalizeConfirm', { n: String(list.length) }))) return;
         toast(tr('finalizeBusy', { n: String(list.length) }));
@@ -2239,12 +2456,29 @@
     }
     function runAction(act, e) {
         if (act === 'open') {
+            if (e.deletedAt) return;
             if (e.concluded) {
                 if (!confirm(tr('confirmOpenFinal'))) return;
                 if (applyToEditor(e.html, e.name, false, true)) toast(tr('openedFinalHint'));
                 return;
             }
+            if (e.protected) {
+                if (applyToEditor(e.html, e.name, false, true)) toast(tr('protectedOpened'));
+                return;
+            }
             if (applyToEditor(e.html, e.name, false)) toast(tr('opened'));
+            return;
+        }
+        if (act === 'trash') {
+            moveDraftsToTrash([e], true);
+            return;
+        }
+        if (act === 'restore') {
+            restoreTrashedEntries([e]);
+            return;
+        }
+        if (act === 'protect') {
+            toggleEntryProtection(e);
             return;
         }
         if (act === 'copy') {
@@ -2315,9 +2549,9 @@
     function upsertArchiveEntry(entry) {
         var list = loadStore();
         var existing = list.filter(function (e) {
-            return e.name === entry.name && (e.client || '') === (entry.client || '') && e.type === entry.type;
+            return !e.deletedAt && e.name === entry.name && (e.client || '') === (entry.client || '') && e.type === entry.type;
         })[0];
-        if (existing && existing.concluded) existing = null;
+        if (existing && (existing.concluded || existing.protected)) existing = null;
         if (existing) {
             existing.html = entry.html;
             existing.concluded = entry.concluded;
@@ -2376,6 +2610,8 @@
             total: meta.total,
             documentDate: meta.documentDate,
             concluded: concluded || meta.type === 'completo',
+            protected: !(concluded || meta.type === 'completo') && !!snap.protected,
+            protectedAt: (!(concluded || meta.type === 'completo') && snap.protected) ? new Date().toISOString() : '',
             archivedAt: new Date().toISOString(),
             hasDevis: meta.hasDevis,
             hasReceipt: meta.hasReceipt,
@@ -2463,6 +2699,7 @@
         var num = String(meta.number || '').trim();
         var client = String(meta.client || '').trim().toLowerCase();
         list.forEach(function (item) {
+            if (item.deletedAt) return;
             if (item.concluded) return;
             var matchNum = num && String(item.number || '') === num;
             var matchClient = client && String(item.client || '').toLowerCase() === client;
@@ -2486,6 +2723,8 @@
                 total: snap.total,
                 documentDate: snap.documentDate,
                 concluded: false,
+                protected: !!snap.protected,
+                protectedAt: snap.protected ? new Date().toISOString() : '',
                 sentToClient: true,
                 sentAt: new Date().toISOString(),
                 archivedAt: new Date().toISOString(),
@@ -2510,6 +2749,7 @@
     window.abeneArquivoApi = {
         visibleEntries: function () { return visibleEntries(); },
         allEntries: function () { return allEntries(); },
+        trashedEntries: function () { return trashedEntries(); },
         currentSnapshot: currentSnapshot,
         listFinals: listFinals,
         gravarEtape: gravarEtape,
@@ -2524,6 +2764,14 @@
         saveLastJob: saveLastJob,
         markSentToClient: markSentToClient
     };
+    window.addEventListener('abene:languagechange', function () {
+        var overlay = document.getElementById('arqOverlay');
+        if (!overlay) return;
+        fillChrome();
+        renderTree();
+        renderList();
+        renderPreview();
+    });
     window.addEventListener('online', function () { retryUnsyncedFinals(); });
     setTimeout(function () { retryUnsyncedFinals(); }, 1600);
 })();

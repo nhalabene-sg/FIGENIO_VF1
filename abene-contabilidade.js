@@ -572,6 +572,7 @@
         } else if (!limited && api && typeof api.currentSnapshot === 'function') {
             entries = [api.currentSnapshot()];
         }
+        entries = entries.filter(function (e) { return e && !e.deletedAt; });
         var papers = [];
         var seen = {};
         entries.forEach(function (e) {

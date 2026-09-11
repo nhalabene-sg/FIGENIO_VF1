@@ -7593,6 +7593,7 @@
             if (typeof applyUiLanguage === 'function') applyUiLanguage(normalized);
             if (typeof updateSaveStatus === 'function') updateSaveStatus();
             applyBrandChrome();
+            window.dispatchEvent(new CustomEvent('abene:languagechange', { detail: { language: normalized } }));
         }
 
         function applyBrandChrome() {
@@ -11779,12 +11780,12 @@ table { border-collapse: collapse; }
     <script src="libs/abene-export.js?v=20260909-layout-visibility-10"></script>
     <script src="libs/abene-modelo.js"></script>
     <script src="libs/abene-comercial.js?v=20260909-p0p5-final-3"></script>
-    <script src="libs/abene-contabilidade.js?v=20260910-accountant-professional-7"></script>
-    <script src="libs/abene-arquivo.js?v=20260909-period-selection-6"></script>
+    <script src="libs/abene-contabilidade.js?v=20260911-trash-protection-1"></script>
+    <script src="libs/abene-arquivo.js?v=20260911-trash-protection-2"></script>
     <script src="libs/abene-phone.js?v=20260909-mobile-professional-4"></script>
     <script src="libs/abene-excel-engine.js"></script>
     <script src="libs/abene-excel.js?v=20260910-sheet-mobile-api-1"></script>
-    <script src="libs/abene-sheets.js?v=20260910-sheet-mobile-api-1"></script>
+    <script src="libs/abene-sheets.js?v=20260911-trash-protection-1"></script>
     <script src="libs/abene-collab.js?v=20260909-p0p5-final-3"></script>
     <script src="libs/abene-gdocs.js?v=20260909-p0p5-final-3"></script>
     <script src="libs/abene-pickers.js"></script>

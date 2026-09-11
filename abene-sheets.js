@@ -231,6 +231,7 @@
         });
         (arquivo || []).forEach(function (e) {
             if (!e) return;
+            if (e.deletedAt) return;
             if (e.client) add('client', e.client, '');
             if (e.pasta) add('pasta', e.pasta, e.client || '');
         });
