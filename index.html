@@ -1139,6 +1139,65 @@
             box-sizing: border-box;
         }
         .abene-pic img { max-width: 100%; height: auto; display: block; pointer-events: none; }
+        .abene-pic > .abene-caption,
+        .abene-pic > [data-caption-for] {
+            display: block;
+            pointer-events: auto;
+            cursor: text;
+            width: 100%;
+            margin: 4pt 0 0;
+            user-select: text;
+        }
+        .abene-crop-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 4300;
+            cursor: crosshair;
+            background: transparent;
+        }
+        .abene-crop-rect {
+            position: fixed;
+            box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.45);
+            border: 1px solid #fff;
+            box-sizing: border-box;
+            cursor: move;
+        }
+        .abene-crop-rect span {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background: #fff;
+            border: 1px solid #2b579a;
+            box-sizing: border-box;
+        }
+        .abene-crop-rect [data-c="nw"] { left: -5px; top: -5px; cursor: nwse-resize; }
+        .abene-crop-rect [data-c="ne"] { right: -5px; top: -5px; cursor: nesw-resize; }
+        .abene-crop-rect [data-c="sw"] { left: -5px; bottom: -5px; cursor: nesw-resize; }
+        .abene-crop-rect [data-c="se"] { right: -5px; bottom: -5px; cursor: nwse-resize; }
+        #abeneCropBar {
+            position: fixed;
+            z-index: 4310;
+            display: flex;
+            gap: 6px;
+            align-items: center;
+            background: #fff;
+            border: 1px solid #d0d0d0;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            padding: 6px 8px;
+            border-radius: 6px;
+            font: 12px/1.3 'Segoe UI', sans-serif;
+            color: #323130;
+        }
+        #abeneCropBar[hidden] { display: none !important; }
+        #abeneCropBar button {
+            background: #f0f0f0;
+            border: 1px solid #d0d0d0;
+            padding: 5px 10px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 11px;
+        }
+        #abeneCropBar button:hover { background: #d0e0f0; }
         .abene-obj-left { float: left; margin: 0 12px 8px 0; }
         .abene-obj-right { float: right; margin: 0 0 8px 12px; }
         .abene-obj-center { display: block; float: none; margin: 12px auto; }
@@ -1611,6 +1670,8 @@
             flex-wrap: wrap;
             max-width: min(760px, calc(100vw - 16px));
             align-items: center;
+            max-height: calc(100vh - 24px);
+            overflow: auto;
         }
 
         .image-toolbar.visible {
@@ -2674,6 +2735,56 @@
             padding-bottom: 10px;
             border-bottom: 3px solid #c9a84c;
         }
+        .page [data-abene-lock="1"] { cursor: default; }
+        .page .abene-fill {
+            min-height: 2.4em;
+            margin: 6px 0 14px;
+            padding: 8px 10px;
+            border: 1px dashed #c5cdd6;
+            background: #f8fafc;
+            color: #4b5563;
+        }
+        .page .abene-fill-hint {
+            font-size: 10pt;
+            font-style: italic;
+            color: #5b7aa8;
+            margin: 4px 0 12px;
+        }
+        .page .abene-rev-table,
+        .page .abene-check-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 8px 0 18px;
+            font-size: 10.5pt;
+        }
+        .page .abene-rev-table th,
+        .page .abene-rev-table td,
+        .page .abene-check-table th,
+        .page .abene-check-table td {
+            border: 1px solid #c5cdd6;
+            padding: 6px 8px;
+            text-align: left;
+            vertical-align: top;
+        }
+        .page .abene-rev-table th,
+        .page .abene-check-table th {
+            background: #eef3f5;
+            font-weight: 700;
+            color: #243746;
+        }
+        .abene-signs-tech .abene-sign-line { margin-top: 0; }
+        .abene-sign-space {
+            min-height: 56px;
+            border-bottom: 1px solid #333;
+            margin-top: 28px;
+        }
+        .abene-sign-role,
+        .abene-sign-date {
+            text-align: center;
+            font-size: 9.5pt;
+            color: #555;
+            margin-top: 4px;
+        }
 
         #tab-modelo.ribbon-content { gap: 4px; padding-left: 6px; padding-right: 6px; }
         #tab-modelo .modelo-group { padding-right: 6px; }
@@ -3113,6 +3224,7 @@
             @page { margin: 0; }
             .title-bar, .menu-bar, .ribbon, .ruler-area, .status-bar, .nav-panel,
             .image-toolbar, .table-toolbar, .find-replace-panel, .vertical-ruler,
+            .abene-crop-overlay, #abeneCropBar,
             .toast-container, .comments-pane, #fileMenu, .dropdown-menu, .context-menu,
             .header-badge, .footer-badge, .header-boundary-line, .footer-boundary-line,
             .hf-tab, .hf-rule, .page-gap-band,
@@ -3129,6 +3241,12 @@
             }
             .abene-tbox-bar, .abene-obj-resize, .abene-obj-on { outline: none; }
             .abene-tbox-bar, .abene-obj-resize { display: none !important; }
+            .page .abene-fill {
+                border: none !important;
+                background: transparent !important;
+                padding: 0 !important;
+                color: inherit !important;
+            }
             .abene-tbox { border-color: #333; box-shadow: none; }
             body:not(.abene-printing) .abene-page-flow {
                 height: 0 !important;
@@ -3319,6 +3437,32 @@
         .abene-export-root .selected { display: none !important; }
         .abene-export-root .abene-obj-on,
         .abene-export-root img.selected { outline: none !important; }
+        .abene-export-root .abene-fill {
+            border: none !important;
+            background: transparent !important;
+            padding: 0 !important;
+            color: inherit !important;
+        }
+        .abene-export-root .abene-fill-hint { font-style: italic; color: #5b7aa8; }
+        .abene-export-root .abene-caption,
+        .abene-export-root .abene-pic > .abene-caption {
+            display: block !important;
+            text-align: center;
+            font-style: italic;
+            font-size: 10pt;
+            pointer-events: none;
+        }
+        .abene-export-root .abene-cover {
+            min-height: var(--write-h, 931px) !important;
+            height: var(--write-h, 931px) !important;
+            break-inside: avoid !important;
+        }
+        .abene-export-root .abene-rev-table,
+        .abene-export-root .abene-check-table,
+        .abene-export-root .abene-tp-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
         .abene-export-sheet {
             background: #fff;
             box-sizing: border-box;
@@ -5836,6 +5980,10 @@
                         <span class="icon">✎</span>
                         <span data-i18n="mdlMeta">Dados do relatório</span>
                     </button>
+                    <button class="ribbon-btn" onclick="applyModeloPreset('tech')">
+                        <span class="icon">📑</span>
+                        <span data-i18n="mdlPresetTech">Modelo relatório técnico</span>
+                    </button>
                     <button class="ribbon-btn" onclick="applyModeloPreset('letter')">
                         <span class="icon">✉</span>
                         <span data-i18n="mdlPresetLetter">Modelo carta</span>
@@ -6319,8 +6467,14 @@
     <!-- Image Toolbar -->
     <div class="image-toolbar" id="imageToolbar">
         <div class="image-toolbar-title" data-i18n="imgFormatTitle">Formatar imagem — clique na imagem, depois escolha a disposição</div>
-        <label data-i18n="imgWidth">Largura: <input type="number" id="imgWidth" onchange="resizeSelectedImage('w')"></label>
-        <label data-i18n="imgHeight">Altura: <input type="number" id="imgHeight" onchange="resizeSelectedImage('h')"></label>
+        <button type="button" onclick="closeImageToolbar()" title="Fermer">✕</button>
+        <label data-i18n="imgWidth">Largura: <input type="number" id="imgWidth" min="20" onchange="resizeSelectedImage('w')"></label>
+        <label data-i18n="imgHeight">Altura: <input type="number" id="imgHeight" min="20" onchange="resizeSelectedImage('h')"></label>
+        <label title="Conserver les proportions"><input type="checkbox" id="imgKeepRatio" checked style="width:auto"> 🔗</label>
+        <button type="button" onclick="setImageSizePercent(25)">25%</button>
+        <button type="button" onclick="setImageSizePercent(50)">50%</button>
+        <button type="button" onclick="setImageSizePercent(75)">75%</button>
+        <button type="button" onclick="setImageSizePercent(100)">100%</button>
         <button type="button" data-wrap="none" onclick="setImageWrap('none')" data-i18n="objInline">Com o texto</button>
         <button type="button" data-wrap="left" onclick="setImageWrap('left')" data-i18n="objLeft">À esquerda</button>
         <button type="button" data-wrap="right" onclick="setImageWrap('right')" data-i18n="objRight">À direita</button>
@@ -6330,12 +6484,24 @@
         <button type="button" data-wrap="free" onclick="setImageWrap('free')" data-i18n="objFree">Livre (arrastar)</button>
         <button type="button" data-wrap="behind" onclick="setImageWrap('behind')" data-i18n="objBehind">Atrás do texto</button>
         <button type="button" data-wrap="front" onclick="setImageWrap('front')" data-i18n="objFront">À frente do texto</button>
+        <button type="button" onclick="nudgeSelectedImage(-5,0)" title="Déplacer à gauche">←</button>
+        <button type="button" onclick="nudgeSelectedImage(5,0)" title="Déplacer à droite">→</button>
+        <button type="button" onclick="nudgeSelectedImage(0,-5)" title="Déplacer vers le haut">↑</button>
+        <button type="button" onclick="nudgeSelectedImage(0,5)" title="Déplacer vers le bas">↓</button>
         <button type="button" onclick="insertCaption()" data-i18n="caption">Legenda</button>
+        <button type="button" onclick="abeneRotateImage(-90)" data-i18n="imgRotateL">Rodar ←</button>
+        <button type="button" onclick="abeneRotateImage(90)" data-i18n="imgRotateR">Rodar →</button>
+        <button type="button" onclick="abeneStartCrop()" data-i18n="imgCrop">Recortar</button>
         <button type="button" onclick="addImageBorder()" data-i18n="imgBorder">Limite</button>
         <button type="button" onclick="addImageShadow()" data-i18n="imgShadow">Sombra</button>
         <button type="button" onclick="addImageRounded()" data-i18n="imgRound">Arredondado</button>
         <button type="button" onclick="resetImageStyle()" data-i18n="imgReset">Repor</button>
         <button type="button" onclick="deleteSelectedImage()" style="color: red;" data-i18n="imgDelete">🗑 Eliminar</button>
+    </div>
+    <div id="abeneCropBar" hidden>
+        <span data-i18n="imgCropHint">Arraste a área a manter</span>
+        <button type="button" onclick="abeneApplyCrop()" data-i18n="imgCropOk">Aplicar</button>
+        <button type="button" onclick="abeneCancelCrop()" data-i18n="imgCropCancel">Cancelar</button>
     </div>
     <div id="imageHandles" aria-hidden="true">
         <span class="image-handle" data-handle="nw"></span><span class="image-handle" data-handle="n"></span><span class="image-handle" data-handle="ne"></span>
@@ -7031,7 +7197,7 @@
     <input type="file" id="imageInput" style="display:none" accept="image/*" multiple onchange="handleImageUpload(event)">
     <input type="file" id="excelFileInput" style="display:none" accept=".xlsx,.csv,.txt">
 
-    <script src="libs/abene-i18n.js?v=20260914-hf-section-1"></script>
+    <script src="libs/abene-i18n.js?v=20260914-relatorio-tec-1"></script>
     <script src="libs/abene-tips.js"></script>
     <script src="libs/abene-page-geometry.js"></script>
     <script>
@@ -8933,21 +9099,47 @@
             if (!selectedImage) return;
             const w = parseInt(document.getElementById('imgWidth').value);
             const h = parseInt(document.getElementById('imgHeight').value);
+            const keepRatio = document.getElementById('imgKeepRatio');
+            const ratio = selectedImage.offsetWidth / Math.max(1, selectedImage.offsetHeight);
             if (dim === 'w') {
+                if (!isFinite(w) || w < 20) return;
                 selectedImage.style.width = w + 'px';
-                selectedImage.style.height = 'auto';
-                document.getElementById('imgHeight').value = selectedImage.offsetHeight;
+                selectedImage.style.height = keepRatio && !keepRatio.checked ? Math.max(20, h) + 'px' : 'auto';
             } else {
+                if (!isFinite(h) || h < 20) return;
                 selectedImage.style.height = h + 'px';
-                selectedImage.style.width = 'auto';
-                document.getElementById('imgWidth').value = selectedImage.offsetWidth;
+                if (keepRatio && keepRatio.checked) selectedImage.style.width = Math.max(20, Math.round(h * ratio)) + 'px';
             }
+            selectedImage.style.maxWidth = '100%';
+            const picture = selectedImage.closest && selectedImage.closest('.abene-pic');
+            if (picture) picture.style.width = selectedImage.offsetWidth + 'px';
+            document.getElementById('imgWidth').value = Math.round(selectedImage.offsetWidth);
+            document.getElementById('imgHeight').value = Math.round(selectedImage.offsetHeight);
             saveUndoState();
             positionImageHandles();
         }
 
+        function setImageSizePercent(percent) {
+            if (!selectedImage) return;
+            const available = Math.max(100, editor.clientWidth - 24);
+            selectedImage.style.width = Math.round(available * Math.max(10, Math.min(100, percent)) / 100) + 'px';
+            selectedImage.style.height = 'auto';
+            selectedImage.style.maxWidth = '100%';
+            const picture = selectedImage.closest && selectedImage.closest('.abene-pic');
+            if (picture) picture.style.width = selectedImage.style.width;
+            showImageToolbar({ clientX: 0, clientY: 0 });
+            saveUndoState();
+        }
+
         function setImageWrap(type) {
             if (!selectedImage) return;
+            let objectWrap = selectedImage.closest && selectedImage.closest('.abene-pic');
+            if (!objectWrap && window.ABENE && window.ABENE.Images && typeof window.ABENE.Images.wrapOne === 'function') objectWrap = window.ABENE.Images.wrapOne(selectedImage);
+            if (objectWrap && window.ABENE && window.ABENE.Images && typeof window.ABENE.Images.applyWrap === 'function') {
+                window.ABENE.Images.applyWrap(objectWrap, type);
+                showImageToolbar({ clientX: 0, clientY: 0 });
+                return;
+            }
             selectedImage.classList.remove('float-left', 'float-right', 'center');
             selectedImage.style.float = '';
             selectedImage.style.display = '';
@@ -8975,6 +9167,28 @@
                 selectedImage.style.border = '2px solid #333';
             }
             saveUndoState();
+        }
+
+        function nudgeSelectedImage(dx, dy) {
+            if (!selectedImage) return;
+            let picture = selectedImage.closest && selectedImage.closest('.abene-pic');
+            if (!picture || !/^(free|behind|front)$/.test(picture.getAttribute('data-wrap') || '')) {
+                setImageWrap('free');
+                picture = selectedImage.closest && selectedImage.closest('.abene-pic');
+            }
+            if (!picture) return;
+            picture.style.left = Math.max(0, (parseFloat(picture.style.left) || 0) + dx) + 'px';
+            picture.style.top = Math.max(0, (parseFloat(picture.style.top) || 0) + dy) + 'px';
+            picture.setAttribute('data-abene-dx', String((Number(picture.getAttribute('data-abene-dx')) || 0) + dx));
+            picture.setAttribute('data-abene-dy', String((Number(picture.getAttribute('data-abene-dy')) || 0) + dy));
+            positionImageHandles();
+            saveUndoState();
+        }
+
+        function closeImageToolbar() {
+            const toolbar = document.getElementById('imageToolbar');
+            if (toolbar) toolbar.classList.remove('visible');
+            hideImageHandles();
         }
 
         function addImageShadow() {
@@ -10608,6 +10822,25 @@ table { border-collapse: collapse; }
             });
             let blob;
             try {
+                if (window.ABENE && window.ABENE.Export && typeof window.ABENE.Export.buildDocxSections === 'function') {
+                    try {
+                        var secBlob = await window.ABENE.Export.buildDocxSections({
+                            Document: Document, Packer: Packer, Header: Header, Footer: Footer,
+                            Paragraph: Paragraph, TextRun: TextRun, Table: Table, TableRow: TableRow,
+                            TableCell: TableCell, WidthType: WidthType, AlignmentType: AlignmentType,
+                            PageNumber: PageNumber, PageOrientation: PageOrientation, ImageRun: ImageRun,
+                            children: children, logoRun: logoRun,
+                            pageSize: pageSize, pageMargins: pageMargins, pageOrientation: pageOrientation,
+                            pxToTwip: pxToTwip,
+                            headerTpl: tpl, headerFields: fields, headerText: pageHeaderText,
+                            footerText: pageFooterText, companyName: coName
+                        });
+                        if (secBlob) return secBlob;
+                    } catch (eSec) {}
+                }
+                for (var ci = children.length - 1; ci >= 0; ci--) {
+                    if (children[ci] && children[ci]._abeneSection) children.splice(ci, 1);
+                }
                 const doc = new Document({
                     sections: [{
                         properties: {
@@ -12146,19 +12379,19 @@ table { border-collapse: collapse; }
             } catch (e) {}
         }, 12000);
     </script>
-    <script src="libs/abene-word-home.js?v=20260914-sections-1"></script>
+    <script src="libs/abene-word-home.js?v=20260914-hf-section-1"></script>
     <script src="libs/abene-pagination-engine.js?v=20260908-layout-visibility-2"></script>
-    <script src="libs/abene-sections.js?v=20260914-sections-1"></script>
-    <script src="libs/abene-toolbar.js?v=20260914-sections-1"></script>
+    <script src="libs/abene-sections.js?v=20260914-hf-section-1"></script>
+    <script src="libs/abene-toolbar.js?v=20260914-img-crop-1"></script>
     <script src="libs/abene-commands.js"></script>
     <script src="libs/abene-notes.js"></script>
-    <script src="libs/abene-objects.js?v=20260914-captions-toc-1"></script>
+    <script src="libs/abene-objects.js?v=20260914-image-format-2"></script>
     <script src="libs/abene-modals.js"></script>
     <script src="libs/abene-tables.js"></script>
     <script src="libs/abene-document.js"></script>
     <script src="libs/abene-history.js"></script>
-    <script src="libs/abene-export.js?v=20260909-layout-visibility-10"></script>
-    <script src="libs/abene-modelo.js?v=20260914-sections-1"></script>
+    <script src="libs/abene-export.js?v=20260914-relatorio-export-1"></script>
+    <script src="libs/abene-modelo.js?v=20260914-relatorio-tec-1"></script>
     <script src="libs/abene-comercial.js?v=20260909-p0p5-final-3"></script>
     <script src="libs/abene-contabilidade.js?v=20260911-trash-protection-1"></script>
     <script src="libs/abene-arquivo.js?v=20260911-trash-protection-2"></script>
