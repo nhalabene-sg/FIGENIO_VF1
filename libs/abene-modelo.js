@@ -95,6 +95,7 @@
         out.ref = grab('[data-abene-field="ref"]');
         out.date = grab('[data-abene-field="date"]');
         out.client = grab('[data-abene-field="client"]');
+        out.clientNif = grab('[data-abene-field="clientNif"]');
         out.site = grab('[data-abene-field="site"]');
         out.tech = grab('[data-abene-field="tech"]');
         out.version = grab('[data-abene-field="version"]');
@@ -125,6 +126,7 @@
             ref: stored.ref || prev.ref || (insp ? 'GR-INSP-' + y + '-001' : 'GR-RAP-' + y + '-001'),
             date: stored.date || prev.date || iso,
             client: stored.client || prev.client || tt('mdlClientDef') || 'Cliente',
+            clientNif: stored.clientNif || prev.clientNif || '',
             site: stored.site || prev.site || tt('mdlSiteDef') || 'Obra / local',
             tech: stored.tech || prev.tech || tt('mdlTechDef') || 'Técnico responsável',
             version: stored.version || prev.version || '1.0',
@@ -208,6 +210,7 @@
             idRow(tt('mdlFieldRef'), 'ref', meta.ref) +
             idRow(tt('mdlFieldDate'), 'date', meta.date) +
             idRow(tt('mdlFieldClient'), 'client', meta.client) +
+            idRow(tt('mdlFieldClientNif') || tt('taxId') || 'NIF', 'clientNif', meta.clientNif || '') +
             idRow(tt('mdlFieldSite'), 'site', meta.site) +
             idRow(tt('mdlFieldVersion'), 'version', meta.version) +
             idRow(tt('mdlFieldTech'), 'tech', meta.tech) +
@@ -289,6 +292,7 @@
             idRow(tt('mdlFieldRef'), 'ref', meta.ref) +
             idRow(tt('mdlFieldDate'), 'date', meta.date) +
             idRow(tt('mdlFieldClient'), 'client', meta.client) +
+            idRow(tt('mdlFieldClientNif') || tt('taxId') || 'NIF', 'clientNif', meta.clientNif || '') +
             idRow(tt('mdlFieldSite'), 'site', meta.site) +
             idRow(tt('mdlFieldTech'), 'tech', meta.tech) +
             idRow(tt('mdlFieldVersion'), 'version', meta.version) +
@@ -298,30 +302,56 @@
             heading(2, tt('mdlSecObs')) + fill('obs', tt('mdlFillObs')) +
             '<p class="abene-fill-hint">' + esc(tt('mdlPhotoHint')) + '</p>' +
             '<h3 data-abene-style="h3" data-abene-lock="1" contenteditable="false">' + esc(tt('mdlCheckTitle')) + '</h3>' +
-            '<table class="abene-check-table"><thead><tr>' +
-            '<th>' + esc(tt('mdlCheckItem')) + '</th><th>' + esc(tt('mdlCheckResult')) + '</th><th>' + esc(tt('mdlCheckNotes')) + '</th>' +
-            '</tr></thead><tbody>' +
-            '<tr><td>' + esc(tt('mdlCheck1')) + '</td><td>' + esc(tt('mdlCheckOk')) + '</td><td></td></tr>' +
-            '<tr><td>' + esc(tt('mdlCheck2')) + '</td><td>' + esc(tt('mdlCheckNa')) + '</td><td></td></tr>' +
-            '<tr><td>' + esc(tt('mdlCheck3')) + '</td><td>' + esc(tt('mdlCheckNok')) + '</td><td></td></tr>' +
-            '</tbody></table>' +
+            checkRows([
+                [tt('mdlCheck1'), 'ok'],
+                [tt('mdlCheck2'), 'na'],
+                [tt('mdlCheck3'), 'nok']
+            ]) +
             heading(2, tt('mdlSecConclusions')) + fill('conclusions', tt('mdlFillConclusions')) +
             heading(2, tt('mdlSecReco')) + fill('reco', tt('mdlFillReco'));
     }
 
+    function resultKey(text) {
+        var s = String(text || '').toLowerCase().replace(/\s+/g, ' ').trim();
+        if (/não conforme|nao conforme|non conforme|non-compliant|no conforme/.test(s)) return 'nok';
+        if (/^n\.?a\.?$|^n\/a$/.test(s)) return 'na';
+        if (s === 'ok' || s === 'nok' || s === 'na') return s;
+        if (/conforme|compliant/.test(s)) return 'ok';
+        return 'ok';
+    }
+    function checkBtns(key) {
+        key = key === 'nok' || key === 'na' ? key : 'ok';
+        function btn(val, label) {
+            return '<button type="button" class="abene-check-btn' + (val === key ? ' on' : '') +
+                '" data-check-val="' + val + '" contenteditable="false">' + esc(label) + '</button>';
+        }
+        return '<div class="abene-check-btns" contenteditable="false">' +
+            btn('ok', tt('mdlCheckOk')) +
+            btn('nok', tt('mdlCheckNok')) +
+            btn('na', tt('mdlCheckNa')) +
+            '<button type="button" class="abene-check-del" title="' + esc(tt('mdlCheckDel') || 'Remover linha') +
+            '" contenteditable="false">−</button></div>';
+    }
+    function checkRowHtml(item, result, notes) {
+        var key = resultKey(result);
+        return '<tr data-check-result="' + key + '">' +
+            '<td class="abene-check-item">' + esc(item || tt('mdlCheckNew') || 'Novo item') + '</td>' +
+            '<td class="abene-check-result" contenteditable="false">' + checkBtns(key) + '</td>' +
+            '<td class="abene-check-notes">' + esc(notes || '') + '</td></tr>';
+    }
     function checkRows(rows) {
-        return '<table class="abene-check-table"><thead><tr>' +
+        return '<div class="abene-check-wrap" data-abene-check="1">' +
+            '<table class="abene-check-table" data-abene-live="1"><thead><tr>' +
             '<th>' + esc(tt('mdlCheckItem')) + '</th><th>' + esc(tt('mdlCheckResult')) + '</th><th>' + esc(tt('mdlCheckNotes')) + '</th>' +
             '</tr></thead><tbody>' + rows.map(function (r) {
-                return '<tr><td>' + esc(r[0]) + '</td><td>' + esc(r[1]) + '</td><td></td></tr>';
-            }).join('') + '</tbody></table>';
+                return checkRowHtml(r[0], r[1], r[2]);
+            }).join('') + '</tbody></table>' +
+            '<p class="abene-check-toolbar" contenteditable="false">' +
+            '<button type="button" class="abene-check-add">' + esc(tt('mdlCheckAdd') || 'Adicionar linha') + '</button></p></div>';
     }
 
     function inspSkeleton(meta) {
         meta = meta || defaultMeta({ kind: 'inspection', skeleton: 'inspection', style: 'inspecao' });
-        var ok = tt('mdlCheckOk');
-        var na = tt('mdlCheckNa');
-        var nok = tt('mdlCheckNok');
         return heading(1, tt('mdlInspBody')) +
             '<h3 data-abene-style="h3" data-abene-lock="1" contenteditable="false">' + esc(tt('mdlRevTitle')) + '</h3>' +
             '<table class="abene-rev-table"><thead><tr>' +
@@ -336,6 +366,7 @@
             idRow(tt('mdlFieldRef'), 'ref', meta.ref) +
             idRow(tt('mdlFieldDate'), 'date', meta.date) +
             idRow(tt('mdlFieldClient'), 'client', meta.client) +
+            idRow(tt('mdlFieldClientNif') || tt('taxId') || 'NIF', 'clientNif', meta.clientNif || '') +
             idRow(tt('mdlFieldSite'), 'site', meta.site) +
             idRow(tt('mdlFieldFraction'), 'fraction', meta.fraction) +
             idRow(tt('mdlFieldInspType'), 'inspType', meta.inspType) +
@@ -350,14 +381,14 @@
             '<p class="abene-fill-hint">' + esc(tt('mdlPhotoInspHint')) + '</p>' +
             '<h3 data-abene-style="h3" data-abene-lock="1" contenteditable="false">' + esc(tt('mdlCheckTitle')) + '</h3>' +
             checkRows([
-                [tt('mdlInspCheck1'), ok],
-                [tt('mdlInspCheck2'), ok],
-                [tt('mdlInspCheck3'), na],
-                [tt('mdlInspCheck4'), ok],
-                [tt('mdlInspCheck5'), na],
-                [tt('mdlInspCheck6'), ok],
-                [tt('mdlInspCheck7'), nok],
-                [tt('mdlInspCheck8'), na]
+                [tt('mdlInspCheck1'), 'ok'],
+                [tt('mdlInspCheck2'), 'ok'],
+                [tt('mdlInspCheck3'), 'na'],
+                [tt('mdlInspCheck4'), 'ok'],
+                [tt('mdlInspCheck5'), 'na'],
+                [tt('mdlInspCheck6'), 'ok'],
+                [tt('mdlInspCheck7'), 'nok'],
+                [tt('mdlInspCheck8'), 'na']
             ]) +
             heading(2, tt('mdlInspSecNonconf')) + fill('insp-nonconf', tt('mdlFillInspNonconf')) +
             heading(2, tt('mdlInspSecConclusions')) + fill('insp-conclusions', tt('mdlFillInspConclusions')) +
@@ -453,12 +484,28 @@
         window._abeneChromeSig = '';
     }
 
+    function ensureClientNifRow(editor, meta) {
+        if (!editor) return;
+        var nif = meta && meta.clientNif ? String(meta.clientNif) : '';
+        editor.querySelectorAll('table.abene-tp-table').forEach(function (table) {
+            if (table.querySelector('[data-abene-field="clientNif"]')) return;
+            var clientTd = table.querySelector('[data-abene-field="client"]');
+            if (!clientTd) return;
+            var tr = clientTd.closest('tr');
+            if (!tr || !tr.parentNode) return;
+            var row = document.createElement('tr');
+            row.innerHTML = '<th>' + esc(tt('mdlFieldClientNif') || tt('taxId') || 'NIF') + '</th><td data-abene-field="clientNif">' + esc(nif) + '</td>';
+            tr.parentNode.insertBefore(row, tr.nextSibling);
+        });
+    }
+
     function applyMetaToDoc(meta) {
         var editor = ed();
         if (!editor || !meta) return;
+        ensureClientNifRow(editor, meta);
         Object.keys(meta).forEach(function (k) {
             editor.querySelectorAll('[data-abene-field="' + k + '"]').forEach(function (el) {
-                el.textContent = meta[k];
+                el.textContent = meta[k] == null ? '' : String(meta[k]);
             });
         });
     }
@@ -541,6 +588,7 @@
         if (opts.signs) html += buildSigns(meta, opts);
         if (opts.annex) html += (window.abeneSectionBreakHtml ? window.abeneSectionBreakHtml('annex') : modelBreak()) + buildAnnex(opts);
         editor.innerHTML = html;
+        enhanceCheckTables(editor);
         applyHeaderFooter(opts, meta);
         if (typeof window.applyReportSections === 'function') window.applyReportSections({ silent: true });
         if (opts.toc && window.abeneFillModeloToc) {
@@ -627,25 +675,65 @@
         window.applyReportModel(o);
     };
 
+    function applyClientToMetaForm(c) {
+        if (!c) return;
+        function set(id, v) {
+            var el = document.getElementById('mdlMeta_' + id);
+            if (!el || v == null || v === '') return;
+            el.value = String(v);
+        }
+        set('client', c.nom);
+        set('clientNif', c.nif);
+        var siteEl = document.getElementById('mdlMeta_site');
+        var siteDef = tt('mdlSiteDef') || 'Obra / local';
+        var siteNow = siteEl ? String(siteEl.value || '').trim() : '';
+        if (siteEl && (!siteNow || siteNow === siteDef)) {
+            var loc = [c.morada, [c.postal, c.localidade].filter(Boolean).join(' ')].filter(Boolean).join(', ');
+            if (loc) siteEl.value = loc;
+        }
+    }
+
     window.editModeloMeta = function () {
         var m = defaultMeta(loadOpts());
         if (typeof openGenericModal !== 'function') return;
+        var clients = typeof window.abeneCollectClients === 'function' ? window.abeneCollectClients() : [];
         function field(id, label, val) {
             return '<div class="form-group"><label for="mdlMeta_' + id + '">' + esc(label) + '</label>' +
                 '<input id="mdlMeta_' + id + '" type="text" value="' + esc(val) + '"></div>';
         }
+        var pick = clients.length
+            ? '<div class="form-group modelo-meta-pick"><label for="mdlMeta_pick">' +
+                esc(tt('mdlMetaPick') || tt('pickClient') || 'Escolher cliente') + '</label>' +
+                '<p class="abene-proof-hint">' + esc(tt('mdlMetaPickHint') || tt('pickClientHint') ||
+                    'Sheets, Excel ou Arquivo — o nome e o NIF passam para a capa.') + '</p>' +
+                '<select id="mdlMeta_pick">' +
+                '<option value="">' + esc(tt('mdlMetaPickNone') || '— Escolher cliente —') + '</option>' +
+                clients.map(function (c, i) {
+                    return '<option value="' + i + '">' + esc(c.nom) + (c.nif ? ' · ' + esc(c.nif) : '') + '</option>';
+                }).join('') + '</select></div>'
+            : '<p class="abene-proof-hint modelo-meta-pick">' + esc(tt('pickClientEmpty')) + '</p>';
         openGenericModal(tt('mdlMeta'),
             '<div class="modelo-meta-grid">' +
             field('work', tt('mdlFieldWork'), m.work) +
+            pick +
+            field('client', tt('mdlFieldClient'), m.client) +
+            field('clientNif', tt('mdlFieldClientNif') || tt('taxId') || 'NIF', m.clientNif || '') +
             field('ref', tt('mdlFieldRef'), m.ref) +
             field('date', tt('mdlFieldDate'), m.date) +
-            field('client', tt('mdlFieldClient'), m.client) +
             field('site', tt('mdlFieldSite'), m.site) +
             field('tech', tt('mdlFieldTech'), m.tech) +
             field('version', tt('mdlFieldVersion'), m.version) + '</div>',
             '<button class="btn-secondary" onclick="closeModal(\'genericModal\')">' + esc(tt('cancel')) + '</button>' +
             '<button class="btn-primary" onclick="saveModeloMeta()">' + esc(tt('ok')) + '</button>'
         );
+        setTimeout(function () {
+            var sel = document.getElementById('mdlMeta_pick');
+            if (!sel) return;
+            sel.onchange = function () {
+                var c = clients[Number(sel.value)];
+                if (c) applyClientToMetaForm(c);
+            };
+        }, 30);
     };
 
     window.saveModeloMeta = function () {
@@ -659,6 +747,7 @@
             ref: val('ref'),
             date: val('date'),
             client: val('client'),
+            clientNif: val('clientNif'),
             site: val('site'),
             tech: val('tech'),
             version: val('version'),
@@ -709,8 +798,104 @@
     }
     wrapLoadTemplate();
 
+    function enhanceCheckTables(root) {
+        root = root || ed();
+        if (!root || !root.querySelectorAll) return;
+        root.querySelectorAll('table.abene-check-table').forEach(function (table) {
+            if (!table.closest('.abene-check-wrap')) {
+                var wrap = document.createElement('div');
+                wrap.className = 'abene-check-wrap';
+                wrap.setAttribute('data-abene-check', '1');
+                table.parentNode.insertBefore(wrap, table);
+                wrap.appendChild(table);
+                var bar = document.createElement('p');
+                bar.className = 'abene-check-toolbar';
+                bar.contentEditable = 'false';
+                bar.innerHTML = '<button type="button" class="abene-check-add">' + esc(tt('mdlCheckAdd') || 'Adicionar linha') + '</button>';
+                wrap.appendChild(bar);
+            }
+            table.setAttribute('data-abene-live', '1');
+            Array.prototype.slice.call(table.querySelectorAll('tbody tr')).forEach(function (tr) {
+                var td = tr.cells[1];
+                if (!td) return;
+                if (td.querySelector('.abene-check-btn')) {
+                    var on = td.querySelector('.abene-check-btn.on');
+                    if (on) tr.setAttribute('data-check-result', on.getAttribute('data-check-val') || 'ok');
+                    if (!td.querySelector('.abene-check-del')) {
+                        var box = td.querySelector('.abene-check-btns');
+                        if (box) box.insertAdjacentHTML('beforeend',
+                            '<button type="button" class="abene-check-del" title="' + esc(tt('mdlCheckDel') || 'Remover linha') +
+                            '" contenteditable="false">−</button>');
+                    }
+                    return;
+                }
+                var key = resultKey(td.textContent);
+                tr.setAttribute('data-check-result', key);
+                td.classList.add('abene-check-result');
+                td.contentEditable = 'false';
+                td.innerHTML = checkBtns(key);
+                if (tr.cells[0]) tr.cells[0].classList.add('abene-check-item');
+                if (tr.cells[2]) tr.cells[2].classList.add('abene-check-notes');
+            });
+        });
+    }
+    function bindChecklists() {
+        if (bindChecklists._on) return;
+        bindChecklists._on = true;
+        document.addEventListener('focusin', function (ev) {
+            var editor = ed();
+            if (editor && ev.target && editor.contains(ev.target)) enhanceCheckTables(editor);
+        });
+        document.addEventListener('mousedown', function (ev) {
+            var t = ev.target && ev.target.closest && ev.target.closest('.abene-check-btn, .abene-check-add, .abene-check-del');
+            if (t) ev.preventDefault();
+        }, true);
+        document.addEventListener('click', function (ev) {
+            var t = ev.target;
+            if (!t || !t.closest) return;
+            var add = t.closest('.abene-check-add');
+            var del = t.closest('.abene-check-del');
+            var btn = t.closest('.abene-check-btn');
+            if (!add && !del && !btn) return;
+            var editor = ed();
+            if (!editor || !editor.contains(t)) return;
+            ev.preventDefault();
+            ev.stopPropagation();
+            if (typeof saveUndoState === 'function') saveUndoState();
+            if (add) {
+                var wrap = add.closest('.abene-check-wrap');
+                var table = wrap && wrap.querySelector('.abene-check-table');
+                if (!table) return;
+                var tb = table.tBodies[0] || table.createTBody();
+                tb.insertAdjacentHTML('beforeend', checkRowHtml(tt('mdlCheckNew') || 'Novo item', 'na', ''));
+            } else if (del) {
+                var tr = del.closest('tr');
+                var body = tr && tr.parentNode;
+                if (!tr || !body) return;
+                if (body.querySelectorAll('tr').length < 2) return;
+                body.removeChild(tr);
+            } else if (btn) {
+                var row = btn.closest('tr');
+                var val = btn.getAttribute('data-check-val') || 'ok';
+                if (!row) return;
+                row.setAttribute('data-check-result', val);
+                row.querySelectorAll('.abene-check-btn').forEach(function (b) {
+                    b.classList.toggle('on', b.getAttribute('data-check-val') === val);
+                });
+            }
+            if (A().documentState) A().documentState.dirty = true;
+            if (typeof updateSaveStatus === 'function') updateSaveStatus();
+            if (typeof refreshPagination === 'function') refreshPagination();
+        });
+    }
+    window.abeneEnhanceCheckTables = enhanceCheckTables;
+
     document.addEventListener('DOMContentLoaded', function () {
         writeUi(loadOpts());
         wrapLoadTemplate();
+        bindChecklists();
+        enhanceCheckTables();
+        setTimeout(enhanceCheckTables, 600);
     });
+    bindChecklists();
 })();

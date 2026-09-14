@@ -103,12 +103,29 @@
             n.removeAttribute('data-author');
             n.removeAttribute('data-date');
         });
+        rootEl.querySelectorAll('.abene-check-toolbar, .abene-check-del').forEach(function (n) { n.remove(); });
+        rootEl.querySelectorAll('td.abene-check-result, .abene-check-table td').forEach(function (td) {
+            if (!td.querySelector || !td.querySelector('.abene-check-btn')) return;
+            var tr = td.parentNode;
+            var key = (tr && tr.getAttribute && tr.getAttribute('data-check-result')) || '';
+            var on = td.querySelector('.abene-check-btn.on') || (key && td.querySelector('.abene-check-btn[data-check-val="' + key + '"]'));
+            var label = on ? String(on.textContent || '').replace(/\s+/g, ' ').trim() : '';
+            td.textContent = label || ' ';
+            td.removeAttribute('contenteditable');
+        });
+        rootEl.querySelectorAll('.abene-check-wrap').forEach(function (w) {
+            var table = w.querySelector('table');
+            if (table && w.parentNode) {
+                w.parentNode.insertBefore(table, w);
+                w.parentNode.removeChild(w);
+            }
+        });
         return rootEl;
     }
 
     function sanitizeExportRoot(rootEl) {
         if (!rootEl || !rootEl.querySelectorAll) return rootEl;
-        rootEl.querySelectorAll('.abene-obj-resize, .abene-tbox-bar, .image-handle, .hf-tab, .hf-rule, .hf-close, .page-gap-band, .hf-placeholder, .abene-crop-overlay, #abeneCropBar').forEach(function (n) { n.remove(); });
+        rootEl.querySelectorAll('.abene-obj-resize, .abene-tbox-bar, .image-handle, .hf-tab, .hf-rule, .hf-close, .page-gap-band, .hf-placeholder, .abene-crop-overlay, #abeneCropBar, .abene-check-toolbar, .abene-check-del').forEach(function (n) { n.remove(); });
         rootEl.querySelectorAll('.abene-fill').forEach(function (el) {
             el.style.border = 'none';
             el.style.background = 'transparent';
@@ -801,7 +818,7 @@
         if (root.abeneReleaseViewZoom) root.abeneReleaseViewZoom();
     }
 
-    function captureLivePagedBlob(filterFn) {
+    function captureLivePagedImages(filterFn) {
         if (!useEngine || !root.html2pdf || typeof root.abeneBuildPagedExport !== 'function') {
             return Promise.reject(new Error('no-engine'));
         }
@@ -818,14 +835,42 @@
         document.body.appendChild(tree);
         if (root.abeneHoldViewZoom) root.abeneHoldViewZoom();
         return waitImages(tree).then(function () {
-            return pagedPdfToBlob(tree, g);
-        }).then(function (blob) {
+            flattenExportDom(tree);
+            sanitizeExportRoot(tree);
+            showCaptureRoot(tree, g);
+            return afterLayout().then(function () {
+                return captureSheets(tree, g);
+            });
+        }).then(function (images) {
             cleanupExportCapture(tree);
-            if (!blob || blob.size < 4000) throw new Error('empty');
-            return blob;
+            if (!images || !images.length) throw new Error('blank-canvas');
+            return { images: images, g: g };
         }, function (err) {
             cleanupExportCapture(tree);
             throw err;
+        });
+    }
+
+    function captureLivePagedBlob(filterFn) {
+        return captureLivePagedImages(filterFn).then(function (pack) {
+            return pdfFromPageImages(pack.images, pack.g).then(function (pdf) {
+                var blob = pdf.output('blob');
+                if (!blob || blob.size < 4000) throw new Error('empty');
+                return blob;
+            });
+        });
+    }
+
+    function savePageImagesPdf(images, g, filename) {
+        return pdfFromPageImages(images, g).then(function (pdf) {
+            pdf.save(filename || 'document.pdf');
+            return pdf;
+        });
+    }
+
+    function pageImagesToBlob(images, g) {
+        return pdfFromPageImages(images, g).then(function (pdf) {
+            return pdf.output('blob');
         });
     }
 
@@ -944,7 +989,10 @@
         rasterizeImages: rasterizeImages,
         savePagedPdf: savePagedPdf,
         pagedPdfToBlob: pagedPdfToBlob,
+        captureLivePagedImages: captureLivePagedImages,
         captureLivePagedBlob: captureLivePagedBlob,
+        savePageImagesPdf: savePageImagesPdf,
+        pageImagesToBlob: pageImagesToBlob,
         htmlToPagedBlob: htmlToPagedBlob,
         htmlElementToPdfBlob: htmlElementToPdfBlob,
         buildDocxSections: buildDocxSections

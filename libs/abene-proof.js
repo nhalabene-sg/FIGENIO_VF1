@@ -67,6 +67,54 @@
         'genius raros calibri cambria times geórgia'
     ).split(/\s+/).filter(Boolean);
 
+    /* Termos de relatório Genius Raros (PT-PT). Junta-se ao dicionário-base e ao dicionário pessoal. */
+    var TRADE = (
+        'ramal ramais caudal caudais pressão pressões manómetro manómetros caudalímetro caudalímetros ' +
+        'hidrómetro hidrómetros pressostato pressostatos termóstato termóstatos termómetro ' +
+        'sifão sifões sifónico sifónica válvula válvulas torneira torneiras autoclismo autoclismos ' +
+        'sanita sanitas lavatório lavatórios bidé bidés banheira banheiras duche duches ralo ralos grelha grelhas ' +
+        'tubagem tubagens tubo tubos união uniões curva curvas luva luvas soldadura soldaduras cravação prensagem ' +
+        'coluna colunas derivação derivações coletor coletores coletoras traçado traçados cota cotas ' +
+        'esgoto esgotos pluvial pluviais residual residuais fossa fossas etar depuradora depuradoras ' +
+        'bomba bombas hidropressor hidropressores grupo grupos filtro filtros redutor redutores ' +
+        'contador contadores calibre calibres chave chaves corte estanquidade ensaio ensaios prova provas ' +
+        'ponta pontas espera predial prediais ligação ligações câmara câmaras visita caixa caixas ' +
+        'ventilação primária secundária calorifugação calorifugar infiltração infiltrações fuga fugas ' +
+        'humidade humidades entupimento entupimentos desentupir desentupimento ' +
+        'acumulador acumuladores esquentador esquentadores caldeira caldeiras rede redes abastecimento ' +
+        'águas água polietileno polipropileno multicamada cobre aço inox galvanizado ' +
+        'ppr pead pex per pvc cpvc teflon vedante vedantes estopa rosca roscas macho fêmea aperto apertos ' +
+        'abraçadeira abraçadeiras suporte suportes binário ' +
+        'planta plantas pormenor pormenores caderno encargos especificação especificações ' +
+        'medição medições quantitativo quantitativos mapa mapas empreitada empreitadas ' +
+        'adjudicação adjudicações receção receções provisória definitiva ' +
+        'conformidade conformidades pendência pendências correção correções ' +
+        'reparação reparações substituição substituições instalação instalações ' +
+        'manutenção preventivo corretivo visita visitas inspeção inspeções ' +
+        'inspetor inspetora inspector inspectora técnico técnicos ' +
+        'fração frações piso pisos cave caves sótão condomínio condóminos administração ' +
+        'autarquia municipal regulamento regulamentos decreto lei portaria ' +
+        'norma normas certificado certificados certificação certidão certidões ' +
+        'energético energética energia isolamento isolamentos impermeabilização impermeabilizar ' +
+        'alvenaria reboco estuque betonilha contrapiso betão armado cofragem ' +
+        'telhado telhados cobertura coberturas platibanda platibandas ' +
+        'caixilharia caixilhos vidro vidros pavimento pavimentos cerâmico cerâmicos ' +
+        'revestimento revestimentos pintura pinturas demolição demolições ' +
+        'andaime andaimes epi epis segurança higiene climatização aquecimento ' +
+        'radiador radiadores radiante exutor exutores ' +
+        'constatar constatou constatado verificado verificada medir mediu medido ' +
+        'instalar instalou instalado ensaiar ensaiado recomendar recomendado ' +
+        'cumprir cumprido cumprimento aplicar aplicado substituir substituiu substituído ' +
+        'epbd avc avac recs reh sce qai nif iva cae iban nipc atcud saft ' +
+        'bar kpa mca dhw xps eps ' +
+        'canalizador canalizadores canalização construção civil obra obras ' +
+        'orçamento orçamentos recibo recibos fatura faturas faturação proposta propostas ' +
+        'cliente clientes morada moradas localidade autoridade tributária ' +
+        'e-fatura relatórios objeto âmbito metodologia conclusão conclusões ' +
+        'fotografia fotografias legenda legendas revisão revisões assinatura ' +
+        'não-conforme não-conformidade não-conformidades'
+    ).split(/\s+/).filter(Boolean);
+
     var FR = 'le la les un une des de du et ou mais donc car que qui dont où comment quand je tu il elle nous vous ils elles être avoir faire aller venir voir savoir pouvoir devoir vouloir ce cette ces mon ma mes son sa ses notre nos votre vos leur leurs ne pas plus moins très bien bon aujourd hui après avant avec sans pour par sur sous dans entre'.split(/\s+/);
     var EN = 'the a an and or but if as at by for from in of on to with not no yes is are was were be been being have has had do does did this that these those i you he she we they it my your his her our their'.split(/\s+/);
     var ES = 'el la los las un una unos unas de del y o pero que quien cual cuando donde como no sí más menos muy bien mal ser es son era fue estar está están tener tiene hay por para con sin sobre entre'.split(/\s+/);
@@ -89,7 +137,7 @@
     }
     function dictSet() {
         var set = {};
-        baseDict().concat(userDict()).forEach(function (w) {
+        baseDict().concat(TRADE).concat(userDict()).forEach(function (w) {
             if (w) set[String(w).toLowerCase()] = 1;
         });
         return set;
@@ -134,10 +182,11 @@
             seen[key] = 1;
             issues.push({ kind: 'repeat', word: m[1], raw: m[0] });
         }
-        var reW = /[A-Za-zÀ-ÿ]{3,}/g;
+        var reW = /[A-Za-zÀ-ÿ]{3,}(?:-[A-Za-zÀ-ÿ]{2,})*/g;
         while ((m = reW.exec(text))) {
             var word = m[0];
             if (/^[A-ZÀ-Ý]{2,}$/.test(word)) continue;
+            if (/^[0-9]+[a-zà-ÿ]*$/i.test(word)) continue;
             if (set[word.toLowerCase()]) continue;
             key = 'u:' + word.toLowerCase();
             if (seen[key]) continue;
@@ -363,11 +412,10 @@
         if (k.indexOf('postal') >= 0 || k === 'cp') return client.postal || '';
         return '';
     }
-    function applyClientToDoc(client) {
-        var editor = editorEl();
-        if (!editor || !client) return 0;
+    function fillFields(root, client) {
+        if (!root || !client) return 0;
         var n = 0;
-        editor.querySelectorAll('[data-merge-field]').forEach(function (el) {
+        root.querySelectorAll('[data-merge-field]').forEach(function (el) {
             var id = el.getAttribute('data-merge-field') || '';
             var v = valueFor(client, id);
             if (!v) return;
@@ -375,16 +423,56 @@
             el.setAttribute('data-merge-done', '1');
             n++;
         });
+        return n;
+    }
+    function applyClientToDoc(client) {
+        var editor = editorEl();
+        if (!editor || !client) return 0;
+        var n = fillFields(editor, client);
         save();
         return n;
     }
+    function collectMergeClients() {
+        return typeof root.abeneCollectClients === 'function' ? root.abeneCollectClients() : [];
+    }
+    function selectedMergeClients(clients) {
+        var boxes = document.querySelectorAll('#abeneMergeList input[type="checkbox"]:checked');
+        var out = [];
+        boxes.forEach(function (b) {
+            var c = clients[Number(b.value)];
+            if (c) out.push(c);
+        });
+        return out;
+    }
+    function clientFilePart(c) {
+        var s = String((c && c.nom) || 'cliente').replace(/[\\/:*?"<>|]+/g, ' ').replace(/\s+/g, ' ').trim();
+        return (s || 'cliente').slice(0, 40);
+    }
+    function downloadBlob(blob, name) {
+        var a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = name;
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(function () {
+            if (a.parentNode) a.parentNode.removeChild(a);
+            URL.revokeObjectURL(a.href);
+        }, 1500);
+    }
+    function restoreMergeTemplate(html) {
+        var editor = editorEl();
+        if (!editor) return;
+        editor.innerHTML = html;
+        if (typeof root.refreshPagination === 'function') root.refreshPagination();
+        if (typeof root.abeneEnhanceCheckTables === 'function') root.abeneEnhanceCheckTables(editor);
+    }
     function openMerge() {
         saveCaret();
-        var clients = typeof root.abeneCollectClients === 'function' ? root.abeneCollectClients() : [];
+        var clients = collectMergeClients();
         var fields = fieldKeys();
         var editor = editorEl();
         var used = editor ? editor.querySelectorAll('[data-merge-field]').length : 0;
-        var body = '<p>' + esc(tt('mergeHint', 'Insira campos no texto e preencha-os com um cliente guardado (Sheets, Excel ou Arquivo).')) + '</p>' +
+        var body = '<p>' + esc(tt('mergeHint', 'Insira campos no texto e preencha-os com um ou vários clientes (Sheets, Excel ou Arquivo).')) + '</p>' +
             '<div class="abene-merge-chips">' + fields.map(function (f) {
                 return '<button type="button" class="btn-secondary" data-mf="' + esc(f.id) + '">{' + esc(f.id) + '} · ' + esc(f.label) + '</button>';
             }).join('') + '</div>' +
@@ -392,20 +480,33 @@
             '<input id="abeneMergeCustom" type="text" value="' + esc(tt('mergeFieldDefault', 'NomeCliente')) + '"></div>' +
             '<p>' + esc(tt('mergeInDoc', 'Campos no documento')) + ': <strong>' + used + '</strong></p>' +
             (clients.length
-                ? '<div class="form-group"><label>' + esc(tt('mergePickClient', 'Preencher com o cliente')) + '</label>' +
-                    '<select id="abeneMergeClient">' + clients.map(function (c, i) {
-                        return '<option value="' + i + '">' + esc(c.nom) + (c.nif ? ' · ' + esc(c.nif) : '') + '</option>';
-                    }).join('') + '</select></div>'
+                ? '<div class="form-group"><label>' + esc(tt('mergePickClient', 'Clientes da série')) + '</label>' +
+                    '<label class="abene-merge-all"><input type="checkbox" id="abeneMergeAll"> ' +
+                    esc(tt('mergeSelectAll', 'Selecionar todos')) + '</label>' +
+                    '<div class="abene-merge-list" id="abeneMergeList">' + clients.map(function (c, i) {
+                        return '<label><input type="checkbox" value="' + i + '"' + (i === 0 ? ' checked' : '') + '> ' +
+                            esc(c.nom) + (c.nif ? ' · ' + esc(c.nif) : '') + '</label>';
+                    }).join('') + '</div></div>'
                 : '<p class="abene-proof-hint">' + esc(tt('pickClientEmpty')) + '</p>');
         if (typeof root.openGenericModal !== 'function') return;
         root.openGenericModal(tt('mailMerge', 'Mailing'), body,
             '<button type="button" class="btn-secondary" onclick="abeneMergeInsert()">' + esc(tt('mergeInsert', 'Inserir campo')) + '</button>' +
-            '<button type="button" class="btn-primary" onclick="abeneMergeApply()">' + esc(tt('mergeFinish', 'Concluir mailing')) + '</button>'
+            '<button type="button" class="btn-secondary" onclick="abeneMergeZip()">' + esc(tt('mergeZip', 'ZIP da série')) + '</button>' +
+            '<button type="button" class="btn-secondary" onclick="abeneMergePdf()">' + esc(tt('mergePdf', 'PDF da série')) + '</button>' +
+            '<button type="button" class="btn-primary" onclick="abeneMergeApply()">' + esc(tt('mergeFinish', 'Preencher este documento')) + '</button>'
         );
         setTimeout(function () {
             document.querySelectorAll('.abene-merge-chips [data-mf]').forEach(function (b) {
                 b.onclick = function () { insertMergeField(b.getAttribute('data-mf')); };
             });
+            var all = document.getElementById('abeneMergeAll');
+            if (all) {
+                all.onchange = function () {
+                    document.querySelectorAll('#abeneMergeList input[type="checkbox"]').forEach(function (cb) {
+                        cb.checked = !!all.checked;
+                    });
+                };
+            }
         }, 30);
     }
     root.abeneMergeInsert = function () {
@@ -414,14 +515,91 @@
         toast(tt('mergeInserted', 'Campo inserido.'));
     };
     root.abeneMergeApply = function () {
-        var clients = typeof root.abeneCollectClients === 'function' ? root.abeneCollectClients() : [];
-        var sel = document.getElementById('abeneMergeClient');
-        var c = sel ? clients[Number(sel.value)] : clients[0];
+        var clients = collectMergeClients();
+        var picked = selectedMergeClients(clients);
+        var c = picked[0] || clients[0];
         if (!c) { toast(tt('pickClientEmpty')); return; }
         var n = applyClientToDoc(c);
         toast(tt('mergeDone', '{n} campo(s) preenchidos.').replace('{n}', String(n)));
         if (typeof root.closeModal === 'function') root.closeModal('genericModal');
     };
+    function runMergeSeries(mode) {
+        var editor = editorEl();
+        if (!editor) return;
+        var clients = collectMergeClients();
+        var picked = selectedMergeClients(clients);
+        if (!picked.length) { toast(tt('mergeNeedClients', 'Selecione pelo menos um cliente.')); return; }
+        if (editor.querySelectorAll('[data-merge-field]').length < 1) {
+            toast(tt('mergeNeedFields', 'Insira pelo menos um campo {NomeCliente} no texto.'));
+            return;
+        }
+        var max = 30;
+        if (picked.length > max) {
+            toast(tt('mergeMax', 'A série fica limitada a {n} clientes.').replace('{n}', String(max)));
+            picked = picked.slice(0, max);
+        }
+        var Ex = root.ABENE && root.ABENE.Export;
+        if (!Ex || typeof Ex.captureLivePagedImages !== 'function') {
+            toast(tt('mergeNoPdf', 'Exportação PDF indisponível.'));
+            return;
+        }
+        var template = editor.innerHTML;
+        var wantZip = mode === 'zip';
+        if (wantZip && !root.JSZip) {
+            toast(tt('mergeNoZip', 'ZIP indisponível — a gerar um PDF único.'));
+            wantZip = false;
+        }
+        var zip = wantZip ? new root.JSZip() : null;
+        var allImages = [];
+        var geo = null;
+        var usedNames = {};
+        var ds = (root.abene && root.abene.documentState) || {};
+        var base = String(ds.name || 'mailing').replace(/[\\/:*?"<>|]+/g, ' ').trim() || 'mailing';
+        toast(tt('mergeBusy', 'A gerar a série…'));
+        if (typeof root.closeModal === 'function') root.closeModal('genericModal');
+        var seq = Promise.resolve();
+        picked.forEach(function (c, idx) {
+            seq = seq.then(function () {
+                restoreMergeTemplate(template);
+                fillFields(editor, c);
+                if (typeof root.refreshPagination === 'function') root.refreshPagination();
+                return new Promise(function (resolve) {
+                    requestAnimationFrame(function () { setTimeout(resolve, 80); });
+                }).then(function () {
+                    return Ex.captureLivePagedImages();
+                });
+            }).then(function (pack) {
+                geo = pack.g;
+                if (zip) {
+                    var fname = clientFilePart(c) + (c.nif ? '_' + String(c.nif).replace(/\s+/g, '') : '');
+                    if (usedNames[fname]) fname += '_' + (idx + 1);
+                    usedNames[fname] = true;
+                    return Ex.pageImagesToBlob(pack.images, pack.g).then(function (blob) {
+                        zip.file(fname + '.pdf', blob);
+                    });
+                }
+                allImages = allImages.concat(pack.images || []);
+            });
+        });
+        seq.then(function () {
+            restoreMergeTemplate(template);
+            save();
+            if (zip) {
+                return zip.generateAsync({ type: 'blob' }).then(function (blob) {
+                    downloadBlob(blob, base + '-mailing.zip');
+                });
+            }
+            if (!allImages.length || !geo) throw new Error('empty');
+            return Ex.savePageImagesPdf(allImages, geo, base + '-mailing.pdf');
+        }).then(function () {
+            toast(tt('mergeSeriesOk', '{n} documento(s) gerados.').replace('{n}', String(picked.length)));
+        }).catch(function () {
+            restoreMergeTemplate(template);
+            toast(tt('mergeSeriesFail', 'Não foi possível gerar a série.'));
+        });
+    }
+    root.abeneMergePdf = function () { runMergeSeries('pdf'); };
+    root.abeneMergeZip = function () { runMergeSeries('zip'); };
 
     function openCollabAuthor() {
         var cur = '';

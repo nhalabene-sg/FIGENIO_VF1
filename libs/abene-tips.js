@@ -65,8 +65,8 @@
             section: 'Começa uma nova secção (útil para mudar margens a meio do documento).',
             colBreak: 'Passa o texto para a coluna seguinte.',
             equation: 'Insere uma equação com pré-visualização e símbolos. Duplo-clique para editar.',
-            mailMerge: 'Insere um campo de mailing e preenche-o com um cliente guardado (Sheets, Excel ou Arquivo).',
-            spelling: 'Revisa a ortografia: sugestões, dicionário pessoal e palavras repetidas (F7).',
+            mailMerge: 'Insere um campo de mailing e preenche-o com um ou vários clientes (PDF da série ou ZIP).',
+            spelling: 'Revisa a ortografia: dicionário técnico PT-PT (ramal, caudal, EPBD…), dicionário pessoal e palavras repetidas (F7).',
             collabShare: 'Partilha a pasta Drive. Sem nuvem: guarda o seu nome visível e abre as Definições.',
             watermark: 'Coloca um texto em fundo (ex.: CONFIDENCIAL) em todas as páginas.',
             pageBorder: 'Desenha um limite à volta da página.',
@@ -108,7 +108,7 @@
             versions: 'Mostra versões anteriores guardadas neste computador.',
             protect: 'Bloqueia a edição com palavra-passe nesta sessão.',
             mdlApply: 'Aplica capa, folha de rosto, cabeçalho e logo ao relatório.',
-            mdlMeta: 'Preenche cliente, obra, técnico e data da folha de rosto.',
+            mdlMeta: 'Preenche cliente e NIF a partir de Sheets, Excel ou Arquivo, ou à mão (obra, técnico, data).',
             mdlPresetLetter: 'Aplica o modelo de carta da empresa.',
             mdlPresetMinutes: 'Aplica o modelo de ata de reunião.',
             mdlPresetTech: 'Aplica o relatório técnico completo: capa, rosto, índice, secções a preencher, checklist, assinaturas e anexos.',
@@ -233,8 +233,8 @@
             xlFromQuote: 'Copie les lignes du devis Word vers Excel.',
             xlToQuote: 'Renvoie les quantités d’Excel vers le devis Word.',
             equation: 'Insère une équation avec aperçu et symboles. Double-clic pour modifier.',
-            mailMerge: 'Insère un champ de publipostage et le remplit avec un client enregistré.',
-            spelling: 'Relit l’orthographe : suggestions, dictionnaire personnel et mots répétés (F7).',
+            mailMerge: 'Insère un champ de publipostage et le remplit avec un ou plusieurs clients (PDF de série ou ZIP).',
+            spelling: 'Relit l’orthographe : dictionnaire technique PT-PT, dictionnaire personnel et mots répétés (F7).',
             collabShare: 'Partage le dossier Drive. Hors ligne : enregistre votre nom visible et ouvre les Paramètres.'
         },
         'en-US': {
@@ -258,8 +258,8 @@
             xlFromQuote: 'Copies Word quote lines into Excel.',
             xlToQuote: 'Sends Excel quantities back to the Word quote.',
             equation: 'Inserts an equation with preview and symbols. Double-click to edit.',
-            mailMerge: 'Inserts a mail-merge field and fills it from a saved client.',
-            spelling: 'Checks spelling: suggestions, personal dictionary and repeated words (F7).',
+            mailMerge: 'Inserts a mail-merge field and fills it from one or more clients (series PDF or ZIP).',
+            spelling: 'Checks spelling: PT-PT technical dictionary, personal dictionary and repeated words (F7).',
             collabShare: 'Shares the Drive folder. Offline: saves your display name and opens Settings.'
         },
         'es-ES': {
@@ -283,8 +283,8 @@
             xlFromQuote: 'Copia las líneas del presupuesto Word a Excel.',
             xlToQuote: 'Envía cantidades de Excel de vuelta al presupuesto Word.',
             equation: 'Inserta una ecuación con vista previa y símbolos. Doble clic para editar.',
-            mailMerge: 'Inserta un campo de combinación y lo rellena con un cliente guardado.',
-            spelling: 'Revisa la ortografía: sugerencias, diccionario personal y palabras repetidas (F7).',
+            mailMerge: 'Inserta un campo de combinación y lo rellena con uno o varios clientes (PDF de serie o ZIP).',
+            spelling: 'Revisa la ortografía: diccionario técnico PT-PT, diccionario personal y palabras repetidas (F7).',
             collabShare: 'Comparte la carpeta Drive. Sin nube: guarda su nombre visible y abre Ajustes.'
         }
     };

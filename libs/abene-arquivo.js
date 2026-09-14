@@ -2424,6 +2424,7 @@
             ? window.abenePrepareCopyAsNewHtml(html)
             : cleanArchiveHtml(html);
         editor.innerHTML = prepared || '<p></p>';
+        if (typeof window.abeneEnhanceCheckTables === 'function') window.abeneEnhanceCheckTables(editor);
         editor.contentEditable = readOnly ? 'false' : 'true';
         if (typeof renameDocument === 'function') renameDocument(name);
         if (docState()) {

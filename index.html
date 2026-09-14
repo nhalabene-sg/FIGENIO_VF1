@@ -2835,6 +2835,65 @@
             font-weight: 700;
             color: #243746;
         }
+        .abene-check-wrap { margin: 0 0 8px; }
+        .abene-check-btns {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            align-items: center;
+        }
+        .abene-check-btn {
+            font: 9pt Calibri, 'Segoe UI', sans-serif;
+            border: 1px solid #c5cdd6;
+            background: #fff;
+            color: #243746;
+            padding: 3px 8px;
+            border-radius: 3px;
+            cursor: pointer;
+            line-height: 1.3;
+        }
+        .abene-check-btn.on[data-check-val="ok"] {
+            background: #e6f4ea;
+            border-color: #137333;
+            color: #137333;
+            font-weight: 700;
+        }
+        .abene-check-btn.on[data-check-val="nok"] {
+            background: #fce8e6;
+            border-color: #c5221f;
+            color: #c5221f;
+            font-weight: 700;
+        }
+        .abene-check-btn.on[data-check-val="na"] {
+            background: #f1f3f4;
+            border-color: #5f6368;
+            color: #3c4043;
+            font-weight: 700;
+        }
+        .abene-check-del {
+            margin-left: 4px;
+            width: 22px;
+            height: 22px;
+            border: 1px solid #d0d0d0;
+            background: #fafafa;
+            color: #5f6368;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 14px;
+            line-height: 1;
+        }
+        .abene-check-toolbar { margin: 0 0 16px; }
+        .abene-check-add {
+            font: 10pt Calibri, 'Segoe UI', sans-serif;
+            border: 1px solid #2b579a;
+            background: #e8f0fe;
+            color: #1e4077;
+            padding: 4px 10px;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+        .abene-export-root .abene-check-toolbar,
+        .abene-export-root .abene-check-del { display: none !important; }
         .abene-signs-tech .abene-sign-line { margin-top: 0; }
         .abene-sign-space {
             min-height: 56px;
@@ -2948,7 +3007,9 @@
             gap: 12px 14px;
         }
         .modelo-meta-grid .form-group:first-child,
-        .modelo-meta-grid .form-group:nth-child(5) { grid-column: 1 / -1; }
+        .modelo-meta-grid .modelo-meta-pick { grid-column: 1 / -1; }
+        .modelo-meta-grid select { width: 100%; padding: 8px; box-sizing: border-box; }
+        .modelo-meta-pick .abene-proof-hint { margin: 0 0 6px; }
         @media (max-width: 760px) {
             .abene-cover-meta { grid-template-columns: 1fr; }
             .modelo-meta-grid { grid-template-columns: 1fr; }
@@ -3624,6 +3685,22 @@
         }
         .abene-proof-sugs button, .abene-eq-pal button, .abene-merge-chips button {
             font-size: 12px; padding: 4px 8px;
+        }
+        .abene-merge-all {
+            display: flex; align-items: center; gap: 6px;
+            margin: 6px 0; font-size: 13px; cursor: pointer;
+        }
+        .abene-merge-list {
+            max-height: 220px;
+            overflow: auto;
+            border: 1px solid #d8dee9;
+            border-radius: 6px;
+            padding: 6px 8px;
+            background: #fff;
+        }
+        .abene-merge-list label {
+            display: flex; align-items: center; gap: 8px;
+            padding: 4px 2px; font-size: 13px; cursor: pointer;
         }
         .abene-eq-preview {
             font-family: Georgia, serif;
@@ -4933,6 +5010,20 @@
         body.dark-mode [data-abene-block] {
             color: #0b1223;
         }
+        body.dark-mode .abene-check-btn {
+            background: #fff;
+            color: #243746;
+            border-color: #c5cdd6;
+        }
+        body.dark-mode .abene-check-add {
+            background: #e8f0fe;
+            color: #1e4077;
+            border-color: #2b579a;
+        }
+        body.dark-mode .abene-check-del {
+            background: #fafafa;
+            color: #5f6368;
+        }
         body.dark-mode .abene-conf-banner {
             background: #fbf8ef;
             color: #0b1223;
@@ -5350,6 +5441,11 @@
             background: #fff;
             color: #111;
             border-color: #9db7ff;
+        }
+        body.dark-mode .abene-merge-list {
+            background: #252423;
+            border-color: #3d3d3d;
+            color: #f3f2f1;
         }
         body.dark-mode .image-toolbar button.on,
         body.dark-mode .table-toolbar button.on {
@@ -7462,9 +7558,9 @@
     <input type="file" id="imageInput" style="display:none" accept="image/*" multiple onchange="handleImageUpload(event)">
     <input type="file" id="excelFileInput" style="display:none" accept=".xlsx,.csv,.txt">
 
-    <script src="libs/abene-i18n.js?v=20260914-insp-1"></script>
-    <script src="libs/abene-tips.js?v=20260914-insp-1"></script>
-    <script src="libs/abene-page-geometry.js"></script>
+    <script src="libs/abene-i18n.js?v=20260914-spell-1"></script>
+    <script src="libs/abene-tips.js?v=20260914-spell-1"></script>
+    <script src="libs/abene-page-geometry.js?v=20260914-review-1"></script>
     <script>
         window.abeneBrandName = function () {
             try {
@@ -9944,7 +10040,7 @@
         }
 
         function resolveComment(index) {
-            const comment = editor.querySelectorAll('[data-comment]')[index];
+            const comment = editor.querySelectorAll('[data-comment], .comment-anchor')[index];
             if (comment) comment.replaceWith(...comment.childNodes);
             saveUndoState();
             refreshCommentsPane();
@@ -10693,16 +10789,48 @@
             pane.classList.toggle('open', open);
             if (open) refreshCommentsPane();
         }
+        var activeCommentIndex = 0;
+        function navigateComment(step) {
+            var comments = editor.querySelectorAll('[data-comment], .comment-anchor');
+            if (!comments.length) return;
+            activeCommentIndex = (activeCommentIndex + step + comments.length) % comments.length;
+            comments[activeCommentIndex].scrollIntoView({ behavior: 'smooth', block: 'center' });
+            refreshCommentsPane();
+        }
         function refreshCommentsPane() {
             var body = document.getElementById('commentsPaneBody');
             if (!body) return;
             var comments = editor.querySelectorAll('[data-comment], .comment-anchor');
             if (!comments.length) { body.innerHTML = '<p style="color:#888;font-style:italic;">Nenhum comentário.</p>'; return; }
-            body.innerHTML = Array.from(comments).map(function(node, i) {
+            activeCommentIndex = Math.min(activeCommentIndex, comments.length - 1);
+            body.replaceChildren();
+            var navigation = document.createElement('div');
+            [-1, 1].forEach(function(step) {
+                var button = document.createElement('button');
+                button.type = 'button';
+                button.className = 'btn-secondary';
+                button.textContent = step < 0 ? 'Anterior' : 'Seguinte';
+                button.addEventListener('click', function() { navigateComment(step); });
+                navigation.appendChild(button);
+            });
+            body.appendChild(navigation);
+            Array.from(comments).forEach(function(node, i) {
                 var text = node.dataset.comment || node.title || node.textContent.slice(0, 80);
-                return '<div class="comment-row"><strong>#' + (i + 1) + '</strong><br/>' + text +
-                    '<br/><button class="btn-secondary" style="margin-top:6px;padding:4px 8px;font-size:11px;" onclick="resolveComment(' + i + ');refreshCommentsPane();">Resolver</button></div>';
-            }).join('');
+                var row = document.createElement('div');
+                row.className = 'comment-row';
+                if (i === activeCommentIndex) row.style.borderLeft = '3px solid #2563eb';
+                var label = document.createElement('strong');
+                label.textContent = '#' + (i + 1);
+                var message = document.createElement('p');
+                message.textContent = text;
+                var resolve = document.createElement('button');
+                resolve.type = 'button';
+                resolve.className = 'btn-secondary';
+                resolve.textContent = 'Resolver';
+                resolve.addEventListener('click', function() { resolveComment(i); });
+                row.append(label, message, resolve);
+                body.appendChild(row);
+            });
         }
 
         function headerHtmlForWord() {
@@ -12681,11 +12809,11 @@ table { border-collapse: collapse; }
     <script src="libs/abene-tables.js?v=20260914-essential-1"></script>
     <script src="libs/abene-document.js?v=20260914-essential-1"></script>
     <script src="libs/abene-history.js?v=20260914-essential-1"></script>
-    <script src="libs/abene-export.js?v=20260914-imgexp-1"></script>
-    <script src="libs/abene-modelo.js?v=20260914-insp-1"></script>
+    <script src="libs/abene-export.js?v=20260914-merge-1"></script>
+    <script src="libs/abene-modelo.js?v=20260914-meta-1"></script>
     <script src="libs/abene-comercial.js?v=20260914-essential-1"></script>
     <script src="libs/abene-contabilidade.js?v=20260914-essential-1"></script>
-    <script src="libs/abene-arquivo.js?v=20260914-arqpdf-1"></script>
+    <script src="libs/abene-arquivo.js?v=20260914-check-1"></script>
     <script src="libs/abene-phone.js?v=20260914-essential-1"></script>
     <script src="libs/abene-excel-engine.js?v=20260914-essential-1"></script>
     <script src="libs/abene-excel.js?v=20260914-essential-1"></script>
@@ -12693,7 +12821,7 @@ table { border-collapse: collapse; }
     <script src="libs/abene-collab.js?v=20260914-essential-1"></script>
     <script src="libs/abene-gdocs.js?v=20260914-essential-1"></script>
     <script src="libs/abene-pickers.js?v=20260914-essential-1"></script>
-    <script src="libs/abene-proof.js?v=20260914-essential-1"></script>
+    <script src="libs/abene-proof.js?v=20260914-spell-1"></script>
 
 </body>
 </html>
