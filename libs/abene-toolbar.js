@@ -519,40 +519,178 @@
             }
         });
     };
-    window.insertCaption = function () {
+    function currentCaptionImage() {
+        var img = window.selectedImage;
+        if (img && img.tagName === 'IMG') return img;
+        var sel = window.getSelection();
+        var node = sel && sel.anchorNode;
+        var el = node && (node.nodeType === 1 ? node : node.parentElement);
+        if (!el) return null;
+        var pic = el.closest && el.closest('.abene-pic');
+        if (pic) return pic.querySelector('img');
+        if (el.tagName === 'IMG') return el;
+        var prev = el.previousElementSibling;
+        if (prev && prev.classList && prev.classList.contains('abene-pic')) return prev.querySelector('img');
+        if (prev && prev.tagName === 'IMG') return prev;
+        return null;
+    }
+    function currentCaptionTable() {
+        if (typeof window.getSelectedTable === 'function') {
+            var t = window.getSelectedTable();
+            if (t) return t;
+        }
+        var sel = window.getSelection();
+        var node = sel && sel.anchorNode;
+        var el = node && (node.nodeType === 1 ? node : node.parentElement);
+        return el && el.closest ? el.closest('#editor table') : null;
+    }
+    function captionHost(el) {
+        if (!el) return null;
+        if (el.tagName === 'IMG') return el.closest('.abene-pic') || el;
+        return el;
+    }
+    function findCaptionAfter(host) {
+        if (!host) return null;
+        var n = host.nextElementSibling;
+        if (n && (n.classList.contains('abene-caption') || n.getAttribute('data-caption-for'))) return n;
+        return null;
+    }
+    function captionKindOf(el) {
+        var k = el && el.getAttribute('data-abene-caption');
+        if (k === 'table' || k === 'figure') return k;
+        if (el && el.getAttribute('data-caption-for') === 'table') return 'table';
+        return 'figure';
+    }
+    function extractCaptionText(el) {
+        if (!el) return '';
+        var stored = el.getAttribute('data-caption-text');
+        if (stored) return stored;
+        var span = el.querySelector('.abene-caption-text');
+        if (span) return String(span.textContent || '').trim();
+        return String(el.textContent || '').trim().replace(/^(Figura|Figure|Tabela|Table|Tableau|Tabla|Ilustração|Illustration|Ilustración)\s*\d+\s*[—–:\-]\s*/i, '');
+    }
+    function captionLabel(kind) {
+        return kind === 'table' ? tt('capTable') : tt('capFigure');
+    }
+    function fillCaptionNode(el, kind, n, text) {
+        el.classList.add('abene-caption');
+        el.setAttribute('data-abene-caption', kind);
+        el.setAttribute('data-caption-for', kind === 'table' ? 'table' : 'image');
+        el.setAttribute('data-caption-text', text || '');
+        el.innerHTML = '<span class="abene-caption-label">' + esc(captionLabel(kind)) + ' </span>' +
+            '<span class="abene-caption-num">' + n + '</span>' +
+            (text ? '<span class="abene-caption-sep"> — </span><span class="abene-caption-text">' + esc(text) + '</span>' : '');
+    }
+    function collectCaptions(kind) {
         var editor = editorEl();
-        var n = editor.querySelectorAll('[data-caption-for], img[data-caption]').length + 1;
-        formDialog(tt('caption'), [{ id: 'text', label: tt('pCaption'), value: tt('figCaption', { n: n }) }], function (data) {
-            var caption = (data.text || '').trim();
-            if (!caption) return;
-            var img = window.selectedImage || null;
-            if (img) {
-                img.dataset.caption = caption;
-                img.alt = caption;
-                if (!img.id) img.id = 'figure-' + n;
-                var previous = img.nextElementSibling;
-                if (previous && previous.dataset.captionFor === 'image') previous.remove();
-                var label = document.createElement('p');
-                label.dataset.captionFor = 'image';
-                label.style.cssText = 'font-style:italic;font-size:10pt;color:#666;text-align:center;margin:5px 0;';
-                label.textContent = caption;
-                img.insertAdjacentElement('afterend', label);
-                if (typeof saveUndoState === 'function') saveUndoState();
-                return;
-            }
-            insertHTML('<p data-caption-for="text" style="font-style:italic;font-size:10pt;color:#666;text-align:center;margin:5px 0;">' + esc(caption) + '</p>');
+        if (!editor) return [];
+        return Array.from(editor.querySelectorAll('.abene-caption, [data-caption-for], [data-abene-caption]')).filter(function (el) {
+            if (el.closest('[data-figures-index], [data-illustrations-index], [data-tables-index], .field-toc, [data-field-type="toc"]')) return false;
+            return !kind || captionKindOf(el) === kind;
+        });
+    }
+    function renumberCaptions() {
+        var editor = editorEl();
+        if (!editor) return;
+        ['figure', 'table'].forEach(function (kind) {
+            collectCaptions(kind).forEach(function (el, i) {
+                fillCaptionNode(el, kind, i + 1, extractCaptionText(el));
+            });
+        });
+    }
+    function attachCaption(kind, text) {
+        var editor = editorEl();
+        var img = kind === 'figure' ? currentCaptionImage() : null;
+        var table = kind === 'table' ? currentCaptionTable() : null;
+        if (kind === 'table' && !table) { toast(tt('capNeedTable')); return; }
+        var host = captionHost(table || img);
+        var n = collectCaptions(kind).length + 1;
+        var prefix = kind === 'table' ? 'tabela-' : 'figura-';
+        if (img) {
+            img.dataset.caption = text;
+            img.alt = text || img.alt || '';
+            if (!img.id) img.id = prefix + n;
+        }
+        if (table && !table.id) table.id = prefix + n;
+        if (host) {
+            var previous = findCaptionAfter(host);
+            var label = previous || document.createElement('p');
+            fillCaptionNode(label, kind, n, text);
+            if (!previous) host.insertAdjacentElement('afterend', label);
+        } else {
+            var tmp = document.createElement('p');
+            fillCaptionNode(tmp, kind, n, text);
+            insertHTML(tmp.outerHTML);
+        }
+        renumberCaptions();
+        refreshCaptionIndexes();
+        if (typeof saveUndoState === 'function') saveUndoState();
+    }
+    window.insertCaption = function () {
+        var img = currentCaptionImage();
+        var table = currentCaptionTable();
+        var kind = table && !img ? 'table' : 'figure';
+        var existing = findCaptionAfter(captionHost(table || img));
+        var preset = existing ? extractCaptionText(existing) : '';
+        formDialog(tt('caption'), [
+            {
+                id: 'kind', label: tt('capKind'), type: 'select', value: kind,
+                options: [{ value: 'figure', label: tt('capFigure') }, { value: 'table', label: tt('capTable') }]
+            },
+            { id: 'text', label: tt('capText'), value: preset }
+        ], function (data) {
+            var nextKind = data.kind === 'table' ? 'table' : 'figure';
+            attachCaption(nextKind, String(data.text || '').trim());
         });
     };
+    window.abeneRenumberCaptions = renumberCaptions;
 
+    function indexRowHtml(id, label, page) {
+        return '<p class="abene-lof-row"><a href="#' + esc(id) + '">' + esc(label) + '</a><span class="abene-toc-dots" aria-hidden="true"></span><span class="abene-toc-page">' + esc(String(page || '')) + '</span></p>';
+    }
+    function captionEntries(kind) {
+        return collectCaptions(kind).map(function (cap, index) {
+            var host = cap.previousElementSibling;
+            var target = host && ((kind === 'table' && host.tagName === 'TABLE') || (kind === 'figure' && (host.tagName === 'IMG' || host.classList.contains('abene-pic'))))
+                ? (host.querySelector && host.querySelector('img') || host)
+                : cap;
+            if (!target.id) target.id = (kind === 'table' ? 'tabela-' : 'figura-') + (index + 1);
+            var text = extractCaptionText(cap);
+            var label = captionLabel(kind) + ' ' + (index + 1) + (text ? ' — ' + text : '');
+            return { id: target.id, label: label, page: pageOfEl(target) };
+        });
+    }
+    function buildListIndexHtml(kind, titleKey, emptyKey) {
+        var rows = captionEntries(kind);
+        if (!rows.length && kind === 'figure') {
+            var editor = editorEl();
+            rows = Array.from(editor.querySelectorAll('img')).map(function (image, index) {
+                if (!image.id) image.id = 'illustration-' + (index + 1);
+                var label = image.dataset.caption || image.alt || (tt('illustration') + ' ' + (index + 1));
+                return { id: image.id, label: tt('illustration') + ' ' + (index + 1) + ': ' + label, page: pageOfEl(image) };
+            });
+        }
+        var body = rows.length
+            ? rows.map(function (r) { return indexRowHtml(r.id, r.label, r.page); }).join('')
+            : '<p>' + esc(tt(emptyKey)) + '</p>';
+        var attrs = kind === 'table'
+            ? 'data-tables-index="true"'
+            : 'data-figures-index="true" data-illustrations-index="true"';
+        return '<div ' + attrs + ' class="abene-lof" style="border:1px solid #d0d0d0;padding:20px;margin:15px 0;background:#fafafa;border-radius:4px;"><h3 style="margin-bottom:10px;color:#2b579a;">' + esc(tt(titleKey)) + '</h3>' + body + '</div>';
+    }
     function buildFiguresHtml() {
+        return buildListIndexHtml('figure', 'illIndexTitle', 'aNoFiguresCap');
+    }
+    function buildTablesHtml() {
+        return buildListIndexHtml('table', 'totTitle', 'aNoTablesCap');
+    }
+    function refreshCaptionIndexes() {
         var editor = editorEl();
-        var images = editor.querySelectorAll('img');
-        var rows = Array.from(images).map(function (image, index) {
-            if (!image.id) image.id = 'illustration-' + (index + 1);
-            var label = image.dataset.caption || image.alt || (tt('illustration') + ' ' + (index + 1));
-            return '<p style="margin:5px 0;"><a href="#' + esc(image.id) + '">' + esc(tt('illustration')) + ' ' + (index + 1) + ': ' + esc(label) + '</a></p>';
-        }).join('');
-        return '<div data-figures-index="true" data-illustrations-index="true" style="border:1px solid #d0d0d0;padding:20px;margin:15px 0;background:#fafafa;border-radius:4px;"><h3 style="margin-bottom:10px;color:#2b579a;">' + esc(tt('illIndexTitle')) + '</h3>' + rows + '</div>';
+        if (!editor) return;
+        var fig = editor.querySelector('[data-figures-index], [data-illustrations-index]');
+        if (fig) fig.outerHTML = buildFiguresHtml();
+        var tot = editor.querySelector('[data-tables-index]');
+        if (tot) tot.outerHTML = buildTablesHtml();
     }
     function replaceOrInsert(selector, html, atStart) {
         var editor = editorEl();
@@ -568,10 +706,15 @@
     }
     window.insertIllustrationsIndex = function () {
         var editor = editorEl();
-        if (!editor.querySelector('img')) { toast(tt('aNoIllustDoc')); return; }
+        var hasCap = collectCaptions('figure').length;
+        if (!hasCap && !editor.querySelector('img')) { toast(tt('aNoIllustDoc')); return; }
         replaceOrInsert('[data-figures-index], [data-illustrations-index]', buildFiguresHtml(), true);
     };
     window.insertTableOfFigures = window.insertIllustrationsIndex;
+    window.insertTableOfTables = function () {
+        if (!collectCaptions('table').length) { toast(tt('aNoTablesCap')); return; }
+        replaceOrInsert('[data-tables-index]', buildTablesHtml(), true);
+    };
 
     window.insertCrossReference = function () {
         var editor = editorEl();
@@ -671,30 +814,101 @@
         if (!editor.querySelector('[data-citation]')) toast(tt('biblioEmpty'));
     };
 
+    function pageOfEl(el) {
+        var editor = editorEl();
+        if (!el || !editor) return 1;
+        var y = 0;
+        if (typeof window.abeneYInEditor === 'function') y = window.abeneYInEditor(el, editor);
+        else {
+            try {
+                var er = editor.getBoundingClientRect();
+                var rr = el.getBoundingClientRect();
+                if (er.height) y = (rr.top - er.top) * (editor.offsetHeight / er.height);
+            } catch (err) { y = el.offsetTop || 0; }
+        }
+        var h = (window.PageGeometry && window.PageGeometry.height) || 1123;
+        var physical = Math.max(1, Math.floor(y / h) + 1);
+        if (window.ABENE && window.ABENE.Sections && typeof window.ABENE.Sections.pageNumberInfo === 'function') {
+            var total = window.abeneCountUsedPages ? window.abeneCountUsedPages(editor) : physical;
+            var info = window.ABENE.Sections.pageNumberInfo(physical - 1, total);
+            if (info && info.hideNumbers) return '';
+            if (info && (info.label || info.display)) return info.label || info.display;
+        }
+        return physical;
+    }
+    function headingLevel(h) {
+        if (!h) return 1;
+        if (/^H[1-6]$/.test(h.tagName)) return parseInt(h.tagName[1], 10);
+        var st = h.getAttribute('data-abene-style') || '';
+        if (st === 'title') return 1;
+        if (st === 'subtitle') return 2;
+        if (/^h[1-9]$/.test(st)) return parseInt(st.slice(1), 10);
+        if (h.classList.contains('abene-title')) return 1;
+        if (h.classList.contains('abene-subtitle')) return 2;
+        if (h.classList.contains('abene-h7')) return 7;
+        if (h.classList.contains('abene-h8')) return 8;
+        if (h.classList.contains('abene-h9')) return 9;
+        return 1;
+    }
     function headingTargets() {
         var editor = editorEl();
         if (!editor) return [];
-        return Array.from(editor.querySelectorAll('h1, h2, h3, h4')).filter(function (h) {
-            return !h.closest('[data-abene-block="cover"], [data-abene-block="titlepage"], [data-abene-block="toc"], .field-toc, [data-field-type="toc"]');
+        var sel = 'h1, h2, h3, h4, h5, h6, .abene-title, .abene-subtitle, .abene-h7, .abene-h8, .abene-h9, [data-abene-style="title"], [data-abene-style="subtitle"], [data-abene-style="h1"], [data-abene-style="h2"], [data-abene-style="h3"], [data-abene-style="h4"], [data-abene-style="h5"], [data-abene-style="h6"], [data-abene-style="h7"], [data-abene-style="h8"], [data-abene-style="h9"]';
+        return Array.from(editor.querySelectorAll(sel)).filter(function (h) {
+            if (h.closest('[data-abene-block="cover"], [data-abene-block="titlepage"], [data-abene-block="toc"], .field-toc, [data-field-type="toc"], [data-figures-index], [data-illustrations-index], [data-tables-index], [data-index], [data-bibliography]')) return false;
+            return !!String(h.textContent || '').trim();
         });
     }
-    function buildTocHtml() {
+    function buildTocListHtml() {
         var headings = headingTargets();
-        var list = headings.map(function (h) {
+        if (!headings.length) return '<p>' + esc(tt('aNoToc')) + '</p>';
+        return headings.map(function (h) {
             if (!h.id) h.id = 'h-' + Math.random().toString(36).slice(2, 8);
-            var level = parseInt(h.tagName[1], 10) || 1;
-            return '<p data-toc-level="' + level + '" style="margin:3px 0;padding-left:' + ((level - 1) * 20) + 'px;font-size:10pt;"><a href="#' + esc(h.id) + '">' + esc(h.textContent) + '</a></p>';
+            var level = headingLevel(h);
+            return '<p class="abene-toc-row" data-toc-level="' + level + '" style="padding-left:' + ((Math.max(1, level) - 1) * 16) + 'px">' +
+                '<a href="#' + esc(h.id) + '">' + esc(h.textContent.trim()) + '</a>' +
+                '<span class="abene-toc-dots" aria-hidden="true"></span>' +
+                '<span class="abene-toc-page">' + pageOfEl(h) + '</span></p>';
         }).join('');
-        return '<div class="field-toc" data-field-type="toc" style="border:1px solid #d0d0d0;padding:20px;margin:15px 0;background:#fafafa;border-radius:4px;"><h3 style="margin-bottom:10px;color:#2b579a;">' + esc(tt('tocTitle')) + '</h3>' + (list || '<p>' + esc(tt('aNoToc')) + '</p>') + '</div>';
+    }
+    function buildTocHtml() {
+        return '<div class="field-toc" data-field-type="toc" style="border:1px solid #d0d0d0;padding:20px;margin:15px 0;background:#fafafa;border-radius:4px;"><h3 class="abene-toc-title" style="margin-bottom:10px;color:#2b579a;">' + esc(tt('tocTitle')) + '</h3>' + buildTocListHtml() + '</div>';
+    }
+    function fillFieldToc(el) {
+        if (!el) return;
+        if ((el.className || '').indexOf('field-toc') < 0) el.className = (el.className || '') + ' field-toc';
+        el.setAttribute('data-field-type', 'toc');
+        var title = el.querySelector('h3, h1');
+        var titleHtml = title ? title.outerHTML : '<h3 class="abene-toc-title" style="margin-bottom:10px;color:#2b579a;">' + esc(tt('tocTitle')) + '</h3>';
+        el.innerHTML = titleHtml + buildTocListHtml();
     }
     window.abeneBuildTocHtml = buildTocHtml;
     window.abeneFillModeloToc = function (block) {
         if (!block) return;
-        if (!headingTargets().length) return;
-        block.innerHTML = buildTocHtml();
+        var h = Array.from(block.children).filter(function (c) { return c.tagName === 'H1'; })[0];
+        var title = h ? h.outerHTML : '<h1>' + esc(tt('tocTitle') || 'Índice') + '</h1>';
+        block.innerHTML = title + '<div class="abene-toc-body field-toc" data-field-type="toc">' + buildTocListHtml() + '</div>';
     };
+    function refreshAllTocs() {
+        var editor = editorEl();
+        if (!editor) return;
+        editor.querySelectorAll('[data-abene-block="toc"]').forEach(function (block) {
+            window.abeneFillModeloToc(block);
+        });
+        editor.querySelectorAll('[data-field-type="toc"], .field-toc').forEach(function (el) {
+            if (el.closest('[data-abene-block="toc"]')) return;
+            fillFieldToc(el);
+        });
+    }
     window.insertTOC = function () {
         if (!headingTargets().length) { toast(tt('aNoToc')); return; }
+        var editor = editorEl();
+        var modelo = editor && editor.querySelector('[data-abene-block="toc"]');
+        if (modelo) {
+            window.abeneFillModeloToc(modelo);
+            if (typeof saveUndoState === 'function') saveUndoState();
+            return;
+        }
         replaceOrInsert('[data-field-type="toc"], .field-toc', buildTocHtml(), true);
     };
     window.insertIndex = function () {
@@ -723,25 +937,34 @@
         replaceOrInsert('[data-index="true"]', '<div data-index="true" style="border:1px solid #d0d0d0;padding:20px;margin:15px 0;background:#fafafa;"><h3>' + esc(tt('idxTitle')) + '</h3>' + body + '</div>', true);
     };
 
-    window.updateAllFields = function () {
+    var fieldsBusy = false;
+    window.updateAllFields = function (opts) {
+        if (fieldsBusy) return;
+        var silent = opts && opts.silent;
         var editor = editorEl();
         if (!editor) return;
-        if (headingTargets().length && editor.querySelector('[data-field-type="toc"], .field-toc, [data-abene-block="toc"]')) {
-            var toc = editor.querySelector('[data-field-type="toc"], .field-toc');
-            if (toc) toc.outerHTML = buildTocHtml();
-            var modeloToc = editor.querySelector('[data-abene-block="toc"]');
-            if (modeloToc) window.abeneFillModeloToc(modeloToc);
+        fieldsBusy = true;
+        try {
+            if (typeof refreshPagination === 'function' && !silent) refreshPagination();
+            renumberCaptions();
+            if (editor.querySelector('[data-field-type="toc"], .field-toc, [data-abene-block="toc"]')) {
+                refreshAllTocs();
+            }
+            refreshCaptionIndexes();
+            rebuildBibliography(false);
+            var ph = (window.PageGeometry && window.PageGeometry.height) || 1123;
+            var totalPages = window.abeneCountUsedPages ? window.abeneCountUsedPages(editor) : Math.max(1, Math.ceil(editor.scrollHeight / ph));
+            editor.querySelectorAll('[data-field-type="page"]').forEach(function (field) {
+                var page = Math.max(1, Math.min(totalPages, pageOfEl(field)));
+                field.textContent = (tt('statusPage') || 'Página') + ' ' + page + ' / ' + totalPages;
+            });
+            editor.querySelectorAll('[data-field-type="date"]').forEach(function (field) {
+                field.textContent = new Date().toLocaleDateString(document.documentElement.lang || 'pt-PT', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+            });
+            if (!silent) toast(tt('updateFields'));
+        } finally {
+            fieldsBusy = false;
         }
-        if (editor.querySelector('img') && editor.querySelector('[data-figures-index], [data-illustrations-index]')) {
-            var fig = editor.querySelector('[data-figures-index], [data-illustrations-index]');
-            fig.outerHTML = buildFiguresHtml();
-        }
-        rebuildBibliography(false);
-        editor.querySelectorAll('[data-field-type="date"]').forEach(function (field) {
-            field.textContent = new Date().toLocaleDateString(document.documentElement.lang || 'pt-PT', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-        });
-        if (typeof refreshPagination === 'function') refreshPagination();
-        toast(tt('updateFields'));
     };
 
     var THEME_COLORS = ['#000000', '#44546A', '#2b579a', '#5B9BD5', '#ED7D31', '#A5A5A5', '#FFC000', '#4472C4', '#70AD47', '#c9a84c', '#c0392b', '#1e4e79'];
@@ -801,7 +1024,11 @@
             '<button onclick="insertSectionBreak(\'nextPage\');hideRibbonFlyout()">' + tt('secBreakNext') + '</button>' +
             '<button onclick="insertSectionBreak(\'continuous\');hideRibbonFlyout()">' + tt('secBreakCont') + '</button>' +
             '<button onclick="insertSectionBreak(\'evenPage\');hideRibbonFlyout()">' + tt('secBreakEven') + '</button>' +
-            '<button onclick="insertSectionBreak(\'oddPage\');hideRibbonFlyout()">' + tt('secBreakOdd') + '</button>'
+            '<button onclick="insertSectionBreak(\'oddPage\');hideRibbonFlyout()">' + tt('secBreakOdd') + '</button>' +
+            '<button onclick="insertSectionRole(\'front\');hideRibbonFlyout()">' + tt('secRoleFront') + '</button>' +
+            '<button onclick="insertSectionRole(\'body\');hideRibbonFlyout()">' + tt('secRoleBody') + '</button>' +
+            '<button onclick="insertSectionRole(\'annex\');hideRibbonFlyout()">' + tt('secRoleAnnex') + '</button>' +
+            '<button onclick="applyReportSections();hideRibbonFlyout()">' + tt('secApplyStructure') + '</button>'
         );
     };
     window.insertBlankPage = function () {
@@ -1038,7 +1265,9 @@
     window.showTocMenu = function (ev) {
         showFly(ev,
             '<button onclick="hideRibbonFlyout();insertTOC()">' + tt('tocInsert') + '</button>' +
-            '<button onclick="hideRibbonFlyout();updateAllFields()">' + tt('tocUpdate') + '</button>'
+            '<button onclick="hideRibbonFlyout();updateAllFields()">' + tt('tocUpdate') + '</button>' +
+            '<button onclick="hideRibbonFlyout();insertTableOfFigures()">' + tt('tof') + '</button>' +
+            '<button onclick="hideRibbonFlyout();insertTableOfTables()">' + tt('tocTables') + '</button>'
         );
     };
     window.showMultilevelMenu = function (ev) {
@@ -1099,4 +1328,42 @@
     document.querySelectorAll('#tab-references [onclick="setCitationStyle()"]').forEach(function (btn) {
         btn.setAttribute('onclick', 'setCitationStyle(event)');
     });
+
+    var fieldTimer = 0;
+    function scheduleLiveFields() {
+        clearTimeout(fieldTimer);
+        fieldTimer = setTimeout(function () {
+            var editor = editorEl();
+            if (!editor || fieldsBusy) return;
+            var sel = window.getSelection();
+            var n = sel && sel.anchorNode;
+            var el = n && (n.nodeType === 1 ? n : n.parentElement);
+            if (el && el.closest && el.closest('[data-field-type="toc"], .field-toc, [data-abene-block="toc"], [data-figures-index], [data-tables-index]')) return;
+            if (!editor.querySelector('[data-field-type="toc"], .field-toc, [data-abene-block="toc"], [data-figures-index], [data-tables-index], .abene-caption, [data-caption-for]')) return;
+            window.updateAllFields({ silent: true });
+        }, 800);
+    }
+    window.abeneScheduleLiveFields = scheduleLiveFields;
+    var editorLive = editorEl();
+    if (editorLive) editorLive.addEventListener('input', scheduleLiveFields);
+    var prevApplyStyle = window.applyStyle;
+    if (typeof prevApplyStyle === 'function') {
+        window.applyStyle = function () {
+            var r = prevApplyStyle.apply(this, arguments);
+            scheduleLiveFields();
+            return r;
+        };
+        if (window.abeneApplyStyle) window.abeneApplyStyle = window.applyStyle;
+    }
+    var origDelTable = window.deleteTable;
+    if (typeof origDelTable === 'function') {
+        window.deleteTable = function () {
+            var table = typeof window.getSelectedTable === 'function' ? window.getSelectedTable() : null;
+            var cap = findCaptionAfter(table);
+            origDelTable.apply(this, arguments);
+            if (cap && cap.parentNode) cap.remove();
+            renumberCaptions();
+            refreshCaptionIndexes();
+        };
+    }
 })();

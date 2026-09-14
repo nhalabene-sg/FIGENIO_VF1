@@ -22,6 +22,12 @@
         if (type === 'oddPage') return tt('secBreakOdd', 'Secção página ímpar');
         return tt('secBreakNext', 'Secção página seguinte');
     }
+    function roleLabel(role) {
+        if (role === 'front') return tt('secFrontLabel', 'Capa (sem n.º de página)');
+        if (role === 'annex') return tt('secAnnexLabel', 'Anexos');
+        if (role === 'body') return tt('secBodyLabel', 'Corpo');
+        return '';
+    }
     function geoProps() {
         var G = root.PageGeometry;
         var a = A();
@@ -53,7 +59,10 @@
             headerEvenFields: null,
             headerDistance: null,
             footerDistance: null,
-            pageNumberRestart: null
+            pageNumberRestart: null,
+            pageNumberFormat: null,
+            role: null,
+            hidePageNumbers: false
         };
     }
     function currentDocProps() {
@@ -125,24 +134,57 @@
         else writeProps(sec.el, props);
     }
 
-    function insertBreak(type) {
-        type = String(type || 'nextPage');
+    function roleProps(role, base) {
+        var props = Object.assign({}, base || currentDocProps());
+        props.role = role || props.role || null;
+        if (role === 'front') {
+            props.hidePageNumbers = true;
+            props.differentFirst = true;
+            props.headerLink = false;
+            props.footerLink = false;
+            props.footerText = '';
+        } else if (role === 'body' || role === 'annex') {
+            props.hidePageNumbers = false;
+            props.headerLink = false;
+            props.footerLink = false;
+            props.pageNumberRestart = 1;
+            props.pageNumberFormat = role === 'annex' ? 'annex' : 'decimal';
+            var co = A().companyData || {};
+            if (props.footerText == null || props.footerText === '') {
+                props.footerText = (co.name || 'Genius Raros') + '  ·  {PAGE} / {NUMPAGES}';
+            }
+        }
+        return props;
+    }
+    function breakHtml(type, extra) {
+        extra = extra || {};
+        type = String(type || extra.type || 'nextPage');
+        if (!TYPES[type]) type = 'nextPage';
+        var props = roleProps(extra.role, Object.assign({}, currentDocProps(), geoProps(), extra));
+        var forcesPage = type !== 'continuous';
+        var cls = 'abene-section-break' + (forcesPage ? ' page-break-marker' : '');
+        var lab = extra.role ? roleLabel(extra.role) : labelFor(type);
+        var roleAttr = extra.role ? ' data-abene-section-role="' + extra.role + '"' : '';
+        return '<div class="' + cls + '" contenteditable="false" data-abene-section-type="' + type +
+            '" data-abene-section-props="' + escAttr(JSON.stringify(props)) +
+            '" data-abene-section-label="' + escAttr(lab) + '"' + roleAttr +
+            ' aria-label="' + escAttr(lab) + '"></div>';
+    }
+    function insertBreak(type, extra) {
+        extra = extra || {};
+        type = String(type || extra.type || 'nextPage');
         if (!TYPES[type]) type = 'nextPage';
         var editor = ed();
         if (!editor) return;
         editor.focus();
         var prev = atCaret();
         var props = Object.assign({}, prev && prev.props ? prev.props : currentDocProps(), geoProps(), {
-            headerLink: true,
-            footerLink: true
-        });
-        var forcesPage = type !== 'continuous';
-        var cls = 'abene-section-break' + (forcesPage ? ' page-break-marker' : '');
-        var lab = labelFor(type);
-        var html = '<div class="' + cls + '" contenteditable="false" data-abene-section-type="' + type +
-            '" data-abene-section-props="' + escAttr(JSON.stringify(props)) +
-            '" data-abene-section-label="' + escAttr(lab) +
-            '" aria-label="' + escAttr(lab) + '"></div><p class="abene-normal"><br></p>';
+            headerLink: extra.role ? false : true,
+            footerLink: extra.role ? false : true
+        }, extra);
+        props = roleProps(extra.role, props);
+        var html = breakHtml(type, Object.assign({}, extra, props, { role: extra.role || props.role })) +
+            '<p class="abene-normal"><br></p>';
         if (root.EditorCommands && root.EditorCommands.useEngine && typeof root.EditorCommands.insertHTML === 'function') {
             root.EditorCommands.insertHTML(html);
         } else {
@@ -253,6 +295,159 @@
         return { hf: hf, body: body };
     }
 
+    function pageHeightPx() {
+        return (root.PageGeometry && root.PageGeometry.height) || 1123;
+    }
+    function inferRoleForPage(page0, editor) {
+        editor = editor || ed();
+        if (!editor) return 'body';
+        var h = pageHeightPx();
+        var y0 = page0 * h;
+        var y1 = y0 + h;
+        var yFn = root.abeneYInEditor;
+        var front = false;
+        var annex = false;
+        var other = false;
+        editor.querySelectorAll('[data-abene-block]').forEach(function (b) {
+            var y = yFn ? yFn(b, editor) : (b.offsetTop || 0);
+            var bottom = y + Math.max(1, b.offsetHeight || 1);
+            if (bottom <= y0 + 4 || y >= y1 - 4) return;
+            var k = b.getAttribute('data-abene-block');
+            if (k === 'cover' || k === 'titlepage' || k === 'toc') front = true;
+            else if (k === 'annex') annex = true;
+            else other = true;
+        });
+        if (annex) return 'annex';
+        if (front && !other) return 'front';
+        return 'body';
+    }
+    function classifyPages(total) {
+        total = Math.max(1, Number(total) || 1);
+        var maps = pageMaps();
+        var sections = list();
+        var roles = [];
+        var p;
+        for (p = 0; p < total; p++) {
+            var secIdx = maps.body[p] != null ? maps.body[p] : 0;
+            var sec = sections[secIdx] || sections[0];
+            var role = sec && sec.props ? sec.props.role : null;
+            if (role === 'front' || role === 'body' || role === 'annex') roles[p] = role;
+            else roles[p] = inferRoleForPage(p);
+        }
+        var seenBody = false;
+        var seenAnnex = false;
+        for (p = 0; p < total; p++) {
+            if (roles[p] === 'annex') seenAnnex = true;
+            if (roles[p] === 'body') seenBody = true;
+            if (seenAnnex) roles[p] = 'annex';
+            else if (seenBody && roles[p] === 'front') roles[p] = 'body';
+        }
+        return roles;
+    }
+    function pageNumberInfo(page0, total) {
+        total = Math.max(1, Number(total) || 1);
+        page0 = Math.max(0, Math.min(Number(page0) || 0, total - 1));
+        var roles = classifyPages(total);
+        var role = roles[page0] || 'body';
+        var maps = pageMaps();
+        var sections = list();
+        var secIdx = maps.body[page0] != null ? maps.body[page0] : 0;
+        var props = (sections[secIdx] && sections[secIdx].props) || getRootProps();
+        var hide = role === 'front' || !!props.hidePageNumbers;
+        if (hide) {
+            return { page: page0 + 1, display: '', total: total, sectionTotal: 0, role: role, hideNumbers: true, label: '', format: 'none' };
+        }
+        var start = page0;
+        while (start > 0 && roles[start - 1] === role) start--;
+        var end = page0;
+        while (end + 1 < total && roles[end + 1] === role) end++;
+        var restart = Number(props.pageNumberRestart);
+        if (!isFinite(restart) || restart < 1) restart = 1;
+        var display = page0 - start + restart;
+        var sectionTotal = end - start + 1;
+        var format = props.pageNumberFormat || (role === 'annex' ? 'annex' : 'decimal');
+        var label = String(display);
+        if (format === 'annex') label = tt('secAnnexNum', 'Anexo') + ' ' + display;
+        return { page: page0 + 1, display: display, total: total, sectionTotal: sectionTotal, role: role, hideNumbers: false, label: label, format: format };
+    }
+    function stripPageFields(text) {
+        return String(text == null ? '' : text)
+            .replace(/\{PAGE\}(\s*\/\s*\{NUMPAGES\})?/gi, '')
+            .replace(/\{NUMPAGES\}/gi, '')
+            .replace(/\s*[·•|]\s*$/g, '')
+            .replace(/^\s*[·•|]\s*/g, '')
+            .replace(/\s{2,}/g, ' ')
+            .trim();
+    }
+    function updateBreakRole(el, role) {
+        if (!el) return;
+        var props = roleProps(role, parseProps(el));
+        writeProps(el, props);
+        el.setAttribute('data-abene-section-role', role);
+        el.setAttribute('data-abene-section-label', roleLabel(role));
+        el.setAttribute('aria-label', roleLabel(role));
+    }
+    function makeBreakEl(role) {
+        var wrap = document.createElement('div');
+        wrap.innerHTML = breakHtml('nextPage', { role: role });
+        return wrap.firstChild;
+    }
+    function skipFlow(el, dir) {
+        var n = el;
+        while (n && n.classList && n.classList.contains('abene-page-flow')) {
+            n = dir < 0 ? n.previousElementSibling : n.nextElementSibling;
+        }
+        return n;
+    }
+    function placeBreakAfter(node, role) {
+        if (!node || !node.parentNode) return;
+        var next = skipFlow(node.nextElementSibling, 1);
+        if (next && next.classList && next.classList.contains('abene-section-break')) {
+            updateBreakRole(next, role);
+            return;
+        }
+        if (next && next.classList && next.classList.contains('page-break-marker') && next.getAttribute('data-abene-break') === 'model') {
+            next.parentNode.replaceChild(makeBreakEl(role), next);
+            return;
+        }
+        var br = makeBreakEl(role);
+        if (node.nextSibling) node.parentNode.insertBefore(br, node.nextSibling);
+        else node.parentNode.appendChild(br);
+    }
+    function placeBreakBefore(node, role) {
+        if (!node || !node.parentNode) return;
+        var prev = skipFlow(node.previousElementSibling, -1);
+        if (prev && prev.classList && prev.classList.contains('abene-section-break')) {
+            updateBreakRole(prev, role);
+            return;
+        }
+        if (prev && prev.classList && prev.classList.contains('page-break-marker') && prev.getAttribute('data-abene-break') === 'model') {
+            prev.parentNode.replaceChild(makeBreakEl(role), prev);
+            return;
+        }
+        node.parentNode.insertBefore(makeBreakEl(role), node);
+    }
+    function applyReportSections(opts) {
+        opts = opts || {};
+        var editor = ed();
+        if (!editor) return;
+        var fronts = editor.querySelectorAll('[data-abene-block="cover"], [data-abene-block="titlepage"], [data-abene-block="toc"]');
+        var lastFront = fronts.length ? fronts[fronts.length - 1] : null;
+        var annex = editor.querySelector('[data-abene-block="annex"]');
+        if (lastFront) {
+            var rp = roleProps('front', getRootProps());
+            setRootProps(rp);
+            A().pageHeaderDifferentFirst = true;
+            try { localStorage.setItem('abeneHeaderDifferentFirst', '1'); } catch (e) {}
+            placeBreakAfter(lastFront, 'body');
+        }
+        if (annex) placeBreakBefore(annex, 'annex');
+        refreshChrome();
+        if (root.abeneSchedulePageFlow) root.abeneSchedulePageFlow(true);
+        if (!opts.silent && typeof saveUndoState === 'function') saveUndoState();
+        if (!opts.silent && typeof showToast === 'function') showToast(tt('secStructureDone', 'Estrutura de secções aplicada.'));
+    }
+
     function isFirstHfPage(page, maps) {
         maps = maps || pageMaps();
         if (page <= 0) return true;
@@ -313,6 +508,8 @@
         var header = h.headerText || '';
         var headerTemplate = h.headerTemplate;
         var headerFields = h.headerFields;
+        var info = pageNumberInfo(page, total || 1);
+        var hideNumbers = !!info.hideNumbers;
         if (first && h.differentFirst) {
             if (h.headerFirst != null && String(h.headerFirst).trim() !== '') {
                 header = h.headerFirst;
@@ -330,6 +527,8 @@
         if (footer === undefined || footer === null) footer = '';
         if (hideFirst) {
             footer = '';
+        } else if (hideNumbers) {
+            footer = stripPageFields(footer);
         } else if (first && f.differentFirst && f.footerFirst != null) {
             footer = f.footerFirst;
         } else if (even && f.differentOddEven && f.footerEven != null) {
@@ -341,13 +540,18 @@
             header: header,
             footer: footer,
             hideFirst: hideFirst,
+            hideNumbers: hideNumbers,
+            pageInfo: info,
             template: headerTemplate,
             fields: headerFields,
             headerDistance: distH,
             footerDistance: distF,
             sectionIndex: secIdx,
-            linkedHeader: !targetH || targetH.index !== secIdx || secIdx === 0,
-            linkedFooter: !targetF || targetF.index !== secIdx || secIdx === 0
+            headerSource: targetH ? targetH.index : 0,
+            footerSource: targetF ? targetF.index : 0,
+            linkedHeader: !!(secIdx > 0 && targetH && targetH.index !== secIdx),
+            linkedFooter: !!(secIdx > 0 && targetF && targetF.index !== secIdx),
+            role: (bodySec && bodySec.props && bodySec.props.role) || (info && info.role) || null
         };
     }
 
@@ -360,9 +564,12 @@
             list().forEach(function (s) {
                 if (s.el) parts.push(s.el.getAttribute('data-abene-section-props') || '');
             });
+            var roles = classifyPages(n);
+            parts.push(roles.join(','));
             for (i = 0; i < n; i++) {
                 var hf = hfForPage(i, n);
-                parts.push([hf.header, hf.footer, hf.hideFirst ? '1' : '0', hf.template || '', hf.headerDistance || '', hf.footerDistance || ''].join('~'));
+                var inf = hf.pageInfo || {};
+                parts.push([hf.header, hf.footer, hf.hideFirst ? '1' : '0', hf.hideNumbers ? '1' : '0', inf.label || '', inf.sectionTotal || '', hf.template || '', hf.headerDistance || '', hf.footerDistance || ''].join('~'));
             }
         } catch (e) {
             parts.push(String(e));
@@ -404,22 +611,75 @@
         setRootProps(p);
     }
 
+    function pageFromZone(zone) {
+        if (!zone || !zone.getAttribute) return 0;
+        var n = parseInt(zone.getAttribute('data-page'), 10);
+        return n > 0 ? n - 1 : 0;
+    }
+    function currentHfSection(kind) {
+        var page = null;
+        if (root._abeneHf && root._abeneHf.zone) page = pageFromZone(root._abeneHf.zone);
+        else if (root._abeneHfLastPage != null) page = Number(root._abeneHfLastPage);
+        if (page == null || !isFinite(page) || page < 0) {
+            var area = document.getElementById('editorArea');
+            var h = pageHeightPx();
+            if (area && h) page = Math.max(0, Math.floor((area.scrollTop || 0) / h));
+        }
+        if (page != null && isFinite(page) && page >= 0) {
+            var maps = pageMaps();
+            var secIdx = maps.hf[page] != null ? maps.hf[page] : 0;
+            return list()[secIdx] || list()[0];
+        }
+        return atCaret();
+    }
+    function ensureOwnSection(sec, kind) {
+        if (!sec || sec.index === 0) return sec;
+        var props = Object.assign({}, sec.props);
+        var linkKey = kind === 'footer' ? 'footerLink' : 'headerLink';
+        if (props[linkKey] === false && ((kind === 'footer' && props.footerText != null) || (kind !== 'footer' && props.headerText != null))) {
+            return Object.assign({}, sec, { props: props });
+        }
+        var src = kind === 'footer'
+            ? resolvedFooterBundle(resolveLinkTarget(sec.index - 1, 'footer'))
+            : resolvedHeaderBundle(resolveLinkTarget(sec.index - 1, 'header'));
+        if (kind === 'footer') {
+            if (props.footerText == null) props.footerText = src.footerText;
+            props.footerLink = false;
+        } else {
+            if (props.headerText == null) props.headerText = src.headerText || '';
+            if (props.headerTemplate == null) props.headerTemplate = src.headerTemplate;
+            if (props.headerFields == null) props.headerFields = src.headerFields;
+            props.headerLink = false;
+        }
+        writeSection(sec, props);
+        return { index: sec.index, type: sec.type, el: sec.el, props: props };
+    }
+    function ensureOwnFromZone(zone, kind) {
+        var page = pageFromZone(zone);
+        var maps = pageMaps();
+        var secIdx = maps.hf[page] != null ? maps.hf[page] : 0;
+        var sec = list()[secIdx] || list()[0];
+        return ensureOwnSection(sec, kind === 'footer' ? 'footer' : 'header');
+    }
     function afterGlobalHfWrite(kind, snap) {
-        var cur = atCaret();
-        var target = resolveLinkTarget(cur ? cur.index : 0, kind === 'footer' ? 'footer' : 'header');
-        if (!target || target.index === 0) {
+        kind = kind === 'footer' ? 'footer' : 'header';
+        var cur = currentHfSection(kind);
+        if (cur && cur.index > 0) cur = ensureOwnSection(cur, kind);
+        if (!cur || cur.index === 0) {
             syncRootFromGlobal();
             return;
         }
-        var props = Object.assign({}, target.props);
+        var props = Object.assign({}, cur.props);
         if (kind === 'footer') {
             props.footerText = A().pageFooterText;
+            props.footerLink = false;
         } else {
             props.headerText = A().pageHeaderText || '';
             props.headerTemplate = A().pageHeaderTemplate;
             props.headerFields = A().pageHeaderFields;
+            props.headerLink = false;
         }
-        writeSection(target, props);
+        writeSection(cur, props);
         restoreRootHf(snap);
         refreshChrome();
     }
@@ -529,7 +789,7 @@
     }
 
     function setLink(kind, linked) {
-        var cur = atCaret();
+        var cur = currentHfSection(kind === 'footer' ? 'footer' : 'header');
         if (!cur || cur.index === 0) return;
         var props = Object.assign({}, cur.props);
         var kinds = kind === 'both' ? ['header', 'footer'] : [kind === 'footer' ? 'footer' : 'header'];
@@ -595,7 +855,7 @@
     }
 
     function sectionMenuButtons() {
-        var cur = atCaret();
+        var cur = currentHfSection('header') || atCaret();
         var can = cur && cur.index > 0;
         var html = '';
         if (can) {
@@ -627,14 +887,28 @@
         currentDocProps: currentDocProps,
         pageMaps: pageMaps,
         hfForPage: hfForPage,
+        pageNumberInfo: pageNumberInfo,
+        classifyPages: classifyPages,
+        applyReportStructure: applyReportSections,
+        currentHfSection: currentHfSection,
+        ensureOwnFromZone: ensureOwnFromZone,
+        pageFromZone: pageFromZone,
+        roleLabel: roleLabel,
         chromeSig: chromeSig,
         commitFromZone: commitFromZone,
         setLink: setLink,
         syncRootFromGlobal: syncRootFromGlobal
     };
     root.ABENE.Sections = Sections;
-    root.insertSectionBreak = function (type) {
-        insertBreak(type);
+    root.insertSectionBreak = function (type, extra) {
+        insertBreak(type, extra);
+    };
+    root.insertSectionRole = function (role) {
+        insertBreak('nextPage', { role: role });
+    };
+    root.applyReportSections = applyReportSections;
+    root.abeneSectionBreakHtml = function (role) {
+        return breakHtml('nextPage', { role: role });
     };
     root.abeneHfSetLink = function (kind, linked) { setLink(kind, linked); };
     root.abeneHfToggleFirst = function () { toggleFlag('differentFirst'); };

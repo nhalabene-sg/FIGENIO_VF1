@@ -772,6 +772,36 @@
         .page .abene-keep-together { break-inside: avoid; page-break-inside: avoid; }
         .page .abene-break-before { break-before: page; page-break-before: always; }
         .page .abene-no-hyphen { hyphens: none; }
+        .page .abene-caption,
+        .page p[data-caption-for] {
+            font-style: italic;
+            font-size: 10pt;
+            color: #404040;
+            text-align: center;
+            margin: 4pt 0 10pt 0;
+        }
+        .page .abene-caption-label,
+        .page .abene-caption-num { font-weight: 600; }
+        .abene-toc-row,
+        .field-toc [data-toc-level],
+        .abene-lof-row {
+            display: flex;
+            align-items: baseline;
+            gap: 8px;
+            margin: 3px 0;
+            font-size: 10pt;
+        }
+        .abene-toc-row a,
+        .abene-lof-row a { color: #1f2937; text-decoration: none; }
+        .abene-toc-row a:hover,
+        .abene-lof-row a:hover { color: #2b579a; text-decoration: underline; }
+        .abene-toc-dots {
+            flex: 1;
+            border-bottom: 1px dotted #9aa3ad;
+            min-width: 20px;
+            height: 0.65em;
+        }
+        .abene-toc-page { font-variant-numeric: tabular-nums; min-width: 1.2em; text-align: right; color: #404040; }
         .page .abene-tab { display: inline-block; min-width: 1.27cm; }
         .page.show-marks p::after, .page.show-marks h1::after, .page.show-marks h2::after,
         .page.show-marks h3::after, .page.show-marks h4::after, .page.show-marks h5::after,
@@ -949,6 +979,10 @@
             font-family: 'Segoe UI', sans-serif;
             padding: 0 7px;
             line-height: 14px;
+            max-width: calc(100% - 24px);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
             border-radius: 1px;
             user-select: none;
             cursor: pointer;
@@ -1108,6 +1142,15 @@
         .abene-obj-left { float: left; margin: 0 12px 8px 0; }
         .abene-obj-right { float: right; margin: 0 0 8px 12px; }
         .abene-obj-center { display: block; float: none; margin: 12px auto; }
+        .abene-obj-above, .abene-obj-below {
+            display: block;
+            float: none;
+            margin-left: auto;
+            margin-right: auto;
+            max-width: 100%;
+        }
+        .abene-obj-above { margin: 0 auto 14px; }
+        .abene-obj-below { margin: 14px auto 0; }
         .abene-obj-free { position: absolute; z-index: 6; margin: 0; float: none; }
         .abene-obj-front { position: absolute; z-index: 7; margin: 0; float: none; }
         .abene-obj-behind { position: absolute; z-index: 0; margin: 0; float: none; }
@@ -1564,13 +1607,24 @@
             border-radius: 6px;
             display: none;
             gap: 5px;
-            z-index: 999;
+            z-index: 4200;
             flex-wrap: wrap;
-            max-width: 520px;
+            max-width: min(760px, calc(100vw - 16px));
+            align-items: center;
         }
 
         .image-toolbar.visible {
             display: flex;
+        }
+        .image-toolbar-title {
+            width: 100%;
+            font: 700 12px/1.3 'Segoe UI', sans-serif;
+            color: #2b579a;
+            margin: 0 0 2px;
+        }
+        .image-toolbar button.on {
+            background: #deecf9;
+            border-color: #2b579a;
         }
 
         .image-toolbar button {
@@ -3309,6 +3363,28 @@
         body.app-minimized .title-bar { flex:1; align-items:flex-start; }
         body.app-maximized .editor-area { padding:0; }
         body.app-maximized .page-container { transform:none !important; }
+        .abene-style-list {
+            display: flex;
+            flex-direction: column;
+            max-height: 240px;
+            overflow: auto;
+            border: 1px solid #d0d0d0;
+            background: #fff;
+            padding: 4px;
+            gap: 2px;
+        }
+        .abene-style-item {
+            display: block;
+            width: 100%;
+            text-align: left;
+            border: 1px solid transparent;
+            background: #fff;
+            padding: 6px 8px;
+            font-size: 13px;
+            cursor: pointer;
+            font-family: Calibri, sans-serif;
+        }
+        .abene-style-item:hover { background: #f3f3f3; }
         .style-gallery { display:flex; flex-wrap:nowrap; gap:2px; align-items:center; }
         .style-gallery .ribbon-btn-sm { min-width:52px; height:26px; padding:2px 6px; font-size:11px; background:#fff; white-space:nowrap; }
         .style-gallery .ribbon-btn-sm:nth-child(2) { font-size:12px; font-weight:700; }
@@ -6242,20 +6318,24 @@
 
     <!-- Image Toolbar -->
     <div class="image-toolbar" id="imageToolbar">
+        <div class="image-toolbar-title" data-i18n="imgFormatTitle">Formatar imagem — clique na imagem, depois escolha a disposição</div>
         <label data-i18n="imgWidth">Largura: <input type="number" id="imgWidth" onchange="resizeSelectedImage('w')"></label>
         <label data-i18n="imgHeight">Altura: <input type="number" id="imgHeight" onchange="resizeSelectedImage('h')"></label>
-        <button onclick="setImageWrap('none')" data-i18n="objInline">Com o texto</button>
-        <button onclick="setImageWrap('left')" data-i18n="objLeft">À esquerda</button>
-        <button onclick="setImageWrap('right')" data-i18n="objRight">À direita</button>
-        <button onclick="setImageWrap('center')" data-i18n="objCenter">Centrar</button>
-        <button onclick="setImageWrap('free')" data-i18n="objFree">Livre (arrastar)</button>
-        <button onclick="setImageWrap('behind')" data-i18n="objBehind">Atrás do texto</button>
-        <button onclick="setImageWrap('front')" data-i18n="objFront">À frente do texto</button>
-        <button onclick="addImageBorder()" data-i18n="imgBorder">Limite</button>
-        <button onclick="addImageShadow()" data-i18n="imgShadow">Sombra</button>
-        <button onclick="addImageRounded()" data-i18n="imgRound">Arredondado</button>
-        <button onclick="resetImageStyle()" data-i18n="imgReset">Repor</button>
-        <button onclick="deleteSelectedImage()" style="color: red;" data-i18n="imgDelete">🗑 Eliminar</button>
+        <button type="button" data-wrap="none" onclick="setImageWrap('none')" data-i18n="objInline">Com o texto</button>
+        <button type="button" data-wrap="left" onclick="setImageWrap('left')" data-i18n="objLeft">À esquerda</button>
+        <button type="button" data-wrap="right" onclick="setImageWrap('right')" data-i18n="objRight">À direita</button>
+        <button type="button" data-wrap="center" onclick="setImageWrap('center')" data-i18n="objCenter">Centrar</button>
+        <button type="button" data-wrap="above" onclick="setImageWrap('above')" data-i18n="objAbove">Acima do texto</button>
+        <button type="button" data-wrap="below" onclick="setImageWrap('below')" data-i18n="objBelow">Abaixo do texto</button>
+        <button type="button" data-wrap="free" onclick="setImageWrap('free')" data-i18n="objFree">Livre (arrastar)</button>
+        <button type="button" data-wrap="behind" onclick="setImageWrap('behind')" data-i18n="objBehind">Atrás do texto</button>
+        <button type="button" data-wrap="front" onclick="setImageWrap('front')" data-i18n="objFront">À frente do texto</button>
+        <button type="button" onclick="insertCaption()" data-i18n="caption">Legenda</button>
+        <button type="button" onclick="addImageBorder()" data-i18n="imgBorder">Limite</button>
+        <button type="button" onclick="addImageShadow()" data-i18n="imgShadow">Sombra</button>
+        <button type="button" onclick="addImageRounded()" data-i18n="imgRound">Arredondado</button>
+        <button type="button" onclick="resetImageStyle()" data-i18n="imgReset">Repor</button>
+        <button type="button" onclick="deleteSelectedImage()" style="color: red;" data-i18n="imgDelete">🗑 Eliminar</button>
     </div>
     <div id="imageHandles" aria-hidden="true">
         <span class="image-handle" data-handle="nw"></span><span class="image-handle" data-handle="n"></span><span class="image-handle" data-handle="ne"></span>
@@ -6280,6 +6360,7 @@
         </select>
         <button onclick="mergeCells()" data-i18n="tblMerge">Unir</button>
         <button onclick="splitCell()" data-i18n="tblSplit">Dividir</button>
+        <button onclick="insertCaption()" data-i18n="caption">Legenda</button>
         <button onclick="toggleHeaderRow()" data-i18n="tblHeader">Cabeçalho</button>
         <select onchange="setCellVerticalAlign(this.value)" data-i18n-title="tblVAlign" title="Alinhamento vertical"><option value="" data-i18n="tblAlign">Alinhamento</option><option value="top" data-i18n="tblAlignTop">Superior</option><option value="middle" data-i18n="tblAlignMid">Centro</option><option value="bottom" data-i18n="tblAlignBot">Inferior</option></select>
         <input type="color" value="#ffffff" onchange="setCellBg(this.value)" data-i18n-title="cellColor" title="Cor da célula">
@@ -6808,6 +6889,7 @@
                         <div class="form-group"><label data-i18n="dlgValue">Valor</label><input type="number" id="dlgLineAt" value="1.08" step="0.01"></div>
                     </div>
                     <label style="font-size:12px;" data-i18n="dlgNoSpaceSame"><input type="checkbox" id="dlgNoSpaceSame" checked> Não adicionar espaço entre parágrafos do mesmo estilo</label>
+                    <label style="font-size:12px;display:block;margin-top:8px;" data-i18n="dlgUpdateStyle"><input type="checkbox" id="dlgUpdateStyle"> Atualizar o estilo atual com estes valores</label>
                 </div>
                 <div id="paraPaneBreaks" style="display:none;">
                     <div class="chk-row" style="flex-direction:column;">
@@ -6949,7 +7031,7 @@
     <input type="file" id="imageInput" style="display:none" accept="image/*" multiple onchange="handleImageUpload(event)">
     <input type="file" id="excelFileInput" style="display:none" accept=".xlsx,.csv,.txt">
 
-    <script src="libs/abene-i18n.js?v=20260910-sheet-mobile-api-3"></script>
+    <script src="libs/abene-i18n.js?v=20260914-hf-section-1"></script>
     <script src="libs/abene-tips.js"></script>
     <script src="libs/abene-page-geometry.js"></script>
     <script>
@@ -7252,6 +7334,12 @@
             });
             editor.addEventListener('paste', function(event) {
                 if (documentState.protected) { event.preventDefault(); return; }
+                const files = event.clipboardData && event.clipboardData.files;
+                if (files && files.length && typeof window.abeneHandleDroppedFiles === 'function' && window.abeneHandleDroppedFiles(files)) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    return;
+                }
                 const html = event.clipboardData && event.clipboardData.getData('text/html');
                 const text = event.clipboardData && event.clipboardData.getData('text/plain');
                 if (!html && !text) return;
@@ -7288,6 +7376,28 @@
             document.addEventListener('pointerup', function() { if (imageResize) { imageResize = null; saveUndoState(); } });
             window.addEventListener('beforeunload', function(event) {
                 if (documentState.dirty) { event.preventDefault(); event.returnValue = ''; }
+            });
+            function officeFilesIn(dt) {
+                if (!dt || !dt.files || !dt.files.length) return false;
+                return Array.prototype.some.call(dt.files, function(file) {
+                    return typeof isImportedOfficeFile === 'function' && isImportedOfficeFile(file);
+                });
+            }
+            document.addEventListener('dragover', function(event) {
+                if (!officeFilesIn(event.dataTransfer)) return;
+                event.preventDefault();
+                event.dataTransfer.dropEffect = 'copy';
+            });
+            document.addEventListener('drop', function(event) {
+                if (!officeFilesIn(event.dataTransfer)) return;
+                event.preventDefault();
+                if (typeof handleDroppedFiles === 'function') handleDroppedFiles(event.dataTransfer.files);
+            });
+            document.addEventListener('paste', function(event) {
+                const files = event.clipboardData && event.clipboardData.files;
+                if (files && files.length && typeof handleDroppedFiles === 'function' && handleDroppedFiles(files)) {
+                    event.preventDefault();
+                }
             });
         });
 
@@ -7739,11 +7849,12 @@
         }
 
         function insertClipboardHTML(html) {
+            const formatted = typeof preserveSourceHtmlFormat === 'function' ? preserveSourceHtmlFormat(html) : html;
             const template = document.createElement('template');
-            template.innerHTML = html;
-            template.content.querySelectorAll('script, style, meta, link').forEach(node => node.remove());
+            template.innerHTML = formatted;
+            template.content.querySelectorAll('script, meta, link').forEach(node => node.remove());
             editor.focus();
-            let payload = template.innerHTML || html;
+            let payload = template.innerHTML || formatted;
             if (documentState.tracking) payload = '<ins class="abene-change">' + payload + '</ins>';
             if (window.abeneInsertHTML) window.abeneInsertHTML(payload);
             else document.execCommand('insertHTML', false, payload);
@@ -8025,12 +8136,15 @@
 
         function insertOnlineImage() {
             const url = prompt(t('pImageUrl'));
-            if (url) {
-                editor.focus();
-                const img = `<img data-illustration="true" src="${url}" style="max-width: 400px; height: auto;" alt="Image">`;
-                document.execCommand('insertHTML', false, img);
-                saveUndoState();
+            if (!url) return;
+            if (typeof window.abeneInsertPicture === 'function') {
+                window.abeneInsertPicture(url, { alt: 'Image' });
+                return;
             }
+            editor.focus();
+            const img = `<img data-illustration="true" src="${url}" style="max-width: 400px; height: auto;" alt="Image">`;
+            document.execCommand('insertHTML', false, img);
+            saveUndoState();
         }
 
         function insertLink() {
@@ -8565,17 +8679,18 @@
         // Table editing
         function getSelectedTable() {
             const sel = window.getSelection();
-            if (!sel.rangeCount) return null;
-            let node = sel.anchorNode;
-            while (node && node !== editor) {
-                if (node.tagName === 'TABLE') return node;
-                if (node.tagName === 'TD' || node.tagName === 'TH') {
-                    selectedCell = node;
-                    return node.closest('table');
+            if (sel.rangeCount) {
+                let node = sel.anchorNode;
+                while (node && node !== editor) {
+                    if (node.tagName === 'TABLE') return node;
+                    if (node.tagName === 'TD' || node.tagName === 'TH') {
+                        selectedCell = node;
+                        return node.closest('table');
+                    }
+                    node = node.parentNode;
                 }
-                node = node.parentNode;
             }
-            return null;
+            return selectedTable || null;
         }
 
         function addTableRow(pos) {
@@ -8718,21 +8833,31 @@
         }
 
         // ========== IMAGE FUNCTIONS ==========
+        function syncSelectedImage(img) {
+            if (selectedImage && selectedImage !== img) selectedImage.classList.remove('selected');
+            selectedImage = img || null;
+            window.selectedImage = selectedImage;
+            if (selectedImage) selectedImage.classList.add('selected');
+            return selectedImage;
+        }
+
         function onEditorClick(e) {
-            // Handle image selection
-            if (e.target.tagName === 'IMG') {
-                if (selectedImage) selectedImage.classList.remove('selected');
-                selectedImage = e.target;
-                selectedImage.classList.add('selected');
+            if (e.target.closest && e.target.closest('.image-toolbar, #imageHandles, .abene-obj-resize')) return;
+            const pic = e.target.closest && e.target.closest('.abene-pic');
+            const rawImg = e.target.tagName === 'IMG' ? e.target : null;
+            const img = (pic && pic.querySelector('img')) || rawImg;
+            if (img && editor.contains(img) && !(img.closest && img.closest('[data-abene-block="cover"], [data-abene-block="titlepage"], .page-header-zone, .page-footer-zone'))) {
+                syncSelectedImage(img);
                 showImageToolbar(e);
-            } else {
-                if (selectedImage) {
-                    selectedImage.classList.remove('selected');
-                    selectedImage = null;
-                }
-                document.getElementById('imageToolbar').classList.remove('visible');
-                hideImageHandles();
+                return;
             }
+            if (selectedImage) {
+                selectedImage.classList.remove('selected');
+                selectedImage = null;
+                window.selectedImage = null;
+            }
+            document.getElementById('imageToolbar').classList.remove('visible');
+            hideImageHandles();
 
             // Handle table selection — track the cell but do NOT pop up the toolbar
             const cell = e.target.closest('td, th');
@@ -8747,13 +8872,33 @@
         }
 
         function showImageToolbar(e) {
+            const img = selectedImage || window.selectedImage;
+            if (!img) return;
+            syncSelectedImage(img);
             const toolbar = document.getElementById('imageToolbar');
-            const rect = selectedImage.getBoundingClientRect();
-            toolbar.style.top = Math.max(0, rect.top - 50) + 'px';
-            toolbar.style.left = Math.max(0, rect.left) + 'px';
+            if (!toolbar) return;
+            const rect = img.getBoundingClientRect();
+            const ribbon = document.querySelector('.ribbon, .menu-bar');
+            const ribbonBottom = ribbon ? ribbon.getBoundingClientRect().bottom : 56;
             toolbar.classList.add('visible');
-            document.getElementById('imgWidth').value = selectedImage.offsetWidth;
-            document.getElementById('imgHeight').value = selectedImage.offsetHeight;
+            const barH = toolbar.offsetHeight || 88;
+            const barW = toolbar.offsetWidth || 520;
+            let top = rect.top - barH - 8;
+            if (top < ribbonBottom + 6) top = Math.min(window.innerHeight - barH - 8, rect.bottom + 8);
+            if (top < 8) top = 8;
+            let left = Math.max(8, rect.left);
+            if (left + barW > window.innerWidth - 8) left = Math.max(8, window.innerWidth - barW - 8);
+            toolbar.style.top = top + 'px';
+            toolbar.style.left = left + 'px';
+            const wEl = document.getElementById('imgWidth');
+            const hEl = document.getElementById('imgHeight');
+            if (wEl) wEl.value = Math.round(img.offsetWidth);
+            if (hEl) hEl.value = Math.round(img.offsetHeight);
+            const wrap = img.closest && img.closest('.abene-pic');
+            const mode = wrap ? (wrap.getAttribute('data-wrap') || 'none') : 'none';
+            toolbar.querySelectorAll('[data-wrap]').forEach(function(btn) {
+                btn.classList.toggle('on', btn.getAttribute('data-wrap') === mode);
+            });
             positionImageHandles();
         }
 
@@ -9375,6 +9520,9 @@
             renameDocument(String(fileName || 'Documento').replace(/\.[^.]+$/, ''));
             documentState.dirty = false;
             editor.querySelectorAll('.page-decoration, .page-header-zone, .page-footer-zone, .abene-page-flow').forEach(function(el) { el.remove(); });
+            if (typeof window.abeneWrapLooseImages === 'function') {
+                try { window.abeneWrapLooseImages(editor); } catch (eWrap) {}
+            }
             undoStack = [];
             redoStack = [];
             saveUndoState();
@@ -9413,7 +9561,15 @@
                         });
                         scopedRules.push(selectors.join(', ') + '{' + rule.style.cssText + '}');
                     });
-                } catch (eCss) {}
+                } catch (eCss) {
+                    extractCssRules(css).forEach(function(rule) {
+                        const selectors = rule.selectors.map(function(sel) {
+                            sel = String(sel || '').trim().replace(/^html\b/i, '').replace(/^body\b/i, '').trim();
+                            return sel.indexOf('#editor') === 0 ? sel : ('#editor ' + (sel || '*'));
+                        });
+                        scopedRules.push(selectors.join(', ') + '{' + safeCssText(rule.css) + '}');
+                    });
+                }
             });
             if (!scopedRules.length) return;
             const style = document.createElement('style');
@@ -9422,9 +9578,91 @@
             document.head.appendChild(style);
         }
 
+        function safeCssText(css) {
+            return String(css || '')
+                .replace(/expression\s*\([^)]*\)/gi, '')
+                .replace(/url\s*\(\s*['"]?\s*(?:javascript|vbscript|data:text\/html)/gi, 'url(')
+                .replace(/behavior\s*:/gi, 'x-behavior:');
+        }
+
+        function extractCssRules(cssText) {
+            const rules = [];
+            const css = String(cssText || '')
+                .replace(/<!--[\s\S]*?-->/g, function(block) { return block.replace(/<!--|-->/g, ''); })
+                .replace(/\/\*[\s\S]*?\*\//g, '');
+            const re = /([^{}@][^{}]*)\{([^{}]+)\}/g;
+            let match;
+            while ((match = re.exec(css))) {
+                const selectors = String(match[1] || '').split(',').map(function(sel) { return sel.trim(); }).filter(Boolean);
+                if (!selectors.length) continue;
+                rules.push({ selectors: selectors, css: match[2] });
+            }
+            return rules;
+        }
+
+        function inlineCssRulesOnTree(root, rules) {
+            if (!root || !rules || !rules.length) return;
+            rules.forEach(function(rule) {
+                (rule.selectors || []).forEach(function(sel) {
+                    sel = String(sel || '').trim().replace(/^html\b/i, '').replace(/^body\b/i, '').trim();
+                    if (!sel || sel.charAt(0) === '@') return;
+                    try {
+                        root.querySelectorAll(sel).forEach(function(el) {
+                            const prev = el.getAttribute('style') || '';
+                            const next = safeCssText(rule.css);
+                            if (!next) return;
+                            el.setAttribute('style', next + (prev ? ';' + prev : ''));
+                        });
+                    } catch (eSel) {}
+                });
+            });
+        }
+
+        function collectDocumentCssRules(doc) {
+            const rules = [];
+            if (!doc) return rules;
+            doc.querySelectorAll('style').forEach(function(styleEl) {
+                extractCssRules(styleEl.textContent).forEach(function(rule) { rules.push(rule); });
+            });
+            return rules;
+        }
+
+        function inlineDocumentStyles(doc) {
+            if (!doc) return;
+            const rules = collectDocumentCssRules(doc);
+            if (doc.body) inlineCssRulesOnTree(doc.body, rules);
+            else inlineCssRulesOnTree(doc, rules);
+        }
+
+        function preserveSourceHtmlFormat(html) {
+            const raw = String(html || '');
+            if (!raw) return raw;
+            if (!/<\/?[a-z][\s\S]*>/i.test(raw)) return raw;
+            let parsed;
+            try { parsed = new DOMParser().parseFromString(raw, 'text/html'); } catch (eParse) { return raw; }
+            const rules = collectDocumentCssRules(parsed);
+            const start = raw.indexOf('<!--StartFragment-->');
+            const end = raw.indexOf('<!--EndFragment-->');
+            if (start >= 0 && end > start) {
+                const wrap = document.createElement('div');
+                wrap.innerHTML = raw.slice(start + 20, end);
+                inlineCssRulesOnTree(wrap, rules);
+                wrap.querySelectorAll('script, noscript, iframe, object, embed, meta, link, base, style').forEach(function(n) { n.remove(); });
+                return wrap.innerHTML;
+            }
+            const body = parsed.body;
+            if (!body) return raw;
+            inlineCssRulesOnTree(body, rules);
+            body.querySelectorAll('script, noscript, iframe, object, embed, meta, link, base, style').forEach(function(n) { n.remove(); });
+            return body.innerHTML;
+        }
+        window.abeneExtractCssRules = extractCssRules;
+        window.abeneInlineDocumentStyles = inlineDocumentStyles;
+        window.abenePreserveSourceHtmlFormat = preserveSourceHtmlFormat;
+
         function sanitizeImportedEditorHTML(html) {
             const wrap = document.createElement('div');
-            wrap.innerHTML = html || '';
+            wrap.innerHTML = (typeof preserveSourceHtmlFormat === 'function' ? preserveSourceHtmlFormat(html) : html) || '';
             wrap.querySelectorAll('script, noscript, iframe, object, embed, link, meta, base, form, style').forEach(function(n) { n.remove(); });
             wrap.querySelectorAll('*').forEach(function(n) {
                 Array.from(n.attributes || []).forEach(function(attr) {
@@ -9508,19 +9746,7 @@
             closeAllDropdowns();
         }
 
-        function loadFile(event) {
-            const file = event.target.files[0];
-            if (!file) return;
-            if (file.name.toLowerCase().endsWith('.docx')) {
-                importDocx(file);
-                event.target.value = '';
-                return;
-            }
-            if (/\.(xlsx|xlsm|ods|csv)$/i.test(file.name) && typeof window.abeneExcelImportFile === 'function') {
-                window.abeneExcelImportFile(file);
-                event.target.value = '';
-                return;
-            }
+        function loadImportedTextFile(file) {
             const reader = new FileReader();
             reader.onload = function(e) {
                 const raw = e.target.result;
@@ -9534,6 +9760,7 @@
                 if (lower.endsWith('.html') || lower.endsWith('.htm')) {
                     const documentFile = new DOMParser().parseFromString(raw, 'text/html');
                     injectImportedDocumentStyles(documentFile);
+                    inlineDocumentStyles(documentFile);
                     const settings = documentFile.querySelector('meta[name="abene-settings"]')?.content;
                     if (settings) restoreProjectSettings(settings);
                     const importedEditor = documentFile.querySelector('[data-abene-editor]');
@@ -9553,6 +9780,62 @@
                 setTimeout(function() { showImportAnalysis(file.name); }, 350);
             };
             reader.readAsText(file);
+        }
+
+        function isImportedOfficeFile(file) {
+            if (!file) return false;
+            const name = String(file.name || '');
+            const type = String(file.type || '');
+            return /\.(docx|xlsx|xlsm|ods|csv|html|htm|txt)$/i.test(name) ||
+                /wordprocessingml|spreadsheetml|opendocument\.spreadsheet|text\/(html|plain|csv)/i.test(type);
+        }
+
+        function openImportedFile(file, opts) {
+            if (!file) return false;
+            opts = opts || {};
+            const name = String(file.name || '');
+            const type = String(file.type || '');
+            if (/\.docx$/i.test(name) || /wordprocessingml\.document/i.test(type)) {
+                if (!opts.skipConfirm && !confirmReplaceDocument()) return false;
+                if (typeof switchTab === 'function') switchTab('home');
+                importDocx(file);
+                return true;
+            }
+            if ((/\.(xlsx|xlsm|ods|csv)$/i.test(name) || /spreadsheetml|opendocument\.spreadsheet|text\/csv/i.test(type)) && typeof window.abeneExcelImportFile === 'function') {
+                window.abeneExcelImportFile(file);
+                return true;
+            }
+            if (/\.(html|htm|txt)$/i.test(name) || /text\/(html|plain)/i.test(type)) {
+                if (!opts.skipConfirm && !confirmReplaceDocument()) return false;
+                if (typeof switchTab === 'function') switchTab('home');
+                loadImportedTextFile(file);
+                return true;
+            }
+            if (/\.(json|md)$/i.test(name)) {
+                if (!opts.skipConfirm && !confirmReplaceDocument()) return false;
+                if (typeof switchTab === 'function') switchTab('home');
+                loadImportedTextFile(file);
+                return true;
+            }
+            return false;
+        }
+
+        function handleDroppedFiles(fileList) {
+            const files = Array.prototype.slice.call(fileList || []);
+            let opened = false;
+            files.forEach(function(file) {
+                if (!isImportedOfficeFile(file)) return;
+                if (openImportedFile(file, { skipConfirm: opened })) opened = true;
+            });
+            return opened;
+        }
+        window.abeneOpenImportedFile = openImportedFile;
+        window.abeneHandleDroppedFiles = handleDroppedFiles;
+
+        function loadFile(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            if (!openImportedFile(file, { skipConfirm: true })) loadImportedTextFile(file);
             event.target.value = '';
         }
 
@@ -9630,7 +9913,10 @@
                 gdocsFileId: documentState.gdocsFileId || '',
                 gdocsUrl: documentState.gdocsUrl || '',
                 sentToClient: !!documentState.sentToClient,
-                pdfOwnerId: documentState.pdfOwnerId || ''
+                pdfOwnerId: documentState.pdfOwnerId || '',
+                styles: (function () {
+                    try { return JSON.parse(localStorage.getItem('abeneDocStyles') || '{}'); } catch (e) { return {}; }
+                })()
             });
         }
 
@@ -9688,6 +9974,10 @@
                     applyPageGeometry();
                 } else if (settings.pageSize) {
                     applyPageGeometry();
+                }
+                if (settings.styles && typeof settings.styles === 'object') {
+                    try { localStorage.setItem('abeneDocStyles', JSON.stringify(settings.styles)); } catch (eSt) {}
+                    if (typeof window.abeneFillStyleSelect === 'function') window.abeneFillStyleSelect();
                 }
                 if (window.applyPageColumns) window.applyPageColumns(pageColumns);
                 applyCompanyDefaults();
@@ -10391,10 +10681,72 @@ table { border-collapse: collapse; }
         function docxEscapeAttr(value) {
             return docxEscape(value).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
         }
+        var _docxTheme = {
+            dark1: '#000000', light1: '#FFFFFF', dark2: '#44546A', light2: '#E7E6E6',
+            accent1: '#5B9BD5', accent2: '#ED7D31', accent3: '#A5A5A5',
+            accent4: '#FFC000', accent5: '#4472C4', accent6: '#70AD47',
+            hyperlink: '#0563C1', followedHyperlink: '#954F72',
+            text1: '#000000', text2: '#44546A', background1: '#FFFFFF', background2: '#E7E6E6'
+        };
         function docxColor(val) {
             if (!val || String(val).toLowerCase() === 'auto') return '';
             if (/^[0-9a-f]{6}$/i.test(val)) return '#' + val;
             return val;
+        }
+        function docxApplyTint(hex, tint) {
+            tint = Number(tint);
+            if (!hex || !/^#[0-9a-f]{6}$/i.test(hex) || !isFinite(tint) || !tint) return hex;
+            const n = parseInt(hex.slice(1), 16);
+            function ch(c) {
+                let x = c / 255;
+                if (tint < 0) x = x * (1 + tint);
+                else x = x * (1 - tint) + tint;
+                return Math.max(0, Math.min(255, Math.round(x * 255)));
+            }
+            const r = ch((n >> 16) & 255), g = ch((n >> 8) & 255), b = ch(n & 255);
+            return '#' + [r, g, b].map(function(v) { return ('0' + v.toString(16)).slice(-2); }).join('');
+        }
+        function docxThemeHex(name) {
+            if (!name) return '';
+            const key = String(name).replace(/^bg/i, 'background');
+            return _docxTheme[key] || _docxTheme[key.toLowerCase()] || '';
+        }
+        function docxThemeColor(node) {
+            if (!node) return '';
+            let hex = docxColor(docxAttr(node, 'val')) || docxColor(docxAttr(node, 'fill'));
+            const themeName = docxAttr(node, 'themeColor') || docxAttr(node, 'themeFill');
+            if (themeName && docxThemeHex(themeName)) hex = docxThemeHex(themeName);
+            const tintRaw = docxAttr(node, 'themeTint') || docxAttr(node, 'themeFillTint');
+            const shadeRaw = docxAttr(node, 'themeShade') || docxAttr(node, 'themeFillShade');
+            if (tintRaw) {
+                const tint = /^[0-9a-f]+$/i.test(tintRaw) ? parseInt(tintRaw, 16) / 255 : Number(tintRaw);
+                hex = docxApplyTint(hex, tint);
+            } else if (shadeRaw) {
+                const shade = /^[0-9a-f]+$/i.test(shadeRaw) ? parseInt(shadeRaw, 16) / 255 : Number(shadeRaw);
+                hex = docxApplyTint(hex, -shade);
+            }
+            return hex;
+        }
+        function docxParseTheme(doc) {
+            if (!doc) return;
+            const map = {
+                dk1: 'dark1', lt1: 'light1', dk2: 'dark2', lt2: 'light2',
+                accent1: 'accent1', accent2: 'accent2', accent3: 'accent3',
+                accent4: 'accent4', accent5: 'accent5', accent6: 'accent6',
+                hlink: 'hyperlink', folHlink: 'followedHyperlink'
+            };
+            Object.keys(map).forEach(function(tag) {
+                const el = Array.from(doc.getElementsByTagName('*')).find(function(node) { return (node.localName || '') === tag; });
+                if (!el) return;
+                const srgb = Array.from(el.getElementsByTagName('*')).find(function(node) { return (node.localName || '') === 'srgbClr'; });
+                const sys = Array.from(el.getElementsByTagName('*')).find(function(node) { return (node.localName || '') === 'sysClr'; });
+                const val = srgb ? (srgb.getAttribute('val') || '') : (sys ? (sys.getAttribute('lastClr') || '') : '');
+                if (/^[0-9a-f]{6}$/i.test(val)) _docxTheme[map[tag]] = '#' + val;
+            });
+            _docxTheme.text1 = _docxTheme.dark1;
+            _docxTheme.text2 = _docxTheme.dark2;
+            _docxTheme.background1 = _docxTheme.light1;
+            _docxTheme.background2 = _docxTheme.light2;
         }
         function docxOn(node) {
             if (!node) return null;
@@ -10421,7 +10773,7 @@ table { border-collapse: collapse; }
             const underline = docxFirst(rPr, 'u', true);
             if (underline) props.underline = !/^(none|0|false)$/i.test(docxAttr(underline, 'val') || 'single');
             const color = docxFirst(rPr, 'color', true);
-            if (color) props.color = docxColor(docxAttr(color, 'val'));
+            if (color) props.color = docxThemeColor(color);
             const size = docxFirst(rPr, 'sz', true) || docxFirst(rPr, 'szCs', true);
             if (size && Number(docxAttr(size, 'val'))) props.size = Number(docxAttr(size, 'val')) / 2;
             const fonts = docxFirst(rPr, 'rFonts', true);
@@ -10435,7 +10787,7 @@ table { border-collapse: collapse; }
                 props.background = map[val] || docxColor(val);
             }
             const shading = docxFirst(rPr, 'shd', true);
-            if (shading && docxColor(docxAttr(shading, 'fill'))) props.background = docxColor(docxAttr(shading, 'fill'));
+            if (shading && docxThemeColor(shading)) props.background = docxThemeColor(shading);
             const spacing = docxFirst(rPr, 'spacing', true);
             if (spacing && Number(docxAttr(spacing, 'val'))) props.letterSpacing = Number(docxAttr(spacing, 'val')) / 20;
             return props;
@@ -10470,7 +10822,7 @@ table { border-collapse: collapse; }
                 if (hangingRaw !== '' && isFinite(Number(hangingRaw)) && Number(hangingRaw)) props.firstLine = -Number(hangingRaw) / 20;
             }
             const shading = docxFirst(pPr, 'shd', true);
-            if (shading && docxColor(docxAttr(shading, 'fill'))) props.background = docxColor(docxAttr(shading, 'fill'));
+            if (shading && docxThemeColor(shading)) props.background = docxThemeColor(shading);
             const outline = docxFirst(pPr, 'outlineLvl', true);
             if (outline && isFinite(Number(docxAttr(outline, 'val')))) props.outline = Number(docxAttr(outline, 'val'));
             [['keepNext', 'keepNext'], ['keepLines', 'keepLines'], ['pageBreakBefore', 'pageBreakBefore']].forEach(function(pair) {
@@ -10745,7 +11097,7 @@ table { border-collapse: collapse; }
 
         function docxBorderCss(border, side) {
             if (!border || /^(nil|none)$/i.test(docxAttr(border, 'val'))) return '';
-            const color = docxColor(docxAttr(border, 'color')) || '#999';
+            const color = docxThemeColor(border) || docxColor(docxAttr(border, 'color')) || '#999';
             const width = Math.max(0.5, (Number(docxAttr(border, 'sz')) || 8) / 8);
             return 'border-' + side + ':' + width + 'pt solid ' + color;
         }
@@ -10784,7 +11136,7 @@ table { border-collapse: collapse; }
                     }
                     const css = ['vertical-align:top'];
                     const shading = tcPr && docxFirst(tcPr, 'shd', true);
-                    if (shading && docxColor(docxAttr(shading, 'fill'))) css.push('background:' + docxColor(docxAttr(shading, 'fill')));
+                    if (shading && docxThemeColor(shading)) css.push('background:' + docxThemeColor(shading));
                     const vAlign = tcPr && docxFirst(tcPr, 'vAlign', true);
                     if (vAlign) css.push('vertical-align:' + (docxAttr(vAlign, 'val') || 'top'));
                     const cellWidth = tcPr && docxFirst(tcPr, 'tcW', true);
@@ -10914,6 +11266,20 @@ table { border-collapse: collapse; }
                         docxParseNumbering(new DOMParser().parseFromString(nXml, 'application/xml'));
                     } catch (e) { docxParseNumbering(null); }
                 } else docxParseNumbering(null);
+                _docxTheme = {
+                    dark1: '#000000', light1: '#FFFFFF', dark2: '#44546A', light2: '#E7E6E6',
+                    accent1: '#5B9BD5', accent2: '#ED7D31', accent3: '#A5A5A5',
+                    accent4: '#FFC000', accent5: '#4472C4', accent6: '#70AD47',
+                    hyperlink: '#0563C1', followedHyperlink: '#954F72',
+                    text1: '#000000', text2: '#44546A', background1: '#FFFFFF', background2: '#E7E6E6'
+                };
+                const themeFile = zip.file('word/theme/theme1.xml') || zip.file('word/theme/theme.xml');
+                if (themeFile) {
+                    try {
+                        const themeXml = await themeFile.async('text');
+                        docxParseTheme(new DOMParser().parseFromString(themeXml, 'application/xml'));
+                    } catch (eTheme) {}
+                }
 
                 resetEditorToOriginal({ keepPageSettings: false });
                 const xml = await xmlFile.async('text');
@@ -10986,6 +11352,7 @@ table { border-collapse: collapse; }
                 documentState.pdfOwnerId = '';
                 if (window.abeneGdocsClearLink) window.abeneGdocsClearLink();
                 editor.innerHTML = importedHtml || '<p></p>';
+                if (typeof switchTab === 'function') switchTab('home');
                 finishOpenedDocument(file.name, t('docxImportOk') || 'DOCX aberto com formatação original');
 
                 // Post-import analysis: detect tables with numbers → offer quote
@@ -11339,7 +11706,8 @@ table { border-collapse: collapse; }
             const styleSelect = document.getElementById('styleSelect');
             if (block && styleSelect) {
                 var mapped = 'normal';
-                if (block.classList.contains('abene-nospacing')) mapped = 'nospacing';
+                if (block.getAttribute('data-abene-style')) mapped = block.getAttribute('data-abene-style');
+                else if (block.classList.contains('abene-nospacing')) mapped = 'nospacing';
                 else if (block.classList.contains('abene-title')) mapped = 'title';
                 else if (block.classList.contains('abene-subtitle')) mapped = 'subtitle';
                 else if (/^H[1-6]$/.test(block.tagName)) mapped = block.tagName.toLowerCase();
@@ -11738,13 +12106,25 @@ table { border-collapse: collapse; }
         function changeMargins(val) { if (window.abeneChangeMargins) return window.abeneChangeMargins(val); }
         function changeFontSize(val) { if (window.abeneChangeFontSize) return window.abeneChangeFontSize(val); }
         function stepFontSize(delta) { if (window.abeneStepFontSize) return window.abeneStepFontSize(delta); }
-        function applyStyle(tag) { if (window.abeneApplyStyle) return window.abeneApplyStyle(tag); }
+        function applyStyle(tag) {
+            if (window.abeneApplyStyle) return window.abeneApplyStyle(tag);
+            if (tag === 'blockquote' || tag === 'pre') execCmd('formatBlock', tag);
+            else execCmd('formatBlock', tag);
+            updateNavigation();
+        }
         function changeLineSpacing(val) { if (window.abeneChangeLineSpacing) return window.abeneChangeLineSpacing(val); }
         function pasteContent() { if (window.abenePasteContent) return window.abenePasteContent.apply(this, arguments); }
         function formatPainter() { if (window.abeneFormatPainter) return window.abeneFormatPainter.apply(this, arguments); }
         function openFindReplace(mode) { if (window.abeneOpenFindReplace) return window.abeneOpenFindReplace(mode); }
         function addBorders() { if (window.abeneAddBorders) return window.abeneAddBorders(); }
-        function manageStyles() { if (window.abeneManageStyles) return window.abeneManageStyles(); }
+        function manageStyles() {
+            if (window.abeneManageStyles) return window.abeneManageStyles();
+            const titleColor = prompt(t('pTitleColor'), localStorage.getItem('abeneTitleColor') || '#2b579a');
+            if (!titleColor) return;
+            localStorage.setItem('abeneTitleColor', titleColor);
+            document.querySelectorAll('#editor h1, #editor h2, #editor h3, #editor h4').forEach(heading => { heading.style.color = titleColor; });
+            saveUndoState();
+        }
         function clearFormatting() { if (window.abeneClearFormatting) return window.abeneClearFormatting(); }
 
         // ========== LOAD SAVED CONTENT ==========
@@ -11766,25 +12146,25 @@ table { border-collapse: collapse; }
             } catch (e) {}
         }, 12000);
     </script>
-    <script src="libs/abene-word-home.js?v=20260909-layout-visibility-3"></script>
+    <script src="libs/abene-word-home.js?v=20260914-sections-1"></script>
     <script src="libs/abene-pagination-engine.js?v=20260908-layout-visibility-2"></script>
-    <script src="libs/abene-sections.js"></script>
-    <script src="libs/abene-toolbar.js"></script>
+    <script src="libs/abene-sections.js?v=20260914-sections-1"></script>
+    <script src="libs/abene-toolbar.js?v=20260914-sections-1"></script>
     <script src="libs/abene-commands.js"></script>
     <script src="libs/abene-notes.js"></script>
-    <script src="libs/abene-objects.js"></script>
+    <script src="libs/abene-objects.js?v=20260914-captions-toc-1"></script>
     <script src="libs/abene-modals.js"></script>
     <script src="libs/abene-tables.js"></script>
     <script src="libs/abene-document.js"></script>
     <script src="libs/abene-history.js"></script>
     <script src="libs/abene-export.js?v=20260909-layout-visibility-10"></script>
-    <script src="libs/abene-modelo.js"></script>
+    <script src="libs/abene-modelo.js?v=20260914-sections-1"></script>
     <script src="libs/abene-comercial.js?v=20260909-p0p5-final-3"></script>
     <script src="libs/abene-contabilidade.js?v=20260911-trash-protection-1"></script>
     <script src="libs/abene-arquivo.js?v=20260911-trash-protection-2"></script>
     <script src="libs/abene-phone.js?v=20260909-mobile-professional-4"></script>
     <script src="libs/abene-excel-engine.js"></script>
-    <script src="libs/abene-excel.js?v=20260910-sheet-mobile-api-1"></script>
+    <script src="libs/abene-excel.js?v=20260914-keep-format-1"></script>
     <script src="libs/abene-sheets.js?v=20260911-trash-protection-1"></script>
     <script src="libs/abene-collab.js?v=20260909-p0p5-final-3"></script>
     <script src="libs/abene-gdocs.js?v=20260909-p0p5-final-3"></script>

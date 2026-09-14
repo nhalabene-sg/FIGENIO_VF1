@@ -66,5 +66,18 @@ para a pasta Cliente/Pasta/Tipo/Ano/Concluidos no Drive. Se estiver
 temporariamente offline, a aplicação tenta novamente quando a ligação voltar.
 Depois de colar o script 2.6: Gerir implementações → lápis → Nova versão.
 
+Arquivo — Lixo e proteção individual:
+- Só os rascunhos podem ser movidos para o Lixo e depois restaurados.
+- Os documentos concluídos/finais não podem ser eliminados.
+- A proteção aplica-se apenas ao documento escolhido; um rascunho protegido
+  abre em leitura e não pode ser movido para o Lixo.
+- A folha ARQUIVO recebe automaticamente as colunas DeletedAt, Protected e
+  ProtectedAt, sem apagar as linhas existentes.
+- Os documentos no Lixo ficam fora dos packs e índices do contabilista.
+- A pasta do Lixo respeita o idioma selecionado (Lixo por defeito em pt-PT).
+
+Depois desta alteração: voltar a colar o script e usar
+Implementar → Gerir implementações → lápis → Nova versão.
+
 Nunca publique o URL /exec no GitHub.
 Conta gratuita Gmail: cerca de 100 e-mails / dia.

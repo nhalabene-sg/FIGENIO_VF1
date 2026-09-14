@@ -425,6 +425,7 @@
         var block = getBlock();
         if (block && block !== editor) {
             block.removeAttribute('style');
+            block.removeAttribute('data-abene-style');
             var keep = (block.className || '').split(/\s+/).filter(function (c) {
                 return c && !/^abene-/.test(c) && c !== 'selected';
             });
@@ -454,46 +455,341 @@
         p: { tag: 'p', cls: 'abene-normal' },
         blockquote: { tag: 'blockquote', cls: 'abene-quote' }
     };
+    var STYLE_PROPS = {
+        normal: { font: 'Calibri', size: 11, weight: '400', italic: false, color: '#000000', align: 'left', before: 0, after: 8, line: '1.08' },
+        nospacing: { font: 'Calibri', size: 11, weight: '400', italic: false, color: '#000000', align: 'left', before: 0, after: 0, line: '1' },
+        title: { font: 'Calibri Light', size: 28, weight: '300', italic: false, color: '#2b579a', align: 'left', before: 0, after: 4, line: '1.1' },
+        subtitle: { font: 'Calibri', size: 11, weight: '400', italic: true, color: '#5b9bd5', align: 'left', before: 0, after: 8, line: '1.08' },
+        h1: { font: 'Calibri Light', size: 16, weight: '300', italic: false, color: '#2b579a', align: 'left', before: 12, after: 0, line: '1.15', keepNext: true },
+        h2: { font: 'Calibri Light', size: 13, weight: '300', italic: false, color: '#2b579a', align: 'left', before: 8, after: 0, line: '1.15', keepNext: true },
+        h3: { font: 'Calibri', size: 12, weight: '400', italic: false, color: '#1e4e79', align: 'left', before: 8, after: 0, line: '1.15', keepNext: true },
+        h4: { font: 'Calibri', size: 11, weight: '700', italic: false, color: '#2b579a', align: 'left', before: 8, after: 0, line: '1.15', keepNext: true },
+        h5: { font: 'Calibri', size: 11, weight: '400', italic: true, color: '#2b579a', align: 'left', before: 8, after: 0, line: '1.15' },
+        h6: { font: 'Calibri', size: 11, weight: '400', italic: false, color: '#404040', align: 'left', before: 8, after: 0, line: '1.15' },
+        h7: { font: 'Calibri', size: 10, weight: '700', italic: false, color: '#000000', align: 'left', before: 6, after: 0, line: '1.08' },
+        h8: { font: 'Calibri', size: 10, weight: '400', italic: true, color: '#000000', align: 'left', before: 6, after: 0, line: '1.08' },
+        h9: { font: 'Calibri', size: 9, weight: '700', italic: false, color: '#000000', align: 'left', before: 6, after: 0, line: '1.08' },
+        quote: { font: 'Calibri', size: 11, weight: '400', italic: true, color: '#404040', align: 'left', before: 8, after: 8, line: '1.15' },
+        intensequote: { font: 'Calibri', size: 11, weight: '700', italic: true, color: '#2b579a', align: 'left', before: 8, after: 8, line: '1.15' },
+        listpara: { font: 'Calibri', size: 11, weight: '400', italic: false, color: '#000000', align: 'left', before: 0, after: 0, line: '1.08', indent: 36 },
+        pre: { font: 'Courier New', size: 10, weight: '400', italic: false, color: '#000000', align: 'left', before: 8, after: 8, line: '1.2' }
+    };
+    function builtinStyleKeys() {
+        return Object.keys(STYLE_DEFS);
+    }
+    function loadUserStyles() {
+        try { return JSON.parse(localStorage.getItem('abeneDocStyles') || '{}') || {}; } catch (e) { return {}; }
+    }
+    function saveUserStyles(map) {
+        try { localStorage.setItem('abeneDocStyles', JSON.stringify(map || {})); } catch (e) {}
+    }
+    function mergeStyle(a, b) {
+        var out = {}, k;
+        [a, b].forEach(function (obj) {
+            Object.keys(obj || {}).forEach(function (key) {
+                if (obj[key] !== undefined && obj[key] !== null && obj[key] !== '') out[key] = obj[key];
+            });
+        });
+        return out;
+    }
+    function resolveStyle(key) {
+        var base = mergeStyle(STYLE_DEFS[key] || {}, STYLE_PROPS[key] || {});
+        var user = loadUserStyles()[key] || {};
+        var out = mergeStyle(base, user);
+        out.id = key;
+        if (!out.name) out.name = styleDisplayName(key);
+        return out;
+    }
+    function styleDisplayName(key) {
+        var map = {
+            normal: tt('styleNormal'), nospacing: tt('styleNoSpace'), title: tt('styleTitle'),
+            subtitle: tt('styleSubtitle'), h1: tt('styleH1'), h2: tt('styleH2'), h3: tt('styleH3'),
+            h4: tt('styleH4'), h5: tt('styleH5'), h6: tt('styleH6'), h7: tt('styleH7'),
+            h8: tt('styleH8'), h9: tt('styleH9'), quote: tt('styleQuote'),
+            intensequote: tt('styleIntenseQuote'), listpara: tt('styleListPara'),
+            emphasis: tt('styleEmphasis'), strong: tt('styleStrong'), booktitle: tt('styleBook'),
+            pre: tt('styleCode')
+        };
+        var user = loadUserStyles()[key];
+        if (user && user.name) return user.name;
+        return map[key] || key;
+    }
+    function allStyleKeys() {
+        var keys = builtinStyleKeys().slice();
+        Object.keys(loadUserStyles()).forEach(function (k) {
+            if (keys.indexOf(k) < 0) keys.push(k);
+        });
+        return keys;
+    }
+    function applyResolvedProps(block, props) {
+        if (!block || !props || props.inline) return;
+        if (props.font) block.style.fontFamily = props.font;
+        if (props.size) block.style.fontSize = props.size + 'pt';
+        if (props.weight) block.style.fontWeight = String(props.weight);
+        block.style.fontStyle = props.italic ? 'italic' : 'normal';
+        if (props.color) block.style.color = props.color;
+        if (props.align) block.style.textAlign = props.align;
+        if (props.before != null) block.style.marginTop = Number(props.before) + 'pt';
+        if (props.after != null) block.style.marginBottom = Number(props.after) + 'pt';
+        if (props.line) block.style.lineHeight = String(props.line);
+        if (props.indent != null) block.style.marginLeft = Number(props.indent) + 'px';
+        if (props.firstLine != null) block.style.textIndent = Number(props.firstLine) + 'px';
+        block.classList.toggle('abene-keep-next', !!props.keepNext);
+        if (props.id) block.setAttribute('data-abene-style', props.id);
+    }
+    function readBlockStyle(block) {
+        if (!block) return {};
+        var cs = window.getComputedStyle(block);
+        var sizePx = parseFloat(cs.fontSize) || 16;
+        return {
+            font: (block.style.fontFamily || cs.fontFamily || 'Calibri').replace(/['"]/g, '').split(',')[0].trim(),
+            size: Math.round((/pt$/i.test(block.style.fontSize) ? parseFloat(block.style.fontSize) : sizePx * 72 / 96) || 11),
+            weight: (parseInt(cs.fontWeight, 10) >= 600 || cs.fontWeight === 'bold') ? '700' : '400',
+            italic: cs.fontStyle === 'italic',
+            color: block.style.color || rgbToHex(cs.color) || '#000000',
+            align: (block.style.textAlign || cs.textAlign || 'left').replace('start', 'left'),
+            before: cssToPt(block.style.marginTop || cs.marginTop),
+            after: cssToPt(block.style.marginBottom || cs.marginBottom),
+            line: block.style.lineHeight || (cs.lineHeight && cs.fontSize ? (parseFloat(cs.lineHeight) / parseFloat(cs.fontSize)).toFixed(2) : '1.08'),
+            indent: parseFloat(block.style.marginLeft) || 0,
+            firstLine: parseFloat(block.style.textIndent) || 0,
+            keepNext: block.classList.contains('abene-keep-next')
+        };
+    }
+    function cssToPt(val) {
+        var s = String(val || '');
+        if (/pt$/i.test(s)) return parseFloat(s) || 0;
+        if (/px$/i.test(s)) return Math.round((parseFloat(s) || 0) * 72 / 96);
+        return parseFloat(s) || 0;
+    }
+    function rgbToHex(rgb) {
+        var m = String(rgb || '').match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/i);
+        if (!m) return '';
+        return '#' + [m[1], m[2], m[3]].map(function (n) {
+            return ('0' + Number(n).toString(16)).slice(-2);
+        }).join('');
+    }
+    function currentStyleKey(block) {
+        if (!block) block = getBlock();
+        if (!block) return 'normal';
+        var named = block.getAttribute('data-abene-style');
+        if (named) return named;
+        if (block.classList.contains('abene-nospacing')) return 'nospacing';
+        if (block.classList.contains('abene-title')) return 'title';
+        if (block.classList.contains('abene-subtitle')) return 'subtitle';
+        if (block.classList.contains('abene-h7')) return 'h7';
+        if (block.classList.contains('abene-h8')) return 'h8';
+        if (block.classList.contains('abene-h9')) return 'h9';
+        if (block.classList.contains('abene-list-para')) return 'listpara';
+        if (block.classList.contains('abene-intense-quote')) return 'intensequote';
+        if (/^H[1-6]$/.test(block.tagName)) return block.tagName.toLowerCase();
+        if (block.tagName === 'BLOCKQUOTE') return 'quote';
+        if (block.tagName === 'PRE') return 'pre';
+        return 'normal';
+    }
+    function syncStyleSelect(key) {
+        var sel = document.getElementById('styleSelect');
+        if (!sel || !key) return;
+        if (!Array.from(sel.options).some(function (o) { return o.value === key; })) {
+            var opt = document.createElement('option');
+            opt.value = key;
+            opt.textContent = styleDisplayName(key);
+            sel.appendChild(opt);
+        }
+        sel.value = key;
+    }
+    function fillStyleSelect() {
+        var sel = document.getElementById('styleSelect');
+        if (!sel) return;
+        var current = sel.value;
+        allStyleKeys().forEach(function (key) {
+            if (STYLE_DEFS[key] && STYLE_DEFS[key].inline) return;
+            if (Array.from(sel.options).some(function (o) { return o.value === key; })) return;
+            var opt = document.createElement('option');
+            opt.value = key;
+            opt.textContent = styleDisplayName(key);
+            sel.appendChild(opt);
+        });
+        if (current) sel.value = current;
+    }
+    function matchingStyleBlocks(editor, key) {
+        var nodes = [];
+        var safe = String(key || '').replace(/"/g, '');
+        if (!editor || !safe) return nodes;
+        editor.querySelectorAll('[data-abene-style="' + safe + '"]').forEach(function (el) { nodes.push(el); });
+        var def = STYLE_DEFS[key];
+        if (def && !def.inline) {
+            var sel = def.cls ? '.' + def.cls : (def.tag || '');
+            if (sel) {
+                editor.querySelectorAll(sel).forEach(function (el) {
+                    var named = el.getAttribute('data-abene-style');
+                    if (named && named !== key) return;
+                    if (nodes.indexOf(el) < 0) nodes.push(el);
+                });
+            }
+        }
+        return nodes;
+    }
+    function reapplyStyleToDocument(key) {
+        var editor = ed();
+        if (!editor || !key) return;
+        var props = resolveStyle(key);
+        matchingStyleBlocks(editor, key).forEach(function (el) {
+            applyResolvedProps(el, props);
+        });
+    }
     window.applyStyle = function (key) {
-        var def = STYLE_DEFS[key] || STYLE_DEFS.normal;
-        if (def.inline) {
-            wrapInline(function (span) { span.className = def.cls || def.inline; });
+        var def = resolveStyle(key);
+        if (def.inline || (STYLE_DEFS[key] && STYLE_DEFS[key].inline)) {
+            wrapInline(function (span) { span.className = def.cls || def.inline || STYLE_DEFS[key].inline; });
             return;
         }
-        var block = getBlock();
         var editor = ed();
         editor.focus();
         if (def.tag && ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'blockquote', 'pre'].indexOf(def.tag) >= 0) {
             runExec('formatBlock', def.tag);
         }
-        block = getBlock();
+        var block = getBlock();
         if (block && def.cls) {
             block.className = (block.className || '').replace(/abene-\S+/g, '').trim() + ' ' + def.cls;
         }
+        if (block) applyResolvedProps(block, def);
         if (typeof updateNavigation === 'function') updateNavigation();
         if (typeof saveUndoState === 'function') saveUndoState();
-        var sel = document.getElementById('styleSelect');
-        if (sel) sel.value = key;
+        syncStyleSelect(key);
     };
 
     window.manageStyles = function () {
         if (typeof openGenericModal !== 'function') return;
+        fillStyleSelect();
+        var current = currentStyleKey();
+        var list = allStyleKeys().filter(function (k) { return !(STYLE_DEFS[k] && STYLE_DEFS[k].inline); }).map(function (key) {
+            var on = key === current ? ' style="background:#deecf9;border-color:#2b579a;"' : '';
+            return '<button type="button" class="abene-style-item" data-style="' + key + '"' + on + ' onclick="applyStyle(\'' + key.replace(/'/g, '') + '\')">' +
+                escStyle(styleDisplayName(key)) + '</button>';
+        }).join('');
         openGenericModal(tt('stylesPaneTitle'),
-            '<p style="font-size:12px;margin-bottom:8px;">' + tt('stylesPaneHint') + '</p>' +
-            '<label>' + tt('stylesTitleColor') + ' <input type="color" id="styleTitleColor" value="' + (localStorage.getItem('abeneTitleColor') || '#2b579a') + '"></label>',
+            '<p style="font-size:12px;margin-bottom:8px;">' + tt('stylesPaneHint2') + '</p>' +
+            '<div class="abene-style-list">' + list + '</div>' +
+            '<div class="form-row" style="margin-top:10px;">' +
+            '<label>' + tt('stylesTitleColor') + ' <input type="color" id="styleTitleColor" value="' + (localStorage.getItem('abeneTitleColor') || '#2b579a') + '"></label>' +
+            '</div>',
             '<button class="btn-secondary" onclick="closeModal(\'genericModal\')">' + tt('cancel') + '</button>' +
+            '<button class="btn-secondary" onclick="abeneStyleFromSelection()">' + tt('styleNewFromSel') + '</button>' +
+            '<button class="btn-secondary" onclick="abeneStyleUpdateCurrent()">' + tt('styleUpdate') + '</button>' +
+            '<button class="btn-secondary" onclick="abeneStyleModifyCurrent()">' + tt('styleModify') + '</button>' +
             '<button class="btn-primary" onclick="applyManagedStyles()">' + tt('ok') + '</button>'
         );
     };
+    function escStyle(s) {
+        return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+        });
+    }
     window.applyManagedStyles = function () {
         var c = document.getElementById('styleTitleColor');
         if (c) {
             localStorage.setItem('abeneTitleColor', c.value);
+            var user = loadUserStyles();
+            ['h1', 'h2', 'h3', 'h4', 'h5', 'title'].forEach(function (key) {
+                user[key] = mergeStyle(user[key] || {}, { color: c.value });
+            });
+            saveUserStyles(user);
             ed().querySelectorAll('h1, h2, h3, h4, h5, h6, .abene-title').forEach(function (h) { h.style.color = c.value; });
+            ['h1', 'h2', 'h3', 'h4', 'h5', 'title'].forEach(reapplyStyleToDocument);
         }
         closeModal('genericModal');
         if (typeof saveUndoState === 'function') saveUndoState();
     };
+    window.abeneStyleUpdateCurrent = function (opts) {
+        var key = currentStyleKey();
+        var block = getBlock();
+        if (!block || !key) return;
+        var user = loadUserStyles();
+        user[key] = mergeStyle(user[key] || { name: styleDisplayName(key) }, readBlockStyle(block));
+        saveUserStyles(user);
+        reapplyStyleToDocument(key);
+        if (typeof saveUndoState === 'function') saveUndoState();
+        if (typeof showToast === 'function') showToast(tt('styleUpdated'));
+        if (!opts || !opts.silent) window.manageStyles();
+    };
+    window.abeneStyleFromSelection = function () {
+        var block = getBlock();
+        if (!block) return;
+        var name = window.prompt(tt('styleNewName'), tt('styleCustom'));
+        if (!name) return;
+        var slug = String(name).toLowerCase().replace(/[^a-z0-9]+/gi, '_').replace(/^_|_$/g, '');
+        var id = 'u_' + (slug || Date.now().toString(36));
+        var user = loadUserStyles();
+        user[id] = mergeStyle(readBlockStyle(block), { name: name, tag: 'p', cls: 'abene-normal', custom: true });
+        saveUserStyles(user);
+        fillStyleSelect();
+        applyResolvedProps(block, resolveStyle(id));
+        if (typeof saveUndoState === 'function') saveUndoState();
+        if (typeof showToast === 'function') showToast(tt('styleCreated'));
+        window.manageStyles();
+    };
+    window.abeneStyleModifyCurrent = function () {
+        var key = currentStyleKey();
+        var props = resolveStyle(key);
+        if (typeof openGenericModal !== 'function') return;
+        openGenericModal(tt('styleModify') + ' — ' + escStyle(props.name || key),
+            '<div class="form-group"><label>' + tt('styleName') + '</label><input id="stName" type="text" value="' + escStyle(props.name || key) + '"></div>' +
+            '<div class="form-row">' +
+            '<div class="form-group"><label>' + tt('dlgFont') + '</label><input id="stFont" type="text" value="' + escStyle(props.font || 'Calibri') + '"></div>' +
+            '<div class="form-group"><label>' + tt('dlgSizePt') + '</label><input id="stSize" type="number" min="6" max="96" value="' + (props.size || 11) + '"></div>' +
+            '</div>' +
+            '<div class="form-row">' +
+            '<div class="form-group"><label>' + tt('dlgBefore') + '</label><input id="stBefore" type="number" min="0" value="' + (props.before || 0) + '"></div>' +
+            '<div class="form-group"><label>' + tt('dlgAfter') + '</label><input id="stAfter" type="number" min="0" value="' + (props.after || 0) + '"></div>' +
+            '</div>' +
+            '<div class="form-row">' +
+            '<div class="form-group"><label>' + tt('dlgLineRule') + '</label><input id="stLine" type="text" value="' + escStyle(props.line || '1.08') + '"></div>' +
+            '<div class="form-group"><label>' + tt('dlgAlign') + '</label><select id="stAlign">' +
+            '<option value="left"' + (props.align === 'left' ? ' selected' : '') + '>' + tt('alignLeft') + '</option>' +
+            '<option value="center"' + (props.align === 'center' ? ' selected' : '') + '>' + tt('alignCenter') + '</option>' +
+            '<option value="right"' + (props.align === 'right' ? ' selected' : '') + '>' + tt('alignRight') + '</option>' +
+            '<option value="justify"' + (props.align === 'justify' ? ' selected' : '') + '>' + tt('dlgJustify') + '</option>' +
+            '</select></div></div>' +
+            '<label><input type="checkbox" id="stBold"' + (String(props.weight) === '700' ? ' checked' : '') + '> ' + tt('bold') + '</label> ' +
+            '<label><input type="checkbox" id="stItalic"' + (props.italic ? ' checked' : '') + '> ' + tt('italic') + '</label>',
+            '<button class="btn-secondary" onclick="manageStyles()">' + tt('cancel') + '</button>' +
+            ((props.custom || String(key).indexOf('u_') === 0) ? '<button class="btn-secondary" onclick="abeneStyleDelete(\'' + key.replace(/'/g, '') + '\')">' + tt('styleDelete') + '</button>' : '') +
+            '<button class="btn-primary" onclick="abeneStyleSaveModify(\'' + key.replace(/'/g, '') + '\')">' + tt('ok') + '</button>'
+        );
+    };
+    window.abeneStyleSaveModify = function (key) {
+        var user = loadUserStyles();
+        user[key] = mergeStyle(user[key] || {}, {
+            name: (document.getElementById('stName') || {}).value || styleDisplayName(key),
+            font: (document.getElementById('stFont') || {}).value || 'Calibri',
+            size: Number((document.getElementById('stSize') || {}).value) || 11,
+            before: Number((document.getElementById('stBefore') || {}).value) || 0,
+            after: Number((document.getElementById('stAfter') || {}).value) || 0,
+            line: (document.getElementById('stLine') || {}).value || '1.08',
+            align: (document.getElementById('stAlign') || {}).value || 'left',
+            weight: document.getElementById('stBold') && document.getElementById('stBold').checked ? '700' : '400',
+            italic: !!(document.getElementById('stItalic') && document.getElementById('stItalic').checked)
+        });
+        saveUserStyles(user);
+        reapplyStyleToDocument(key);
+        fillStyleSelect();
+        if (typeof saveUndoState === 'function') saveUndoState();
+        window.manageStyles();
+    };
+    window.abeneStyleDelete = function (key) {
+        if (STYLE_DEFS[key] && String(key).indexOf('u_') !== 0) return;
+        var user = loadUserStyles();
+        delete user[key];
+        saveUserStyles(user);
+        fillStyleSelect();
+        window.manageStyles();
+    };
+    window.abeneCurrentStyleKey = currentStyleKey;
+    window.abeneReadBlockStyle = readBlockStyle;
+    window.abeneFillStyleSelect = fillStyleSelect;
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fillStyleSelect);
+    else fillStyleSelect();
 
     window.showCaseMenu = function (ev) {
         showFly(ev,
@@ -786,8 +1082,8 @@
         document.getElementById('dlgAlign').value = (b.style.textAlign || 'left').replace('start', 'left');
         document.getElementById('dlgIndLeft').value = cm(parseFloat(b.style.marginLeft) || 0).toFixed(2);
         document.getElementById('dlgIndRight').value = cm(parseFloat(b.style.marginRight) || 0).toFixed(2);
-        document.getElementById('dlgSpBefore').value = parseFloat(b.style.marginTop) || 0;
-        document.getElementById('dlgSpAfter').value = b.style.marginBottom ? parseFloat(b.style.marginBottom) : 8;
+        document.getElementById('dlgSpBefore').value = cssToPt(b.style.marginTop || getComputedStyle(b).marginTop);
+        document.getElementById('dlgSpAfter').value = b.style.marginBottom ? cssToPt(b.style.marginBottom) : cssToPt(getComputedStyle(b).marginBottom);
         document.getElementById('dlgWidow').checked = getComputedStyle(b).widows !== '1';
         document.getElementById('dlgKeepNext').checked = b.classList.contains('abene-keep-next');
         document.getElementById('dlgKeepLines').checked = b.classList.contains('abene-keep-together');
@@ -797,6 +1093,23 @@
         if (ti > 0) { document.getElementById('dlgIndSpecial').value = 'first'; document.getElementById('dlgIndBy').value = cm(ti).toFixed(2); }
         else if (ti < 0) { document.getElementById('dlgIndSpecial').value = 'hanging'; document.getElementById('dlgIndBy').value = cm(-ti).toFixed(2); }
         else document.getElementById('dlgIndSpecial').value = 'none';
+        var lh = b.style.lineHeight || '';
+        var ruleEl = document.getElementById('dlgLineRule');
+        var atEl = document.getElementById('dlgLineAt');
+        if (ruleEl && atEl) {
+            if (/pt$/i.test(lh)) { ruleEl.value = 'exactly'; atEl.value = parseFloat(lh) || 12; }
+            else if (lh === '1' || lh === '1.15' || lh === '1.5' || lh === '2') { ruleEl.value = lh; atEl.value = lh; }
+            else if (lh) { ruleEl.value = 'multiple'; atEl.value = parseFloat(lh) || 1.08; }
+            else {
+                var csLh = getComputedStyle(b).lineHeight;
+                var csFs = parseFloat(getComputedStyle(b).fontSize) || 16;
+                var ratio = (parseFloat(csLh) / csFs) || 1.08;
+                ruleEl.value = 'multiple';
+                atEl.value = ratio.toFixed(2);
+            }
+        }
+        var upd = document.getElementById('dlgUpdateStyle');
+        if (upd) upd.checked = false;
     };
     window.applyParagraphDialog = function () {
         applyToBlocks(function (b) {
@@ -828,6 +1141,10 @@
             lastIndent.right = parseFloat(b.style.marginRight) || 0;
             lastIndent.first = parseFloat(b.style.textIndent) || 0;
         });
+        var updateStyle = document.getElementById('dlgUpdateStyle');
+        if (updateStyle && updateStyle.checked && typeof window.abeneStyleUpdateCurrent === 'function') {
+            window.abeneStyleUpdateCurrent({ silent: true });
+        }
         closeModal('paragraphDialog');
         window.updateRulerFromSelection();
     };
@@ -1574,6 +1891,7 @@
         return (page + 1) * h + (m.top || 0);
     }
 
+    window.abeneYInEditor = yInEditor;
     function yInEditor(el, editor) {
         if (!el || !editor) return 0;
         try {
@@ -2659,12 +2977,16 @@
             var pageFooter = pageHf ? pageHf.footer : footer;
             if (!pageHf && (pageFooter === undefined || pageFooter === null)) pageFooter = footer;
             var hideFirst = pageHf ? !!pageHf.hideFirst : (!!A().pageHeaderDifferentFirst && page === 0);
+            var info = (secHf && window.ABENE.Sections.pageNumberInfo) ? window.ABENE.Sections.pageNumberInfo(page, pages) : (pageHf && pageHf.pageInfo) || null;
+            var hideNumbers = !!(info && info.hideNumbers) || (pageHf && pageHf.hideNumbers);
+            var numLabel = hideNumbers ? '' : ((info && (info.label || info.display)) || n);
+            var numTotal = hideNumbers ? '' : ((info && info.sectionTotal) || pages);
             var pageTpl = (pageHf && pageHf.template) || tpl;
             var structured = isStructuredHeader(pageTpl);
             var savedFields = A().pageHeaderFields;
             if (pageHf && pageHf.fields) A().pageHeaderFields = pageHf.fields;
-            var hHtml = hideFirst ? '' : hfInner('header', pageHeader, n, pages, pageTpl);
-            var fHtml = hideFirst ? { main: '', right: '' } : hfInner('footer', pageFooter, n, pages);
+            var hHtml = hideFirst ? '' : hfInner('header', pageHeader, numLabel || n, numTotal || pages, pageTpl, hideNumbers);
+            var fHtml = hideFirst ? { main: '', right: '' } : hfInner('footer', pageFooter, numLabel || n, numTotal || pages, null, hideNumbers);
             if (pageHf && pageHf.fields) A().pageHeaderFields = savedFields;
             var brand = (!structured && !hideFirst && page > 0)
                 ? '<span class="hf-brand"><img src="' + escapeHf(brandIcon) + '" alt="" width="18" height="18" /><span>' + escapeHf(brandName) + '</span></span>'
@@ -2674,12 +2996,21 @@
                 : '<div class="hf-left">' + brand + '</div><div class="hf-center"><div class="header-content">' + hHtml + '</div></div><div class="hf-right"></div>';
             var headH = (pageHf && pageHf.headerDistance != null) ? pageHf.headerDistance : m.top;
             var footH = (pageHf && pageHf.footerDistance != null) ? pageHf.footerDistance : m.bottom;
-            html += '<div class="page-header-zone' + (hideFirst ? ' hf-first-blank' : '') + '" data-page="' + n + '" style="top:' + pageTop + 'px;height:' + headH + 'px;' + cssVars + '">' +
+            var secIdx = pageHf && pageHf.sectionIndex != null ? pageHf.sectionIndex : 0;
+            var roleName = (pageHf && pageHf.role && window.ABENE.Sections.roleLabel) ? window.ABENE.Sections.roleLabel(pageHf.role) : '';
+            var hSrc = pageHf && pageHf.headerSource != null ? pageHf.headerSource : secIdx;
+            var fSrc = pageHf && pageHf.footerSource != null ? pageHf.footerSource : secIdx;
+            var hLink = pageHf && pageHf.linkedHeader ? '1' : '0';
+            var fLink = pageHf && pageHf.linkedFooter ? '1' : '0';
+            var hTab = tt('headerBadge') + (roleName ? ' · ' + roleName : '') + (hLink === '1' ? ' · ' + tt('hfSamePrev') : '');
+            var fTab = tt('footerBadge') + (roleName ? ' · ' + roleName : '') + (fLink === '1' ? ' · ' + tt('hfSamePrev') : '');
+            var secAttrs = ' data-abene-sec="' + secIdx + '" data-abene-role="' + escapeHf(pageHf && pageHf.role || '') + '"';
+            html += '<div class="page-header-zone' + (hideFirst ? ' hf-first-blank' : '') + '" data-page="' + n + '" data-hf-source="' + hSrc + '" data-hf-linked="' + hLink + '"' + secAttrs + ' style="top:' + pageTop + 'px;height:' + headH + 'px;' + cssVars + '">' +
                 '<div class="hf-row' + (structured ? ' hf-wide' : '') + '">' + rowInner + '</div>' +
-                '<div class="hf-rule"></div><span class="hf-tab">' + tt('headerBadge') + '</span></div>';
+                '<div class="hf-rule"></div><span class="hf-tab">' + escapeHf(hTab) + '</span></div>';
             var seamPad = page < pages - 1 ? PAGE_GAP : 0;
-            html += '<div class="page-footer-zone' + (hideFirst ? ' hf-first-blank' : '') + '" data-page="' + n + '" style="top:' + (pageTop + pageHeight - footH) + 'px;height:' + footH + 'px;--hf-seam:' + seamPad + 'px;' + cssVars + '">' +
-                '<div class="hf-rule"></div><span class="hf-tab">' + tt('footerBadge') + '</span>' +
+            html += '<div class="page-footer-zone' + (hideFirst ? ' hf-first-blank' : '') + '" data-page="' + n + '" data-hf-source="' + fSrc + '" data-hf-linked="' + fLink + '"' + secAttrs + ' style="top:' + (pageTop + pageHeight - footH) + 'px;height:' + footH + 'px;--hf-seam:' + seamPad + 'px;' + cssVars + '">' +
+                '<div class="hf-rule"></div><span class="hf-tab">' + escapeHf(fTab) + '</span>' +
                 '<div class="hf-row"><div class="hf-left"></div><div class="hf-center"><div class="footer-content">' + fHtml.main + '</div></div><div class="hf-right">' + fHtml.right + '</div></div></div>';
             if (page < pages - 1) {
                 html += '<div class="page-gap-band" style="top:' + (pageTop + pageHeight - PAGE_GAP) + 'px;height:' + PAGE_GAP + 'px"></div>';
@@ -2700,15 +3031,23 @@
             .replace(/\{PAGE\}/gi, String(page))
             .replace(/\{NUMPAGES\}/gi, String(total));
     }
-    function hfInner(kind, text, page, total, tplOverride) {
+    function hfInner(kind, text, page, total, tplOverride, hideNumbers) {
         var raw = String(text || '').trim();
+        if (hideNumbers) {
+            raw = raw.replace(/\{PAGE\}(\s*\/\s*\{NUMPAGES\})?/gi, '').replace(/\{NUMPAGES\}/gi, '')
+                .replace(/\s*[·•|]\s*$/g, '').replace(/^\s*[·•|]\s*/g, '').trim();
+        }
         if (kind === 'header') {
             var tpl = tplOverride || headerTplId();
-            if (isStructuredHeader(tpl)) return renderHeaderTemplateHtml(tpl);
-            if (tpl === 'blank' || !raw) return '<span class="hf-placeholder">' + tt('headerHint') + '</span>';
+            if (isStructuredHeader(tpl)) return hideNumbers && !raw ? '' : renderHeaderTemplateHtml(tpl);
+            if (tpl === 'blank' || !raw) return hideNumbers ? '' : '<span class="hf-placeholder">' + tt('headerHint') + '</span>';
             return substPageFields(raw, page, total);
         }
-        var hasField = /\{PAGE\}/i.test(raw);
+        var hasField = /\{PAGE\}/i.test(String(text || ''));
+        if (hideNumbers) {
+            if (!raw) return { main: '', right: '' };
+            return { main: substPageFields(raw, page, total), right: '' };
+        }
         if (!raw) {
             return { main: '<span class="hf-placeholder">' + tt('footerHint') + '</span>', right: page + ' / ' + total };
         }
@@ -2816,6 +3155,20 @@
         if (sec && typeof sec.syncRootFromGlobal === 'function') sec.syncRootFromGlobal();
     }
 
+    function unlinkHfIfNeeded(zone, type) {
+        if (!zone || zone.getAttribute('data-hf-linked') !== '1') return;
+        var S = window.ABENE && window.ABENE.Sections;
+        if (S && typeof S.ensureOwnFromZone === 'function') S.ensureOwnFromZone(zone, type);
+        var sec = zone.getAttribute('data-abene-sec') || '0';
+        var chrome = document.getElementById('pageChrome');
+        var sel = (type === 'footer' ? '.page-footer-zone' : '.page-header-zone') + '[data-abene-sec="' + sec + '"]';
+        (chrome ? chrome.querySelectorAll(sel) : [zone]).forEach(function (z) {
+            z.setAttribute('data-hf-linked', '0');
+            z.setAttribute('data-hf-source', sec);
+        });
+        if (typeof showToast === 'function') showToast(tt('hfUnlinkedToast'));
+    }
+
     function decorateHfTab(zone, type) {
         var tab = zone.querySelector('.hf-tab');
         if (!tab || tab.querySelector('.hf-close')) return;
@@ -2853,6 +3206,12 @@
         editor.contentEditable = 'false';
         editor.classList.add('editing-header-footer');
         var chrome = document.getElementById('pageChrome');
+        var page0 = Math.max(0, (parseInt(zone.getAttribute('data-page'), 10) || 1) - 1);
+        window._abeneHfLastPage = page0;
+        var srcKey = zone.getAttribute('data-hf-source') || zone.getAttribute('data-abene-sec') || '0';
+        var pageHf = (window.ABENE && window.ABENE.Sections && window.ABENE.Sections.hfForPage)
+            ? window.ABENE.Sections.hfForPage(page0, window.abeneCountUsedPages ? window.abeneCountUsedPages(editor) : page0 + 1)
+            : null;
         if (chrome) {
             chrome.classList.add('hf-guides-on');
             chrome.querySelectorAll('.page-header-zone, .page-footer-zone').forEach(function (z) {
@@ -2862,12 +3221,15 @@
                 });
             });
             chrome.querySelectorAll(type === 'footer' ? '.page-footer-zone' : '.page-header-zone').forEach(function (z) {
-                z.classList.add('active');
-                decorateHfTab(z, type);
+                var same = (z.getAttribute('data-hf-source') || z.getAttribute('data-abene-sec') || '0') === srcKey;
+                if (same) {
+                    z.classList.add('active');
+                    decorateHfTab(z, type);
+                }
             });
         }
-        var structured = type === 'header' && isStructuredHeader();
-        window._abeneHf = { type: type, zone: zone, content: content, structured: structured };
+        var structured = type === 'header' && isStructuredHeader((pageHf && pageHf.template) || headerTplId());
+        window._abeneHf = { type: type, zone: zone, content: content, structured: structured, source: srcKey };
         if (structured) {
             content.contentEditable = 'false';
             var fields = content.querySelectorAll('[data-hf-field]');
@@ -2876,9 +3238,11 @@
                 f.spellcheck = true;
             });
             content.oninput = function () {
+                unlinkHfIfNeeded(zone, type);
                 var live = readHfFields(content);
                 if (chrome) {
-                    chrome.querySelectorAll('.header-content').forEach(function (c) {
+                    var src = zone.getAttribute('data-hf-source') || zone.getAttribute('data-abene-sec') || '0';
+                    chrome.querySelectorAll('.page-header-zone[data-hf-source="' + src + '"] .header-content').forEach(function (c) {
                         if (c === content) return;
                         c.querySelectorAll('[data-hf-field]').forEach(function (el) {
                             var k = el.getAttribute('data-hf-field');
@@ -2911,15 +3275,19 @@
             if (target) placeCaretIn(target, ev);
             return;
         }
-        var raw = type === 'footer' ? (A().pageFooterText || '') : (A().pageHeaderText || '');
+        var raw = type === 'footer'
+            ? ((pageHf && pageHf.footer != null) ? pageHf.footer : (A().pageFooterText || ''))
+            : ((pageHf && pageHf.header != null) ? pageHf.header : (A().pageHeaderText || ''));
         content.textContent = raw;
         content.contentEditable = 'true';
         content.spellcheck = true;
         content.oninput = function () {
+            unlinkHfIfNeeded(zone, type);
             var live = content.innerText;
             var selClass = type === 'footer' ? '.footer-content' : '.header-content';
+            var src = zone.getAttribute('data-hf-source') || zone.getAttribute('data-abene-sec') || '0';
             if (chrome) {
-                chrome.querySelectorAll(selClass).forEach(function (c) {
+                chrome.querySelectorAll((type === 'footer' ? '.page-footer-zone' : '.page-header-zone') + '[data-hf-source="' + src + '"] ' + selClass).forEach(function (c) {
                     if (c !== content) c.textContent = live;
                 });
             }
@@ -3614,7 +3982,18 @@
     window.abeneActivateHeaderFooter = function (type) {
         var chrome = document.getElementById('pageChrome');
         if (!chrome) return;
-        var zone = chrome.querySelector(type === 'footer' ? '.page-footer-zone' : '.page-header-zone');
+        var page = window._abeneHfLastPage != null ? window._abeneHfLastPage : pageIndexFromCaret();
+        var sel = type === 'footer' ? '.page-footer-zone' : '.page-header-zone';
+        var zones = chrome.querySelectorAll(sel);
+        var zone = null;
+        var i;
+        for (i = 0; i < zones.length; i++) {
+            if (parseInt(zones[i].getAttribute('data-page'), 10) === page + 1) {
+                zone = zones[i];
+                break;
+            }
+        }
+        if (!zone) zone = zones[page] || zones[0];
         if (!zone) return;
         window.enterHeaderFooter(type, zone);
     };

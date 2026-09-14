@@ -1623,23 +1623,42 @@
         }
         var doc;
         try { doc = new DOMParser().parseFromString(html, 'text/html'); } catch (e) { return null; }
+        var extract = window.abeneExtractCssRules;
+        var classCss = {};
+        if (typeof extract === 'function') {
+            doc.querySelectorAll('style').forEach(function (st) {
+                extract(st.textContent).forEach(function (rule) {
+                    (rule.selectors || []).forEach(function (sel) {
+                        var cls = String(sel).trim().match(/\.([A-Za-z0-9_-]+)/);
+                        if (cls) classCss[cls[1]] = (classCss[cls[1]] || '') + ';' + (rule.css || '');
+                    });
+                });
+            });
+        }
         var table = doc.querySelector('table');
         if (!table) return null;
         var cells = [];
         table.querySelectorAll('tr').forEach(function (tr) {
             var row = [];
             tr.querySelectorAll('th,td').forEach(function (td) {
+                var classStyle = '';
+                String(td.className || '').split(/\s+/).forEach(function (name) {
+                    if (name && classCss[name]) classStyle += classCss[name] + ';';
+                });
+                if (classStyle) td.setAttribute('style', classStyle + (td.getAttribute('style') || ''));
                 var raw = td.getAttribute('data-raw');
                 if (raw == null) raw = (td.innerText || td.textContent || '').replace(/\u00a0/g, ' ').trim();
                 var ce = { raw: raw, value: raw };
                 var cs = td.style || {};
-                if (cs.fontWeight === 'bold' || Number(cs.fontWeight) >= 700 || td.tagName === 'TH') ce.bold = true;
-                if (cs.fontStyle === 'italic') ce.italic = true;
-                if (String(cs.textDecoration || '').indexOf('underline') >= 0) ce.under = true;
+                if (cs.fontWeight === 'bold' || Number(cs.fontWeight) >= 700 || td.tagName === 'TH' || /bold/i.test(classStyle)) ce.bold = true;
+                if (cs.fontStyle === 'italic' || /italic/i.test(classStyle)) ce.italic = true;
+                if (String(cs.textDecoration || classStyle).indexOf('underline') >= 0) ce.under = true;
                 if (cs.backgroundColor && cs.backgroundColor !== 'transparent') ce.fill = cs.backgroundColor;
                 else if (cs.background && cs.background !== 'transparent') ce.fill = cs.background;
+                if (td.getAttribute('bgcolor') && !ce.fill) ce.fill = td.getAttribute('bgcolor');
                 if (cs.color) ce.color = cs.color;
                 if (cs.textAlign) ce.align = cs.textAlign;
+                else if (td.getAttribute('align')) ce.align = td.getAttribute('align');
                 if (cs.fontSize) ce.size = parseFloat(cs.fontSize) || ce.size;
                 if (cs.fontFamily) ce.font = cs.fontFamily;
                 row.push(ce);
@@ -2075,13 +2094,46 @@
         }
         return '';
     }
+    var _xlsxTheme = ['#FFFFFF', '#000000', '#E7E6E6', '#44546A', '#5B9BD5', '#ED7D31', '#A5A5A5', '#FFC000', '#4472C4', '#70AD47'];
+    function xlsxApplyTint(hex, tint) {
+        tint = Number(tint);
+        if (!hex || !/^#[0-9a-f]{6}$/i.test(hex) || !isFinite(tint) || !tint) return hex;
+        var n = parseInt(hex.slice(1), 16);
+        function ch(c) {
+            var x = c / 255;
+            if (tint < 0) x = x * (1 + tint);
+            else x = x * (1 - tint) + tint;
+            return Math.max(0, Math.min(255, Math.round(x * 255)));
+        }
+        var r = ch((n >> 16) & 255), g = ch((n >> 8) & 255), b = ch(n & 255);
+        return '#' + [r, g, b].map(function (v) { return ('0' + v.toString(16)).slice(-2); }).join('');
+    }
+    function parseXlsxTheme(xml) {
+        _xlsxTheme = ['#FFFFFF', '#000000', '#E7E6E6', '#44546A', '#5B9BD5', '#ED7D31', '#A5A5A5', '#FFC000', '#4472C4', '#70AD47'];
+        if (!xml) return;
+        var doc = parseXml(xml);
+        if (!doc) return;
+        var order = ['lt1', 'dk1', 'lt2', 'dk2', 'accent1', 'accent2', 'accent3', 'accent4', 'accent5', 'accent6'];
+        order.forEach(function (tag, i) {
+            var el = Array.prototype.find.call(doc.getElementsByTagName('*'), function (node) { return (node.localName || '') === tag; });
+            if (!el) return;
+            var srgb = Array.prototype.find.call(el.getElementsByTagName('*'), function (node) { return (node.localName || '') === 'srgbClr'; });
+            var sys = Array.prototype.find.call(el.getElementsByTagName('*'), function (node) { return (node.localName || '') === 'sysClr'; });
+            var val = srgb ? (srgb.getAttribute('val') || '') : (sys ? (sys.getAttribute('lastClr') || '') : '');
+            if (/^[0-9a-f]{6}$/i.test(val)) _xlsxTheme[i] = '#' + val;
+        });
+    }
     function xlsxRgb(node) {
         if (!node) return '';
         var rgb = node.getAttribute('rgb');
         if (rgb) {
             rgb = rgb.replace(/^#/, '');
             if (rgb.length === 8) rgb = rgb.slice(2);
-            if (rgb.length === 6) return '#' + rgb;
+            if (rgb.length === 6) {
+                var hex = '#' + rgb;
+                var tintRgb = node.getAttribute('tint');
+                return tintRgb ? xlsxApplyTint(hex, Number(tintRgb)) : hex;
+            }
         }
         var indexed = node.getAttribute('indexed');
         if (indexed !== null && indexed !== '') {
@@ -2090,8 +2142,10 @@
         }
         var theme = node.getAttribute('theme');
         if (theme !== null && theme !== '') {
-            var themes = ['#FFFFFF','#000000','#E7E6E6','#44546A','#5B9BD5','#ED7D31','#A5A5A5','#FFC000','#4472C4','#70AD47'];
-            return themes[Number(theme)] || '';
+            var hexTheme = _xlsxTheme[Number(theme)] || '';
+            var tint = node.getAttribute('tint');
+            if (hexTheme && tint) hexTheme = xlsxApplyTint(hexTheme, Number(tint));
+            return hexTheme;
         }
         return '';
     }
@@ -2282,8 +2336,10 @@
                 read('xl/workbook.xml'),
                 read('xl/_rels/workbook.xml.rels'),
                 read('xl/sharedStrings.xml'),
-                read('xl/styles.xml')
+                read('xl/styles.xml'),
+                read('xl/theme/theme1.xml')
             ]).then(function (base) {
+                parseXlsxTheme(base[4]);
                 var wbDoc = parseXml(base[0]);
                 var relDoc = parseXml(base[1]);
                 var ssDoc = parseXml(base[2]);
@@ -2331,9 +2387,7 @@
                     }
                     return style && style !== 'none' ? (xlsxRgb(color) || '#616161') : '';
                 });
-                var xfs = xels(stDoc, 'xf').filter(function (xf) {
-                    return xf.parentNode && xf.parentNode.localName === 'cellXfs';
-                }).map(function (xf) {
+                function xfFromNode(xf) {
                     var al = xel(xf, 'alignment');
                     var nid = xattr(xf, 'numFmtId') || '0';
                     var font = fonts[Number(xattr(xf, 'fontId') || 0)] || {};
@@ -2347,7 +2401,33 @@
                         font: font, fill: fill, border: border,
                         align: align, valign: valign,
                         wrap: al ? (xattr(al, 'wrapText') === '1' || xattr(al, 'wrapText') === 'true') : false,
-                        fmt: parseNumFmtKind(nid, numFmts[nid] || '')
+                        fmt: parseNumFmtKind(nid, numFmts[nid] || ''),
+                        applyFont: xattr(xf, 'applyFont'),
+                        applyFill: xattr(xf, 'applyFill'),
+                        applyBorder: xattr(xf, 'applyBorder'),
+                        applyAlignment: xattr(xf, 'applyAlignment'),
+                        applyNumberFormat: xattr(xf, 'applyNumberFormat')
+                    };
+                }
+                function xfApplied(flag) {
+                    return flag === '' || flag === '1' || flag === 'true';
+                }
+                var cellStyleXfs = xels(stDoc, 'xf').filter(function (xf) {
+                    return xf.parentNode && xf.parentNode.localName === 'cellStyleXfs';
+                }).map(xfFromNode);
+                var xfs = xels(stDoc, 'xf').filter(function (xf) {
+                    return xf.parentNode && xf.parentNode.localName === 'cellXfs';
+                }).map(function (xf) {
+                    var own = xfFromNode(xf);
+                    var base = cellStyleXfs[Number(xattr(xf, 'xfId') || 0)] || {};
+                    return {
+                        font: xfApplied(own.applyFont) ? own.font : (base.font || own.font),
+                        fill: xfApplied(own.applyFill) ? own.fill : (base.fill || own.fill),
+                        border: xfApplied(own.applyBorder) ? own.border : (base.border || own.border),
+                        align: xfApplied(own.applyAlignment) ? own.align : (base.align || own.align),
+                        valign: xfApplied(own.applyAlignment) ? own.valign : (base.valign || own.valign),
+                        wrap: xfApplied(own.applyAlignment) ? own.wrap : (base.wrap || own.wrap),
+                        fmt: xfApplied(own.applyNumberFormat) ? own.fmt : (base.fmt || own.fmt)
                     };
                 });
                 var names = {};
@@ -3440,6 +3520,41 @@
         if (name) name.addEventListener('keydown', function (ev) {
             if (ev.key === 'Enter') { ev.preventDefault(); jumpName(name.value); }
         });
+        var ws = document.getElementById('excelWorkspace');
+        if (ws && !ws._abeneFmtBound) {
+            ws._abeneFmtBound = true;
+            ws.addEventListener('dragover', function (ev) {
+                var dt = ev.dataTransfer;
+                if (!dt || !dt.files || !dt.files.length) return;
+                ev.preventDefault();
+                dt.dropEffect = 'copy';
+            });
+            ws.addEventListener('drop', function (ev) {
+                var files = ev.dataTransfer && ev.dataTransfer.files;
+                if (!files || !files.length) return;
+                if (typeof window.abeneHandleDroppedFiles === 'function' && window.abeneHandleDroppedFiles(files)) {
+                    ev.preventDefault();
+                    ev.stopPropagation();
+                }
+            });
+            ws.addEventListener('paste', function (ev) {
+                var files = ev.clipboardData && ev.clipboardData.files;
+                if (files && files.length && typeof window.abeneHandleDroppedFiles === 'function' && window.abeneHandleDroppedFiles(files)) {
+                    ev.preventDefault();
+                    ev.stopPropagation();
+                    return;
+                }
+                var html = ev.clipboardData && ev.clipboardData.getData('text/html');
+                var text = ev.clipboardData && ev.clipboardData.getData('text/plain');
+                var parsed = parseHtmlToCells(html) || (text ? { cells: parseTsvToCells(text), meta: { type: 'tsv' } } : null);
+                if (parsed && parsed.cells && parsed.cells.length) {
+                    ev.preventDefault();
+                    clip = parsed.cells;
+                    clipPack = parsed;
+                    applyPasteRows('all', parsed.cells, parsed.meta, false);
+                }
+            });
+        }
         var rsT;
         window.addEventListener('resize', function () {
             if (!document.body.classList.contains('abene-excel-mode')) return;

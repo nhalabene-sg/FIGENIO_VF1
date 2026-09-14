@@ -364,17 +364,21 @@
         })();
         stripModelBlocks(editor);
         var html = '';
-        if (opts.cover) html += buildCover(opts, meta) + modelBreak();
-        if (opts.titlepage) html += buildTitlePage(opts, meta) + modelBreak();
+        if (opts.cover) html += buildCover(opts, meta) + ((opts.titlepage || opts.toc) ? modelBreak() : '');
+        if (opts.titlepage) html += buildTitlePage(opts, meta) + (opts.toc ? modelBreak() : '');
         if (opts.confidential) html += buildConfidential();
-        if (opts.toc) html += buildTocPage() + modelBreak();
+        if (opts.toc) html += buildTocPage();
+        var hasFront = !!(opts.cover || opts.titlepage || opts.toc);
+        if (hasFront && window.abeneSectionBreakHtml) html += window.abeneSectionBreakHtml('body');
+        else if (opts.cover || opts.titlepage) html += modelBreak();
         if (opts.logo && !opts.header && !opts.cover) html += buildBodyLogo(opts);
         if (keep && keep.replace(/<p>\s*(<br\s*\/?>)?\s*<\/p>/gi, '').trim()) html += keep;
         else html += bodySkeleton(opts);
         if (opts.signs) html += buildSigns(meta);
-        if (opts.annex) html += modelBreak() + buildAnnex();
+        if (opts.annex) html += (window.abeneSectionBreakHtml ? window.abeneSectionBreakHtml('annex') : modelBreak()) + buildAnnex();
         editor.innerHTML = html;
         applyHeaderFooter(opts);
+        if (typeof window.applyReportSections === 'function') window.applyReportSections({ silent: true });
         if (opts.toc && window.abeneFillModeloToc) {
             window.abeneFillModeloToc(editor.querySelector('[data-abene-block="toc"]'));
         }

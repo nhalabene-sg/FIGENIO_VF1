@@ -162,7 +162,7 @@
         mode = mode || 'none';
         if (mode === 'inline') mode = 'none';
         el.classList.remove('abene-obj-left', 'abene-obj-right', 'abene-obj-center', 'abene-obj-free',
-            'abene-obj-inline', 'abene-obj-behind', 'abene-obj-front');
+            'abene-obj-inline', 'abene-obj-behind', 'abene-obj-front', 'abene-obj-above', 'abene-obj-below');
         el.style.float = '';
         el.style.display = '';
         el.style.marginLeft = '';
@@ -179,6 +179,15 @@
         if (mode === 'left') el.classList.add('abene-obj-left');
         else if (mode === 'right') el.classList.add('abene-obj-right');
         else if (mode === 'center') el.classList.add('abene-obj-center');
+        else if (mode === 'above' || mode === 'below') {
+            el.classList.add(mode === 'above' ? 'abene-obj-above' : 'abene-obj-below');
+            var block = el.closest && el.closest('p, h1, h2, h3, h4, h5, h6, li, td, th, .abene-normal');
+            if (block && block !== el && block.parentNode) {
+                if (mode === 'above') block.parentNode.insertBefore(el, block);
+                else if (block.nextSibling) block.parentNode.insertBefore(el, block.nextSibling);
+                else block.parentNode.appendChild(el);
+            }
+        }
         else if (isOverlayWrap(mode)) {
             var mark = ensureAnchor(el);
             var vis = editorXY(el);
@@ -320,7 +329,8 @@
             else if (type === 'center') img.classList.add('center');
             save();
         }
-        if (typeof positionImageHandles === 'function') positionImageHandles();
+        if (typeof showImageToolbar === 'function') showImageToolbar({ clientX: 0, clientY: 0 });
+        else if (typeof positionImageHandles === 'function') positionImageHandles();
     };
     window.setObjectWrap = function (type) {
         var box = editorEl() && editorEl().querySelector('.abene-tbox.abene-obj-on');
@@ -363,6 +373,19 @@
             var tbox = ev.target.closest && ev.target.closest('.abene-tbox');
             var pic = ev.target.closest && ev.target.closest('.abene-pic');
             var img = ev.target.closest && ev.target.closest('#editor img');
+            if (!pic && !tbox && !rs) {
+                var overlayHit = null;
+                editor.querySelectorAll('.abene-pic, .abene-tbox').forEach(function (el) {
+                    var mode = el.getAttribute('data-wrap');
+                    if (!isOverlayWrap(mode) && mode !== 'above' && mode !== 'below') return;
+                    var r = el.getBoundingClientRect();
+                    if (ev.clientX >= r.left && ev.clientX <= r.right && ev.clientY >= r.top && ev.clientY <= r.bottom) overlayHit = el;
+                });
+                if (overlayHit) {
+                    pic = overlayHit.classList.contains('abene-pic') ? overlayHit : pic;
+                    tbox = overlayHit.classList.contains('abene-tbox') ? overlayHit : tbox;
+                }
+            }
             if (rs) {
                 ev.preventDefault();
                 ev.stopPropagation();
@@ -381,6 +404,7 @@
                 return;
             }
             if (pic) {
+                ev.preventDefault();
                 startDrag(pic, ev);
                 selectObj(pic);
                 return;
@@ -469,10 +493,14 @@
             var files = e.dataTransfer && e.dataTransfer.files;
             if (!files || !files.length) return;
             var n = 0;
+            var opened = false;
             Array.prototype.forEach.call(files, function (f) {
                 if (/^image\//.test(f.type)) { n++; insertImageFile(f); }
             });
-            if (n) {
+            if (typeof window.abeneHandleDroppedFiles === 'function') {
+                opened = window.abeneHandleDroppedFiles(files);
+            }
+            if (n || opened) {
                 e.preventDefault();
                 e.stopPropagation();
             }
@@ -507,6 +535,9 @@
     window.deleteSelectedImage = function () {
         var img = window.selectedImage;
         var wrap = img && img.closest && img.closest('.abene-pic');
+        var host = wrap || img;
+        var capAfter = host && host.nextElementSibling;
+        if (capAfter && !(capAfter.classList.contains('abene-caption') || capAfter.getAttribute('data-caption-for'))) capAfter = null;
         if (wrap) {
             removeAnchor(wrap);
             wrap.remove();
@@ -515,9 +546,12 @@
             if (tb) tb.classList.remove('visible');
             if (typeof hideImageHandles === 'function') hideImageHandles();
             save();
-            return;
+        } else if (typeof origDelImg === 'function') {
+            origDelImg.apply(this, arguments);
         }
-        if (typeof origDelImg === 'function') return origDelImg.apply(this, arguments);
+        if (capAfter && capAfter.parentNode) capAfter.remove();
+        if (typeof window.abeneRenumberCaptions === 'function') window.abeneRenumberCaptions();
+        if (typeof window.abeneScheduleLiveFields === 'function') window.abeneScheduleLiveFields();
     };
     var origReset = window.resetImageStyle;
     window.resetImageStyle = function () {
@@ -527,10 +561,21 @@
         if (wrap) applyWrap(wrap, 'none');
     };
 
+    function wrapLooseImages(root) {
+        var editor = root || editorEl();
+        if (!editor) return;
+        editor.querySelectorAll('img').forEach(function (img) {
+            if (isLockedImg(img)) return;
+            wrapImg(img);
+        });
+    }
+    window.abeneWrapLooseImages = wrapLooseImages;
+
     window.ABENE = window.ABENE || {};
     window.ABENE.Images = {
         syncAnchors: syncAnchors,
         applyWrap: applyWrap,
-        ensureAnchor: ensureAnchor
+        ensureAnchor: ensureAnchor,
+        wrapLoose: wrapLooseImages
     };
 })();

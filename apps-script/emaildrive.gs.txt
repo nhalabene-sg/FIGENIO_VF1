@@ -264,9 +264,9 @@ function init_() {
   ensure_(ss, 'CONFIG', ['Key', 'Value']);
   ensure_(ss, 'DOCUMENTS', ['Id', 'Name', 'UpdatedAt', 'DriveFileId', 'Size', 'Preview']);
   ensure_(ss, 'EXCEL', ['Id', 'Name', 'UpdatedAt', 'DriveFileId', 'Size']);
-  ensure_(ss, 'ARQUIVO', ['Id', 'Name', 'Type', 'Client', 'Pasta', 'Concluded', 'UpdatedAt', 'DriveFileId', 'Size', 'DriveFolderId', 'DrivePath']);
+  ensure_(ss, 'ARQUIVO', ['Id', 'Name', 'Type', 'Client', 'Pasta', 'Concluded', 'UpdatedAt', 'DriveFileId', 'Size', 'DriveFolderId', 'DrivePath', 'DeletedAt', 'Protected', 'ProtectedAt']);
   ensure_(ss, 'FOLDERS', ['Path', 'DriveFolderId', 'Kind', 'Label', 'Client', 'Url']);
-  padHeaders_(getSheetByKey_('ARQUIVO', ss), ['Id', 'Name', 'Type', 'Client', 'Pasta', 'Concluded', 'UpdatedAt', 'DriveFileId', 'Size', 'DriveFolderId', 'DrivePath']);
+  padHeaders_(getSheetByKey_('ARQUIVO', ss), ['Id', 'Name', 'Type', 'Client', 'Pasta', 'Concluded', 'UpdatedAt', 'DriveFileId', 'Size', 'DriveFolderId', 'DrivePath', 'DeletedAt', 'Protected', 'ProtectedAt']);
   ensure_(ss, 'CLIENTS', ['id', 'nom', 'nif', 'morada', 'telefone', 'email', 'estado']);
   ensure_(ss, 'ARTICLES', ['code', 'designation', 'unite', 'prix_unitaire', 'tva', 'actif']);
   ensure_(ss, 'DEVIS', ['reference', 'date', 'client_id', 'statut', 'total_ht', 'total_tva', 'total_ttc']);
@@ -1199,6 +1199,10 @@ function typeFolderName_(type) {
   return map[String(type || '')] || '05_Outros';
 }
 
+function trashFolderName_() {
+  return ['Lixo', 'Corbeille', 'Trash', 'Papelera'][sheetLanguageIndex_()] || 'Lixo';
+}
+
 function arquivoParts_(it) {
   var client = sanitizeDrive_(it.client);
   var pasta = sanitizeDrive_(it.pasta);
@@ -1206,6 +1210,9 @@ function arquivoParts_(it) {
   if (pasta === '_') pasta = '00_Sem_pasta';
   var year = String(it.archivedAt || it.updatedAt || '').slice(0, 4);
   if (!/^\d{4}$/.test(year)) year = String(new Date().getFullYear());
+  if (it.deletedAt && !it.concluded) {
+    return [trashFolderName_(), client, pasta, typeFolderName_(it.type), year];
+  }
   var status = it.concluded ? 'Concluidos' : 'Em_curso';
   return [client, pasta, typeFolderName_(it.type), year, status];
 }
@@ -1387,7 +1394,7 @@ function saveArquivo_(list) {
   var last = sh.getLastRow();
   var i, it, html, fileId, folder, parts, path, old, vals;
   if (last >= 2) {
-    vals = sh.getRange(2, 1, last - 1, Math.max(11, sh.getLastColumn())).getValues();
+    vals = sh.getRange(2, 1, last - 1, Math.max(14, sh.getLastColumn())).getValues();
     for (i = 0; i < vals.length; i++) {
       prev[String(vals[i][0])] = { fileId: String(vals[i][7] || ''), path: String(vals[i][10] || '') };
     }
@@ -1418,7 +1425,10 @@ function saveArquivo_(list) {
       fileId,
       html.length,
       folder.getId(),
-      path
+      path,
+      (!it.concluded && it.deletedAt) ? String(it.deletedAt) : '',
+      it.protected ? '1' : '0',
+      it.protected ? String(it.protectedAt || it.updatedAt || now_()) : ''
     ]);
   }
 }
@@ -1467,6 +1477,7 @@ function saveFolders_(catalog, arquivo) {
   if (Array.isArray(arquivo)) {
     for (i = 0; i < arquivo.length; i++) {
       it = arquivo[i] || {};
+      if (it.deletedAt) continue;
       if (it.client) add('client', it.client, '');
       if (it.pasta) add('pasta', it.pasta, it.client || '');
     }
@@ -1501,6 +1512,7 @@ function writeReadme_() {
     '  {Cliente}/{Pasta}/\n' +
     '    01_Relatorios | 02_Orcamentos | 03_Recibos | 04_Completos | 05_Outros\n' +
     '      {Ano}/{Em_curso|Concluidos}/ficheiro.html\n\n' +
+    '  Lixo/                     rascunhos eliminados que ainda podem ser restaurados\n\n' +
     'As pastas de cliente e de obra sao criadas mesmo vazias, para manter a organizacao.\n';
   root.createFile(Utilities.newBlob(txt, 'text/plain', name));
 }
@@ -1511,6 +1523,7 @@ function writeIndexCsv_(list) {
   if (Array.isArray(list)) {
     for (i = 0; i < list.length; i++) {
       it = list[i] || {};
+      if (it.deletedAt) continue;
       parts = arquivoParts_(it);
       lines.push([
         String(it.name || '').replace(/;/g, ','),
@@ -1640,7 +1653,7 @@ function readArquivo_() {
   var sh = getSheetByKey_('ARQUIVO');
   var last = sh.getLastRow();
   if (last < 2) return [];
-  var vals = sh.getRange(2, 1, last - 1, Math.max(11, sh.getLastColumn())).getValues();
+  var vals = sh.getRange(2, 1, last - 1, Math.max(14, sh.getLastColumn())).getValues();
   var out = [], i, row;
   for (i = 0; i < vals.length; i++) {
     row = vals[i];
@@ -1656,7 +1669,10 @@ function readArquivo_() {
       archivedAt: row[6],
       html: readFile_(row[7]),
       driveFolderId: row[9] || '',
-      drivePath: row[10] || ''
+      drivePath: row[10] || '',
+      deletedAt: String(row[5]) === '1' ? '' : (row[11] || ''),
+      protected: String(row[12]) === '1',
+      protectedAt: String(row[12]) === '1' ? (row[13] || '') : ''
     });
   }
   return out;
