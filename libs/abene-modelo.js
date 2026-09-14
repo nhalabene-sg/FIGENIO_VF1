@@ -396,6 +396,12 @@
             btn.setAttribute('aria-pressed', selected ? 'true' : 'false');
         });
         if (ev) ev.stopPropagation();
+        /* La carte Técnico doit produire le même rapport guidé complet que
+           le bouton « Modelo relatório técnico », pas seulement recolorer. */
+        if (style === 'tecnico') {
+            window.applyModeloPreset('tech');
+            return;
+        }
         var o = readUi();
         o.style = style;
         if (style === 'carta') o.skeleton = 'letter';

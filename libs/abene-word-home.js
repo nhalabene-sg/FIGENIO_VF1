@@ -4219,6 +4219,30 @@
                 var source = sourceChildren[childIndex];
                 if (!source || sourcePageIndex(source) !== i) child.remove();
             });
+            /* Les objets libres sont positionnés dans les coordonnées du document
+               complet. L'export travaille page par page : ramener leur top dans
+               la page courante évite tout déplacement ou disparition au PDF. */
+            edClone.querySelectorAll('.abene-obj-free, .abene-obj-front, .abene-obj-behind').forEach(function (obj) {
+                var top = parseFloat(obj.style.top);
+                var left = parseFloat(obj.style.left);
+                if (isFinite(top)) obj.style.setProperty('top', Math.max(0, top - i * h) + 'px', 'important');
+                if (isFinite(left)) obj.style.setProperty('left', Math.max(0, left) + 'px', 'important');
+                obj.style.setProperty('position', 'absolute', 'important');
+                if (obj.classList.contains('abene-obj-behind')) obj.style.setProperty('z-index', '0', 'important');
+                else if (obj.classList.contains('abene-obj-front')) obj.style.setProperty('z-index', '20', 'important');
+                else obj.style.setProperty('z-index', '6', 'important');
+            });
+            /* Un filigrane appartient à la page, pas seulement au premier écran. */
+            var liveWatermark = editor.querySelector(':scope > .watermark');
+            if (liveWatermark) {
+                edClone.querySelectorAll(':scope > .watermark').forEach(function (wm) { wm.remove(); });
+                var wmClone = liveWatermark.cloneNode(true);
+                wmClone.style.setProperty('position', 'absolute', 'important');
+                wmClone.style.setProperty('top', '50%', 'important');
+                wmClone.style.setProperty('left', '50%', 'important');
+                wmClone.style.setProperty('z-index', '0', 'important');
+                edClone.insertBefore(wmClone, edClone.firstChild);
+            }
             edClone.querySelectorAll('.abene-page-flow').forEach(function (sp) {
                 var hh = sp.style.getPropertyValue('--flow-h') || sp.style.height || (sp.offsetHeight + 'px');
                 if (hh) sp.style.setProperty('height', hh, 'important');

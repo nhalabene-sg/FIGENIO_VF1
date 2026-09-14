@@ -257,12 +257,20 @@
                 var dy = Number(pic.getAttribute('data-abene-dy')) || 0;
                 var left = parseFloat(pic.style.left) || dx;
                 var top = parseFloat(pic.style.top) || dy;
+                var pageHeight = geo().h || 1123;
+                if (top >= pageHeight) top = top % pageHeight;
                 var isFloat = wrap === 'left' || wrap === 'right';
                 var isFree = wrap === 'free' || wrap === 'behind' || wrap === 'front';
                 if (isFloat || isFree) {
                     opts.floating = {
-                        horizontalPosition: { offset: pxToEmu(isFloat && wrap === 'right' ? 360 : left) },
-                        verticalPosition: { offset: pxToEmu(top) },
+                        horizontalPosition: {
+                            relative: D.HorizontalPositionRelativeFrom ? D.HorizontalPositionRelativeFrom.PAGE : undefined,
+                            offset: pxToEmu(isFloat && wrap === 'right' ? Math.max(0, geo().w - w - geo().margins.right) : Math.max(0, left))
+                        },
+                        verticalPosition: {
+                            relative: D.VerticalPositionRelativeFrom ? D.VerticalPositionRelativeFrom.PAGE : undefined,
+                            offset: pxToEmu(Math.max(0, top))
+                        },
                         wrap: {
                             type: isFree ? D.TextWrappingType.NONE : D.TextWrappingType.SQUARE
                         },

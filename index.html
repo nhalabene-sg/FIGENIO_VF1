@@ -84,9 +84,9 @@
     <link rel="icon" href="branding/favicon.svg" type="image/svg+xml">
     <link rel="apple-touch-icon" href="branding/icon_96.svg">
     <link rel="manifest" href="manifest.webmanifest">
-    <script src="libs/jszip.min.js" onerror="window.abeneLibraries={...(window.abeneLibraries||{}),jszip:false}"></script>
-    <script src="libs/html2pdf.bundle.min.js" onerror="window.abeneLibraries={...(window.abeneLibraries||{}),pdf:false}"></script>
-    <script src="libs/docx.umd.js" onerror="window.abeneLibraries={...(window.abeneLibraries||{}),docx:false}"></script>
+    <script src="libs/jszip.min.js?v=20260914-essential-1" onerror="window.abeneLibraries={...(window.abeneLibraries||{}),jszip:false}"></script>
+    <script src="libs/html2pdf.bundle.min.js?v=20260914-essential-1" onerror="window.abeneLibraries={...(window.abeneLibraries||{}),pdf:false}"></script>
+    <script src="libs/docx.umd.js?v=20260914-essential-1" onerror="window.abeneLibraries={...(window.abeneLibraries||{}),docx:false}"></script>
     <style>
         * {
             margin: 0;
@@ -1139,6 +1139,24 @@
             box-sizing: border-box;
         }
         .abene-pic img { max-width: 100%; height: auto; display: block; pointer-events: none; }
+        .abene-pic.abene-icon {
+            cursor: pointer;
+            line-height: 1;
+            vertical-align: middle;
+        }
+        .abene-pic.abene-icon .abene-icon-glyph,
+        .abene-pic [data-icon] {
+            display: block;
+            line-height: 1;
+            text-align: center;
+            user-select: none;
+            pointer-events: none;
+        }
+        .abene-pic.abene-icon.abene-obj-on,
+        .page [data-icon].selected {
+            outline: 2px solid #2b579a;
+            outline-offset: 2px;
+        }
         .abene-pic > .abene-caption,
         .abene-pic > [data-caption-for] {
             display: block;
@@ -1191,6 +1209,7 @@
         #abeneCropBar[hidden] { display: none !important; }
         #abeneCropBar button {
             background: #f0f0f0;
+            color: #1a1a1a;
             border: 1px solid #d0d0d0;
             padding: 5px 10px;
             border-radius: 3px;
@@ -1210,6 +1229,38 @@
         }
         .abene-obj-above { margin: 0 auto 14px; }
         .abene-obj-below { margin: 14px auto 0; }
+        .abene-pic.abene-obj-inline, .abene-tbox.abene-obj-inline {
+            display: inline-block !important;
+            float: none !important;
+            clear: none;
+            vertical-align: middle;
+        }
+        .abene-pic.abene-obj-left, .abene-tbox.abene-obj-left {
+            float: left !important;
+            display: inline-block !important;
+            margin: 0 12px 8px 0;
+        }
+        .abene-pic.abene-obj-right, .abene-tbox.abene-obj-right {
+            float: right !important;
+            display: inline-block !important;
+            margin: 0 0 8px 12px;
+        }
+        .abene-pic.abene-obj-center, .abene-tbox.abene-obj-center {
+            display: block !important;
+            float: none !important;
+            clear: both;
+            margin: 12px auto;
+        }
+        .abene-pic.abene-obj-above, .abene-pic.abene-obj-below,
+        .abene-tbox.abene-obj-above, .abene-tbox.abene-obj-below {
+            display: block !important;
+            float: none !important;
+            clear: both !important;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        .abene-pic.abene-obj-above, .abene-tbox.abene-obj-above { margin: 0 auto 14px; }
+        .abene-pic.abene-obj-below, .abene-tbox.abene-obj-below { margin: 14px auto 0; }
         .abene-obj-free { position: absolute; z-index: 6; margin: 0; float: none; }
         .abene-obj-front { position: absolute; z-index: 7; margin: 0; float: none; }
         .abene-obj-behind { position: absolute; z-index: 0; margin: 0; float: none; }
@@ -1690,6 +1741,7 @@
 
         .image-toolbar button {
             background: #f0f0f0;
+            color: #1a1a1a;
             border: 1px solid #d0d0d0;
             padding: 5px 10px;
             border-radius: 3px;
@@ -1714,6 +1766,7 @@
             display: flex;
             align-items: center;
             gap: 4px;
+            color: #323130;
         }
 
         /* Table toolbar */
@@ -1737,6 +1790,7 @@
 
         .table-toolbar button, .table-toolbar select {
             background: #f0f0f0;
+            color: #1a1a1a;
             border: 1px solid #d0d0d0;
             padding: 5px 10px;
             border-radius: 3px;
@@ -5234,6 +5288,149 @@
         }
         body.dark-mode .arq-tree summary { color: var(--abene-d-muted); }
         body.dark-mode .arq-meta, body.dark-mode .arq-hint { color: #8a8886; }
+
+        /* Chrome flottant : texte lisible sur fond sombre (barres, menus, dialogues) */
+        body.dark-mode .image-toolbar-title {
+            color: #c5d4ff;
+        }
+        body.dark-mode .image-toolbar label {
+            color: #f3f2f1;
+        }
+        body.dark-mode .image-toolbar button,
+        body.dark-mode .table-toolbar button,
+        body.dark-mode .table-toolbar select,
+        body.dark-mode #abeneCropBar button,
+        body.dark-mode .abene-proof-sugs button,
+        body.dark-mode .abene-eq-pal button,
+        body.dark-mode .abene-merge-chips button,
+        body.dark-mode .abene-picker-grid button {
+            background: #f3f2f1;
+            color: #1b1a19;
+            border: 1px solid #c8c6c4;
+        }
+        body.dark-mode .image-toolbar button:hover,
+        body.dark-mode .table-toolbar button:hover,
+        body.dark-mode #abeneCropBar button:hover,
+        body.dark-mode .abene-proof-sugs button:hover,
+        body.dark-mode .abene-eq-pal button:hover,
+        body.dark-mode .abene-merge-chips button:hover {
+            background: #fff;
+            color: #111;
+            border-color: #9db7ff;
+        }
+        body.dark-mode .image-toolbar button.on,
+        body.dark-mode .table-toolbar button.on {
+            background: #d6e4ff;
+            color: #111;
+            border-color: #9db7ff;
+        }
+        body.dark-mode .image-toolbar button[style*="color: red"],
+        body.dark-mode .image-toolbar button[style*="color:red"] {
+            color: #b71c1c;
+            background: #fdecea;
+            border-color: #e57373;
+        }
+        body.dark-mode #abeneCropBar {
+            background: var(--abene-d-surf);
+            color: var(--abene-d-text);
+            border-color: #8a8886;
+        }
+        body.dark-mode .context-menu-item,
+        body.dark-mode .context-menu-item span,
+        body.dark-mode .context-menu-item b,
+        body.dark-mode .context-menu-item i,
+        body.dark-mode .context-menu-item u,
+        body.dark-mode #xlCtxMenu button,
+        body.dark-mode #xlCtxMenu .context-menu-item {
+            color: #fff;
+        }
+        body.dark-mode .context-menu-item:hover,
+        body.dark-mode #xlCtxMenu button:hover {
+            background: #4a4948;
+            color: #fff;
+        }
+        body.dark-mode .context-menu.visible::before,
+        body.dark-mode #xlCtxMenu.context-menu::before {
+            background: #a19f9d;
+        }
+        body.dark-mode .dropdown-item,
+        body.dark-mode .dropdown-item span {
+            color: #f3f2f1;
+        }
+        body.dark-mode .dropdown-item .shortcut { color: #c8c6c4; }
+        body.dark-mode .hf-gal-label { color: #f3f2f1; }
+        body.dark-mode .dialog-tabs { border-bottom-color: var(--abene-d-line); }
+        body.dark-mode .dialog-tabs button { color: var(--abene-d-muted); }
+        body.dark-mode .dialog-tabs button.on { color: #c5d4ff; border-bottom-color: #9db7ff; }
+        body.dark-mode .modal h3,
+        body.dark-mode .modal h4,
+        body.dark-mode .modal p,
+        body.dark-mode .modal label,
+        body.dark-mode #genericModalBody,
+        body.dark-mode #genericModalBody p,
+        body.dark-mode #genericModalBody h4 {
+            color: var(--abene-d-text);
+        }
+        body.dark-mode .modal h4[style],
+        body.dark-mode .modal p[style],
+        body.dark-mode #genericModalBody h4[style],
+        body.dark-mode #genericModalBody p[style] {
+            color: #f3f2f1 !important;
+        }
+        body.dark-mode .abene-proof-hint,
+        body.dark-mode .abene-proof-count { color: #c8c6c4; }
+        body.dark-mode .abene-proof-word { color: #ff8a80; }
+        body.dark-mode .abene-style-list {
+            background: #3b3a39;
+            border-color: #8a8886;
+        }
+        body.dark-mode .abene-style-item {
+            background: #3b3a39;
+            color: #f3f2f1;
+        }
+        body.dark-mode .abene-style-item:hover { background: #4a4948; }
+        body.dark-mode .save-as-choice {
+            background: #3b3a39;
+            border-color: #8a8886;
+            color: #f3f2f1;
+        }
+        body.dark-mode .save-as-choice:hover,
+        body.dark-mode .save-as-choice:focus {
+            background: #2a3350;
+            border-color: #9db7ff;
+        }
+        body.dark-mode .save-as-choice strong { color: #c5d4ff; }
+        body.dark-mode .save-as-choice span,
+        body.dark-mode .save-as-legal { color: #c8c6c4; }
+        body.dark-mode #languageStatus,
+        body.dark-mode #languageStatus option,
+        body.dark-mode select option {
+            color: #1b1a19;
+            background: #f3f2f1;
+        }
+        body.dark-mode .table-grid-cell {
+            border-color: #8a8886;
+            background: #3b3a39;
+        }
+        body.dark-mode .table-grid-cell.hover,
+        body.dark-mode .table-grid-cell.on {
+            background: #4f6bed;
+            border-color: #9db7ff;
+        }
+        body.dark-mode .mini-toolbar .ribbon-btn-sm {
+            color: #f3f2f1;
+            background: #3b3a39;
+            border-color: #8a8886;
+        }
+        body.dark-mode .find-replace-header span,
+        body.dark-mode .find-replace-body label {
+            color: #f3f2f1;
+        }
+        body.dark-mode .comments-pane,
+        body.dark-mode .comments-pane-header,
+        body.dark-mode .comment-row {
+            color: #f3f2f1;
+        }
     </style>
 </head>
 <body class="abene-print-layout">
@@ -8501,6 +8698,10 @@
             const symbols = ['⭐', '❤️', '✅', '❌', '⚠️', 'ℹ️', '📌', '💡', '🔧', '⚙️', '🔒', '🎯', '🏆', '📱', '💻', '🌐', '📧', '✏️', '📝', '🔍', '💰', '🧾', '📄'];
             const choice = prompt(t('pIcon') + '\n' + symbols.join(' '), '⭐');
             if (!choice || !symbols.includes(choice.trim())) return;
+            if (typeof window.abeneInsertIcon === 'function') {
+                window.abeneInsertIcon(choice.trim());
+                return;
+            }
             document.execCommand('insertHTML', false, `<span data-icon="true" style="font-size:32px;">${choice.trim()}</span>`);
             saveUndoState();
         }
@@ -9042,7 +9243,8 @@
             if (e.target.closest && e.target.closest('.image-toolbar, #imageHandles, .abene-obj-resize')) return;
             const pic = e.target.closest && e.target.closest('.abene-pic');
             const rawImg = e.target.tagName === 'IMG' ? e.target : null;
-            const img = (pic && pic.querySelector('img')) || rawImg;
+            const icon = (pic && pic.querySelector('[data-icon]')) || (e.target.closest && e.target.closest('#editor [data-icon]'));
+            const img = (pic && pic.querySelector('img')) || rawImg || icon;
             if (img && editor.contains(img) && !(img.closest && img.closest('[data-abene-block="cover"], [data-abene-block="titlepage"], .page-header-zone, .page-footer-zone'))) {
                 syncSelectedImage(img);
                 showImageToolbar(e);
@@ -9069,7 +9271,7 @@
         }
 
         function showImageToolbar(e) {
-            const img = selectedImage || window.selectedImage;
+            const img = window.selectedImage || selectedImage;
             if (!img) return;
             syncSelectedImage(img);
             const toolbar = document.getElementById('imageToolbar');
@@ -9185,6 +9387,18 @@
                     break;
                 case 'center':
                     selectedImage.classList.add('center');
+                    break;
+                case 'above':
+                    selectedImage.style.display = 'block';
+                    selectedImage.style.float = 'none';
+                    selectedImage.style.clear = 'both';
+                    selectedImage.style.margin = '0 auto 14px';
+                    break;
+                case 'below':
+                    selectedImage.style.display = 'block';
+                    selectedImage.style.float = 'none';
+                    selectedImage.style.clear = 'both';
+                    selectedImage.style.margin = '14px auto 0';
                     break;
             }
             saveUndoState();
@@ -10600,6 +10814,15 @@ table { border-collapse: collapse; }
                 }
                 if (child.tagName === 'BR') {
                     runs.push(new TextRun({ text: '\n', font: 'Calibri' }));
+                    return;
+                }
+                if (child.hasAttribute && child.hasAttribute('data-equation')) {
+                    runs.push(new TextRun({
+                        text: (child.textContent || child.getAttribute('data-equation-src') || '').trim() || ' ',
+                        font: 'Cambria Math',
+                        size: 24,
+                        color: '1F1F1F'
+                    }));
                     return;
                 }
                 const style = getComputedStyle(child);
@@ -12410,30 +12633,30 @@ table { border-collapse: collapse; }
             } catch (e) {}
         }, 12000);
     </script>
-    <script src="libs/abene-word-home.js?v=20260914-hf-section-1"></script>
-    <script src="libs/abene-pagination-engine.js?v=20260908-layout-visibility-2"></script>
-    <script src="libs/abene-sections.js?v=20260914-hf-section-1"></script>
-    <script src="libs/abene-toolbar.js?v=20260914-img-crop-1"></script>
-    <script src="libs/abene-commands.js"></script>
-    <script src="libs/abene-notes.js"></script>
-    <script src="libs/abene-objects.js?v=20260914-image-format-2"></script>
-    <script src="libs/abene-modals.js"></script>
-    <script src="libs/abene-tables.js"></script>
-    <script src="libs/abene-document.js"></script>
-    <script src="libs/abene-history.js"></script>
-    <script src="libs/abene-export.js?v=20260914-relatorio-export-1"></script>
-    <script src="libs/abene-modelo.js?v=20260914-relatorio-tec-1"></script>
-    <script src="libs/abene-comercial.js?v=20260909-p0p5-final-3"></script>
-    <script src="libs/abene-contabilidade.js?v=20260911-trash-protection-1"></script>
-    <script src="libs/abene-arquivo.js?v=20260911-trash-protection-2"></script>
-    <script src="libs/abene-phone.js?v=20260909-mobile-professional-4"></script>
-    <script src="libs/abene-excel-engine.js"></script>
-    <script src="libs/abene-excel.js?v=20260914-keep-format-1"></script>
-    <script src="libs/abene-sheets.js?v=20260911-trash-protection-1"></script>
-    <script src="libs/abene-collab.js?v=20260914-proof-1"></script>
-    <script src="libs/abene-gdocs.js?v=20260909-p0p5-final-3"></script>
-    <script src="libs/abene-pickers.js"></script>
-    <script src="libs/abene-proof.js?v=20260914-proof-1"></script>
+    <script src="libs/abene-word-home.js?v=20260914-essential-1"></script>
+    <script src="libs/abene-pagination-engine.js?v=20260914-essential-1"></script>
+    <script src="libs/abene-sections.js?v=20260914-essential-1"></script>
+    <script src="libs/abene-toolbar.js?v=20260914-essential-1"></script>
+    <script src="libs/abene-commands.js?v=20260914-essential-1"></script>
+    <script src="libs/abene-notes.js?v=20260914-essential-1"></script>
+    <script src="libs/abene-objects.js?v=20260914-essential-1"></script>
+    <script src="libs/abene-modals.js?v=20260914-essential-1"></script>
+    <script src="libs/abene-tables.js?v=20260914-essential-1"></script>
+    <script src="libs/abene-document.js?v=20260914-essential-1"></script>
+    <script src="libs/abene-history.js?v=20260914-essential-1"></script>
+    <script src="libs/abene-export.js?v=20260914-essential-1"></script>
+    <script src="libs/abene-modelo.js?v=20260914-essential-1"></script>
+    <script src="libs/abene-comercial.js?v=20260914-essential-1"></script>
+    <script src="libs/abene-contabilidade.js?v=20260914-essential-1"></script>
+    <script src="libs/abene-arquivo.js?v=20260914-essential-1"></script>
+    <script src="libs/abene-phone.js?v=20260914-essential-1"></script>
+    <script src="libs/abene-excel-engine.js?v=20260914-essential-1"></script>
+    <script src="libs/abene-excel.js?v=20260914-essential-1"></script>
+    <script src="libs/abene-sheets.js?v=20260914-essential-1"></script>
+    <script src="libs/abene-collab.js?v=20260914-essential-1"></script>
+    <script src="libs/abene-gdocs.js?v=20260914-essential-1"></script>
+    <script src="libs/abene-pickers.js?v=20260914-essential-1"></script>
+    <script src="libs/abene-proof.js?v=20260914-essential-1"></script>
 
 </body>
 </html>
