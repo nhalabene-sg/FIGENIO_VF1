@@ -28,3 +28,16 @@ exec-url.txt
 
 # Dépôts Git imbriqués
 **/.git/
+
+# Éléments locaux non utilisés par la page GitHub Pages
+/apps-script/
+/abene-*.js
+/docx.umd.js
+/html2pdf.bundle.min.js
+/jszip.min.js
+/favicon.svg
+/icon_48.svg
+/icon_96.svg
+/icon_mark.svg
+/logo_horizontal.svg
+/logo_vertical.svg

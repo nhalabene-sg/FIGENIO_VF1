@@ -55,11 +55,26 @@
 
     function prepare() {
         var editor = ed();
+        if (typeof root.abeneCancelCrop === 'function') {
+            try { root.abeneCancelCrop(); } catch (eCrop) {}
+        }
+        document.querySelectorAll('.abene-crop-overlay').forEach(function (n) {
+            if (n.parentNode) n.parentNode.removeChild(n);
+        });
         if (editor && editor.classList.contains('editing-header-footer') && typeof root.abeneCloseHeaderFooter === 'function') {
             root.abeneCloseHeaderFooter();
         }
+        if (root.ABENE && root.ABENE.Images && typeof root.ABENE.Images.wrapLoose === 'function') {
+            try { root.ABENE.Images.wrapLoose(editor); } catch (eWrap) {}
+        }
         if (root.ABENE && root.ABENE.Images && typeof root.ABENE.Images.syncAnchors === 'function') {
             try { root.ABENE.Images.syncAnchors(editor); } catch (e1) {}
+        }
+        if (typeof root.abeneRenumberCaptions === 'function') {
+            try { root.abeneRenumberCaptions(); } catch (eCap) {}
+        }
+        if (typeof root.updateAllFields === 'function') {
+            try { root.updateAllFields({ silent: true }); } catch (eFld) {}
         }
         if (root.ABENE && root.ABENE.Document && typeof root.ABENE.Document.capture === 'function') {
             try { root.ABENE.Document.capture(); } catch (e2) {}
@@ -93,7 +108,12 @@
 
     function sanitizeExportRoot(rootEl) {
         if (!rootEl || !rootEl.querySelectorAll) return rootEl;
-        rootEl.querySelectorAll('.abene-obj-resize, .abene-tbox-bar, .image-handle, .hf-tab, .hf-rule, .hf-close, .page-gap-band, .hf-placeholder').forEach(function (n) { n.remove(); });
+        rootEl.querySelectorAll('.abene-obj-resize, .abene-tbox-bar, .image-handle, .hf-tab, .hf-rule, .hf-close, .page-gap-band, .hf-placeholder, .abene-crop-overlay, #abeneCropBar').forEach(function (n) { n.remove(); });
+        rootEl.querySelectorAll('.abene-fill').forEach(function (el) {
+            el.style.border = 'none';
+            el.style.background = 'transparent';
+            el.style.padding = '0';
+        });
         rootEl.querySelectorAll('.abene-obj-on, .selected').forEach(function (el) {
             el.classList.remove('abene-obj-on');
             el.classList.remove('selected');
@@ -256,14 +276,194 @@
         root.docxImageRun._abeneExport = true;
     }
 
+    function isPicHost(node) {
+        if (!node || !node.classList) return false;
+        if (node.classList.contains('abene-pic')) return true;
+        if (node.tagName !== 'P' || !node.querySelector) return false;
+        var pic = node.querySelector(':scope > .abene-pic');
+        if (!pic) return false;
+        var only = true;
+        Array.from(node.childNodes).forEach(function (ch) {
+            if (ch.nodeType === 3 && !String(ch.textContent || '').replace(/\u200b/g, '').trim()) return;
+            if (ch.nodeType === 1 && (ch.classList.contains('abene-pic') || ch.tagName === 'BR')) return;
+            only = false;
+        });
+        return only;
+    }
+    function emitFigure(node, children, api) {
+        var pic = node.classList.contains('abene-pic') ? node : node.querySelector('.abene-pic');
+        var img = (pic || node).querySelector('img');
+        var cap = (pic || node).querySelector('.abene-caption, [data-caption-for]');
+        var ir = img && typeof root.docxImageRun === 'function' ? root.docxImageRun(img, api.ImageRun) : null;
+        if (ir) {
+            children.push(new api.Paragraph({
+                children: [ir],
+                alignment: api.AlignmentType.CENTER,
+                spacing: { after: cap ? 40 : 160 }
+            }));
+        }
+        if (cap) {
+            children.push(new api.Paragraph({
+                children: [new api.TextRun({
+                    text: String(cap.innerText || '').replace(/\s+/g, ' ').trim() || ' ',
+                    italics: true,
+                    font: 'Calibri',
+                    size: 20
+                })],
+                alignment: api.AlignmentType.CENTER,
+                spacing: { after: 200 }
+            }));
+        }
+    }
     function wrapPushBlock() {
         if (typeof root.docxPushBlock !== 'function' || root.docxPushBlock._abeneExport) return;
         var orig = root.docxPushBlock;
         root.docxPushBlock = function (node, children, api) {
-            if (useEngine && node && node.classList && node.classList.contains('abene-notes-source')) return;
+            if (useEngine && node && node.classList) {
+                if (node.classList.contains('abene-notes-source') || node.classList.contains('abene-obj-resize')) return;
+                if (node.classList.contains('abene-section-break')) {
+                    children.push({ _abeneSection: node.getAttribute('data-abene-section-role') || 'body' });
+                    return;
+                }
+                if (node.classList.contains('abene-caption') || node.getAttribute('data-caption-for')) {
+                    children.push(new api.Paragraph({
+                        children: [new api.TextRun({
+                            text: String(node.innerText || '').replace(/\s+/g, ' ').trim() || ' ',
+                            italics: true,
+                            font: 'Calibri',
+                            size: 20
+                        })],
+                        alignment: api.AlignmentType.CENTER,
+                        spacing: { after: 200 }
+                    }));
+                    return;
+                }
+                if (isPicHost(node)) {
+                    emitFigure(node, children, api);
+                    return;
+                }
+            }
             return orig.apply(this, arguments);
         };
         root.docxPushBlock._abeneExport = true;
+    }
+
+    function splitDocxChildren(children) {
+        var parts = [{ role: 'front', items: [] }];
+        var saw = false;
+        (children || []).forEach(function (c) {
+            if (c && c._abeneSection) {
+                saw = true;
+                parts.push({ role: c._abeneSection, items: [] });
+                return;
+            }
+            parts[parts.length - 1].items.push(c);
+        });
+        if (!saw) return null;
+        return parts.filter(function (p) { return p.items.length; });
+    }
+    function emptyHfPara(api) {
+        return new api.Paragraph({ children: [new api.TextRun({ text: ' ' })] });
+    }
+    function reportHeader(api, ctx, role) {
+        if (role === 'front') return new api.Header({ children: [emptyHfPara(api)] });
+        var fields = ctx.headerFields || {};
+        var left = [];
+        if (ctx.logoRun) left.push(new api.Paragraph({ children: [ctx.logoRun] }));
+        left.push(new api.Paragraph({
+            children: [new api.TextRun({ text: ctx.companyName || 'Genius Raros', bold: true, font: 'Calibri', size: 22 })]
+        }));
+        var right = [
+            new api.Paragraph({
+                alignment: api.AlignmentType.RIGHT,
+                children: [new api.TextRun({ text: fields.title || ctx.headerText || '', bold: true, font: 'Calibri', size: 28 })]
+            }),
+            fields.ref
+                ? new api.Paragraph({ alignment: api.AlignmentType.RIGHT, children: [new api.TextRun({ text: fields.ref, font: 'Calibri', size: 18, color: '5B7AA8' })] })
+                : emptyHfPara(api),
+            fields.date
+                ? new api.Paragraph({ alignment: api.AlignmentType.RIGHT, children: [new api.TextRun({ text: fields.date, font: 'Calibri', size: 18, color: '5B7AA8' })] })
+                : emptyHfPara(api)
+        ];
+        if (ctx.headerTpl === 'gr-report' || ctx.headerTpl === 'gr-letter' || ctx.headerTpl === 'triple') {
+            return new api.Header({
+                children: [new api.Table({
+                    width: { size: 100, type: api.WidthType.PERCENTAGE },
+                    rows: [new api.TableRow({
+                        children: [
+                            new api.TableCell({ width: { size: 50, type: api.WidthType.PERCENTAGE }, children: left }),
+                            new api.TableCell({ width: { size: 50, type: api.WidthType.PERCENTAGE }, children: right })
+                        ]
+                    })]
+                })]
+            });
+        }
+        if (ctx.headerText) {
+            return new api.Header({
+                children: [new api.Paragraph({
+                    alignment: api.AlignmentType.CENTER,
+                    children: [new api.TextRun({ text: ctx.headerText, font: 'Calibri', size: 20 })]
+                })]
+            });
+        }
+        return new api.Header({ children: [emptyHfPara(api)] });
+    }
+    function reportFooter(api, ctx, role) {
+        if (role === 'front') return new api.Footer({ children: [emptyHfPara(api)] });
+        var runs = [];
+        var annex = role === 'annex' ? ((typeof root.t === 'function' ? root.t('secAnnexNum') : '') || 'Anexo') + ' ' : '';
+        if (annex) runs.push(new api.TextRun({ text: annex, font: 'Calibri', size: 18 }));
+        String(ctx.footerText || '').split(/(\{PAGE\}|\{NUMPAGES\})/i).forEach(function (part) {
+            if (!part) return;
+            if (/^\{PAGE\}$/i.test(part)) runs.push(new api.TextRun({ children: [api.PageNumber.CURRENT], font: 'Calibri', size: 18 }));
+            else if (/^\{NUMPAGES\}$/i.test(part)) runs.push(new api.TextRun({ children: [api.PageNumber.TOTAL_PAGES], font: 'Calibri', size: 18 }));
+            else runs.push(new api.TextRun({ text: part, font: 'Calibri', size: 18 }));
+        });
+        return new api.Footer({
+            children: [new api.Paragraph({
+                alignment: api.AlignmentType.CENTER,
+                children: runs.length ? runs : [new api.TextRun({ text: ' ' })]
+            })]
+        });
+    }
+    function buildDocxSections(ctx) {
+        if (!useEngine || !ctx || !ctx.Document || !ctx.Packer) return null;
+        var parts = splitDocxChildren(ctx.children);
+        if (!parts || parts.length < 2) return null;
+        var D = root.docx || {};
+        var sections = parts.map(function (part, i) {
+            var page = {
+                size: {
+                    width: ctx.pxToTwip(ctx.pageSize.w),
+                    height: ctx.pxToTwip(ctx.pageSize.h),
+                    orientation: ctx.pageOrientation === 'landscape' ? ctx.PageOrientation.LANDSCAPE : ctx.PageOrientation.PORTRAIT
+                },
+                margin: {
+                    top: ctx.pxToTwip(ctx.pageMargins.top),
+                    right: ctx.pxToTwip(ctx.pageMargins.right),
+                    bottom: ctx.pxToTwip(ctx.pageMargins.bottom),
+                    left: ctx.pxToTwip(ctx.pageMargins.left)
+                }
+            };
+            if (part.role === 'body' || part.role === 'annex') page.pageNumbers = { start: 1 };
+            var props = { page: page };
+            if (D.SectionType && i > 0) props.type = D.SectionType.NEXT_PAGE;
+            if (part.role === 'front') props.titlePage = true;
+            var items = part.items.length ? part.items : [new ctx.Paragraph({ children: [new ctx.TextRun({ text: ' ' })] })];
+            return {
+                properties: props,
+                headers: {
+                    default: reportHeader(ctx, ctx, part.role),
+                    first: part.role === 'front' ? reportHeader(ctx, ctx, 'front') : reportHeader(ctx, ctx, part.role)
+                },
+                footers: {
+                    default: reportFooter(ctx, ctx, part.role),
+                    first: part.role === 'front' ? reportFooter(ctx, ctx, 'front') : reportFooter(ctx, ctx, part.role)
+                },
+                children: items
+            };
+        });
+        return ctx.Packer.toBlob(new ctx.Document({ sections: sections }));
     }
 
     function pdfOptions(g, filename) {
@@ -295,6 +495,14 @@
                         el.style.setProperty('--hf-seam', '0px');
                     });
                     box.querySelectorAll('.page-gap-band').forEach(function (el) {
+                        el.style.display = 'none';
+                    });
+                    box.querySelectorAll('.abene-fill').forEach(function (el) {
+                        el.style.setProperty('border', 'none', 'important');
+                        el.style.setProperty('background', 'transparent', 'important');
+                        el.style.setProperty('padding', '0', 'important');
+                    });
+                    box.querySelectorAll('.abene-obj-resize, .abene-tbox-bar, .image-handle, .abene-crop-overlay').forEach(function (el) {
                         el.style.display = 'none';
                     });
                 }
@@ -561,7 +769,8 @@
         logoPng: logoPng,
         rasterizeImages: rasterizeImages,
         savePagedPdf: savePagedPdf,
-        htmlElementToPdfBlob: htmlElementToPdfBlob
+        htmlElementToPdfBlob: htmlElementToPdfBlob,
+        buildDocxSections: buildDocxSections
     };
     root.ABENE.Export = ExportApi;
 

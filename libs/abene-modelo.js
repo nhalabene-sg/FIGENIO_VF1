@@ -122,6 +122,7 @@
 
     function kindTitle(opts) {
         if (opts && opts.kind === 'minutes') return tt('mdlKindMinutes') || tt('tplMinutesTitle') || 'ATA';
+        if (opts && (opts.kind === 'tech' || opts.skeleton === 'tech')) return tt('mdlKindTech') || 'RELATÓRIO TÉCNICO';
         if (opts && opts.style === 'carta') return tt('hfTplLetterTitle') || 'CARTA';
         if (opts && opts.style === 'simples') return tt('mdlStyleSimple') || 'TEXTO';
         if (opts && opts.style === 'inspecao') return tt('mdlStyleInsp') || 'INSPEÇÃO';
@@ -223,18 +224,73 @@
         return '<div class="abene-conf-banner" data-abene-block="confidential">' + esc(tt('mdlConfText')) + '</div>';
     }
 
-    function buildSigns(meta) {
-        return '<div class="abene-signs" data-abene-block="signs">' +
-            '<div><div class="abene-sign-line">' + esc(meta.tech || tt('mdlSignTech')) + '</div></div>' +
-            '<div><div class="abene-sign-line">' + esc(meta.client || tt('mdlSignClient')) + '</div></div>' +
+    function buildSigns(meta, opts) {
+        var extra = !!(opts && (opts.skeleton === 'tech' || opts.kind === 'tech'));
+        function col(name, role) {
+            return '<div>' +
+                (extra ? '<div class="abene-sign-space"></div>' : '') +
+                '<div class="abene-sign-line">' + esc(name) + '</div>' +
+                (extra ? '<div class="abene-sign-role">' + esc(role) + '</div>' +
+                    '<div class="abene-sign-date">' + esc(tt('mdlFieldDate')) + ': ____________</div>' : '') +
+                '</div>';
+        }
+        return '<div class="abene-signs' + (extra ? ' abene-signs-tech' : '') + '" data-abene-block="signs">' +
+            col(meta.tech || tt('mdlSignTech'), tt('mdlSignTech')) +
+            col(meta.client || tt('mdlSignClient'), tt('mdlSignClient')) +
             '</div>';
     }
 
-    function buildAnnex() {
+    function buildAnnex(opts) {
+        var tech = !!(opts && (opts.skeleton === 'tech' || opts.kind === 'tech'));
         return '<div class="abene-annex" data-abene-block="annex">' +
-            '<h1>' + esc(tt('mdlAnnexTitle')) + '</h1>' +
+            '<h1 data-abene-style="h1">' + esc(tt('mdlAnnexTitle')) + '</h1>' +
             '<p>' + esc(tt('mdlAnnexHint')) + '</p>' +
+            (tech ? heading(2, tt('mdlAnnexA')) + fill('annex-a', tt('mdlFillAnnex')) : '') +
             '</div>';
+    }
+
+    function heading(level, text) {
+        var tag = level === 1 ? 'h1' : 'h2';
+        var st = level === 1 ? 'h1' : 'h2';
+        return '<' + tag + ' data-abene-style="' + st + '" data-abene-lock="1" contenteditable="false">' + esc(text) + '</' + tag + '>';
+    }
+    function fill(id, hint) {
+        return '<p class="abene-fill" data-abene-fill="' + id + '">' + esc(hint) + '</p>';
+    }
+    function techSkeleton(meta) {
+        meta = meta || defaultMeta();
+        return heading(1, tt('tplReportBody')) +
+            '<h3 data-abene-style="h3" data-abene-lock="1" contenteditable="false">' + esc(tt('mdlRevTitle')) + '</h3>' +
+            '<table class="abene-rev-table"><thead><tr>' +
+            '<th>' + esc(tt('mdlRevRev')) + '</th><th>' + esc(tt('mdlRevDate')) + '</th>' +
+            '<th>' + esc(tt('mdlRevDesc')) + '</th><th>' + esc(tt('mdlRevAuthor')) + '</th>' +
+            '</tr></thead><tbody><tr>' +
+            '<td>' + esc(meta.version || '1.0') + '</td><td>' + esc(meta.date || '') + '</td>' +
+            '<td>' + esc(tt('mdlRevFirst')) + '</td><td>' + esc(meta.tech || '') + '</td>' +
+            '</tr></tbody></table>' +
+            heading(2, tt('mdlSecId')) +
+            '<div class="abene-tp-table-wrap"><table class="abene-tp-table">' +
+            idRow(tt('mdlFieldRef'), 'ref', meta.ref) +
+            idRow(tt('mdlFieldDate'), 'date', meta.date) +
+            idRow(tt('mdlFieldClient'), 'client', meta.client) +
+            idRow(tt('mdlFieldSite'), 'site', meta.site) +
+            idRow(tt('mdlFieldTech'), 'tech', meta.tech) +
+            idRow(tt('mdlFieldVersion'), 'version', meta.version) +
+            '</table></div>' +
+            heading(2, tt('mdlSecObject')) + fill('object', tt('mdlFillObject')) +
+            heading(2, tt('mdlSecMethod')) + fill('method', tt('mdlFillMethod')) +
+            heading(2, tt('mdlSecObs')) + fill('obs', tt('mdlFillObs')) +
+            '<p class="abene-fill-hint">' + esc(tt('mdlPhotoHint')) + '</p>' +
+            '<h3 data-abene-style="h3" data-abene-lock="1" contenteditable="false">' + esc(tt('mdlCheckTitle')) + '</h3>' +
+            '<table class="abene-check-table"><thead><tr>' +
+            '<th>' + esc(tt('mdlCheckItem')) + '</th><th>' + esc(tt('mdlCheckResult')) + '</th><th>' + esc(tt('mdlCheckNotes')) + '</th>' +
+            '</tr></thead><tbody>' +
+            '<tr><td>' + esc(tt('mdlCheck1')) + '</td><td>' + esc(tt('mdlCheckOk')) + '</td><td></td></tr>' +
+            '<tr><td>' + esc(tt('mdlCheck2')) + '</td><td>' + esc(tt('mdlCheckNa')) + '</td><td></td></tr>' +
+            '<tr><td>' + esc(tt('mdlCheck3')) + '</td><td>' + esc(tt('mdlCheckNok')) + '</td><td></td></tr>' +
+            '</tbody></table>' +
+            heading(2, tt('mdlSecConclusions')) + fill('conclusions', tt('mdlFillConclusions')) +
+            heading(2, tt('mdlSecReco')) + fill('reco', tt('mdlFillReco'));
     }
 
     function reportSkeleton() {
@@ -266,9 +322,10 @@
             '<h2>' + esc(tt('tplDecisions')) + '</h2><p></p>';
     }
 
-    function bodySkeleton(opts) {
+    function bodySkeleton(opts, meta) {
         if (opts && (opts.skeleton === 'letter' || opts.style === 'carta')) return letterSkeleton();
         if (opts && (opts.skeleton === 'minutes' || opts.kind === 'minutes')) return minutesSkeleton();
+        if (opts && (opts.skeleton === 'tech' || opts.kind === 'tech')) return techSkeleton(meta);
         return reportSkeleton();
     }
 
@@ -283,22 +340,40 @@
         editor.querySelectorAll(BLOCKS).forEach(function (n) { n.remove(); });
     }
 
-    function applyHeaderFooter(opts) {
+    function syncHeaderFields(opts, meta) {
+        if (!opts || !opts.header || !meta) return;
+        var refPrefix = tt('hfRefPrefix') || 'Nº ';
+        var datePrefix = tt('hfDatePrefix') || '';
+        A().pageHeaderFields = {
+            title: kindTitle(opts),
+            ref: String(meta.ref || '').indexOf(refPrefix.trim()) === 0 ? meta.ref : (refPrefix + (meta.ref || '')),
+            date: [meta.client, meta.site, (datePrefix + (meta.date || '')).trim()].filter(Boolean).join(' · ')
+        };
+        try { localStorage.setItem('abeneHeaderFields', JSON.stringify(A().pageHeaderFields)); } catch (e) {}
+    }
+
+    function applyHeaderFooter(opts, meta) {
         if (typeof A().pageHeaderDifferentFirst !== 'undefined') {
             A().pageHeaderDifferentFirst = !!(opts.cover && opts.differentFirst);
         }
         try { localStorage.setItem('abeneHeaderDifferentFirst', A().pageHeaderDifferentFirst ? '1' : '0'); } catch (e) {}
+        syncHeaderFields(opts, meta);
         if (opts.header) {
             var tpl = 'text';
             if (opts.style === 'carta' || opts.skeleton === 'letter') tpl = 'gr-letter';
             else if (opts.logo) tpl = 'gr-report';
             if (window.applyHeaderTemplate) window.applyHeaderTemplate(tpl, { silent: true });
+            syncHeaderFields(opts, meta);
         } else if (window.applyHeaderTemplate) {
             window.applyHeaderTemplate('blank', { silent: true });
         }
         if (opts.footer) {
             var co = company();
-            A().pageFooterText = (co.name || 'Genius Raros') + '  ·  {PAGE} / {NUMPAGES}';
+            var foot = (co.name || 'Genius Raros') + '  ·  {PAGE} / {NUMPAGES}';
+            if (meta && (opts.skeleton === 'tech' || opts.kind === 'tech') && meta.version) {
+                foot = (co.name || 'Genius Raros') + '  ·  Rev. ' + meta.version + '  ·  {PAGE} / {NUMPAGES}';
+            }
+            A().pageFooterText = foot;
             try { localStorage.setItem('abeneFooter', A().pageFooterText); } catch (e) {}
         }
         window._abeneChromeSig = '';
@@ -325,7 +400,10 @@
         o.style = style;
         if (style === 'carta') o.skeleton = 'letter';
         else if (o.skeleton === 'letter' || o.skeleton === 'minutes') o.skeleton = '';
-        if (style !== 'tecnico') o.kind = '';
+        if (style !== 'tecnico') {
+            o.kind = '';
+            if (o.skeleton === 'tech') o.skeleton = '';
+        }
         saveOpts(o);
         window.applyReportModel(o, true);
     };
@@ -338,7 +416,7 @@
         }
         saveOpts(o);
         if (which === 'header' || which === 'logo' || which === 'footer' || which === 'diff') {
-            applyHeaderFooter(o);
+            applyHeaderFooter(o, defaultMeta());
             window._abeneChromeSig = '';
             if (typeof renderPageDecorations === 'function') renderPageDecorations();
             if (typeof refreshPagination === 'function') refreshPagination();
@@ -351,6 +429,8 @@
         var editor = ed();
         if (!editor) return;
         var opts = forced || readUi();
+        var replaceBody = !!opts.replaceBody;
+        opts.replaceBody = false;
         saveOpts(opts);
         var meta = defaultMeta();
         window._abeneModeloMeta = meta;
@@ -372,12 +452,12 @@
         if (hasFront && window.abeneSectionBreakHtml) html += window.abeneSectionBreakHtml('body');
         else if (opts.cover || opts.titlepage) html += modelBreak();
         if (opts.logo && !opts.header && !opts.cover) html += buildBodyLogo(opts);
-        if (keep && keep.replace(/<p>\s*(<br\s*\/?>)?\s*<\/p>/gi, '').trim()) html += keep;
-        else html += bodySkeleton(opts);
-        if (opts.signs) html += buildSigns(meta);
-        if (opts.annex) html += (window.abeneSectionBreakHtml ? window.abeneSectionBreakHtml('annex') : modelBreak()) + buildAnnex();
+        if (!replaceBody && keep && keep.replace(/<p>\s*(<br\s*\/?>)?\s*<\/p>/gi, '').trim()) html += keep;
+        else html += bodySkeleton(opts, meta);
+        if (opts.signs) html += buildSigns(meta, opts);
+        if (opts.annex) html += (window.abeneSectionBreakHtml ? window.abeneSectionBreakHtml('annex') : modelBreak()) + buildAnnex(opts);
         editor.innerHTML = html;
-        applyHeaderFooter(opts);
+        applyHeaderFooter(opts, meta);
         if (typeof window.applyReportSections === 'function') window.applyReportSections({ silent: true });
         if (opts.toc && window.abeneFillModeloToc) {
             window.abeneFillModeloToc(editor.querySelector('[data-abene-block="toc"]'));
@@ -391,7 +471,22 @@
 
     window.applyModeloPreset = function (kind) {
         var o = readUi();
-        if (kind === 'letter') {
+        if (kind === 'tech') {
+            o.style = 'tecnico';
+            o.cover = true;
+            o.titlepage = true;
+            o.toc = true;
+            o.annex = true;
+            o.confidential = false;
+            o.signs = true;
+            o.header = true;
+            o.logo = true;
+            o.footer = true;
+            o.differentFirst = true;
+            o.skeleton = 'tech';
+            o.kind = 'tech';
+            o.replaceBody = true;
+        } else if (kind === 'letter') {
             o.style = 'carta';
             o.cover = false;
             o.titlepage = false;
@@ -470,6 +565,9 @@
         };
         window._abeneModeloMeta = meta;
         applyMetaToDoc(meta);
+        syncHeaderFields(loadOpts(), meta);
+        window._abeneChromeSig = '';
+        if (typeof renderPageDecorations === 'function') renderPageDecorations();
         if (typeof closeModal === 'function') closeModal('genericModal');
         if (typeof saveUndoState === 'function') saveUndoState();
         if (typeof showToast === 'function') showToast(tt('mdlMetaSaved'));
@@ -490,7 +588,26 @@
 
     window.abeneSyncModeloUi = function () { writeUi(loadOpts()); };
 
+    function wrapLoadTemplate() {
+        var orig = window.loadTemplate;
+        if (typeof orig !== 'function' || orig._abeneTech) return;
+        var wrapped = function (type) {
+            if (type === 'rapport') {
+                try { if (typeof saveDocument === 'function') saveDocument({ silent: true }); } catch (eSave) {}
+                if (typeof closeModal === 'function') closeModal('templatesModal');
+                window.applyModeloPreset('tech');
+                if (typeof renameDocument === 'function') renameDocument(tt('tplReport') || 'Relatório');
+                return;
+            }
+            return orig.apply(this, arguments);
+        };
+        wrapped._abeneTech = true;
+        window.loadTemplate = wrapped;
+    }
+    wrapLoadTemplate();
+
     document.addEventListener('DOMContentLoaded', function () {
         writeUi(loadOpts());
+        wrapLoadTemplate();
     });
 })();

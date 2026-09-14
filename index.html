@@ -3529,6 +3529,37 @@
             font-family: Calibri, sans-serif;
         }
         .abene-style-item:hover { background: #f3f3f3; }
+        .abene-proof-word { color: #c0392b; font-size: 1.15em; }
+        .abene-proof-count { color: #5b6b7c; font-size: 12px; margin: 0 0 8px; }
+        .abene-proof-hint { color: #5b6b7c; font-size: 12px; line-height: 1.4; }
+        .abene-proof-sugs, .abene-eq-pal, .abene-merge-chips {
+            display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 12px;
+        }
+        .abene-proof-sugs button, .abene-eq-pal button, .abene-merge-chips button {
+            font-size: 12px; padding: 4px 8px;
+        }
+        .abene-eq-preview {
+            font-family: Georgia, serif;
+            font-size: 1.35em;
+            padding: 12px 14px;
+            background: #f8fafc;
+            border: 1px solid #d8dee9;
+            min-height: 2.2em;
+            text-align: center;
+        }
+        .page .abene-equation, #editor .abene-equation, span[data-equation="true"] {
+            font-family: Georgia, serif;
+            font-size: 1.15em;
+            padding: 3px 8px;
+            background: #f8fafc;
+            border: 1px solid #d8dee9;
+            white-space: nowrap;
+        }
+        .page .abene-merge-field, #editor .abene-merge-field, span[data-merge-field] {
+            background: #eef5ff;
+            color: #24538f;
+            padding: 1px 3px;
+        }
         .style-gallery { display:flex; flex-wrap:nowrap; gap:2px; align-items:center; }
         .style-gallery .ribbon-btn-sm { min-width:52px; height:26px; padding:2px 6px; font-size:11px; background:#fff; white-space:nowrap; }
         .style-gallery .ribbon-btn-sm:nth-child(2) { font-size:12px; font-weight:700; }
@@ -7197,8 +7228,8 @@
     <input type="file" id="imageInput" style="display:none" accept="image/*" multiple onchange="handleImageUpload(event)">
     <input type="file" id="excelFileInput" style="display:none" accept=".xlsx,.csv,.txt">
 
-    <script src="libs/abene-i18n.js?v=20260914-relatorio-tec-1"></script>
-    <script src="libs/abene-tips.js"></script>
+    <script src="libs/abene-i18n.js?v=20260914-proof-1"></script>
+    <script src="libs/abene-tips.js?v=20260914-proof-1"></script>
     <script src="libs/abene-page-geometry.js"></script>
     <script>
         window.abeneBrandName = function () {
@@ -11996,7 +12027,7 @@ table { border-collapse: collapse; }
                 else execCmd('insertHTML', '&nbsp;&nbsp;&nbsp;&nbsp;');
                 return;
             }
-            if (e.key === 'F7' && inEditor) { e.preventDefault(); spellCheck(); return; }
+            if (e.key === 'F7' && inEditor) { e.preventDefault(); (window.spellCheck || spellCheck)(); return; }
             if (e.key === 'F9' && inEditor) { e.preventDefault(); updateAllFields(); return; }
             if (!modifier || !inEditor) return;
             if (window.abeneDispatchShortcut && window.abeneDispatchShortcut(e)) return;
@@ -12399,9 +12430,10 @@ table { border-collapse: collapse; }
     <script src="libs/abene-excel-engine.js"></script>
     <script src="libs/abene-excel.js?v=20260914-keep-format-1"></script>
     <script src="libs/abene-sheets.js?v=20260911-trash-protection-1"></script>
-    <script src="libs/abene-collab.js?v=20260909-p0p5-final-3"></script>
+    <script src="libs/abene-collab.js?v=20260914-proof-1"></script>
     <script src="libs/abene-gdocs.js?v=20260909-p0p5-final-3"></script>
     <script src="libs/abene-pickers.js"></script>
+    <script src="libs/abene-proof.js?v=20260914-proof-1"></script>
 
 </body>
 </html>

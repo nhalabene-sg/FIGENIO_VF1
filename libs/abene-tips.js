@@ -64,8 +64,10 @@
             dropCap: 'Transforma a primeira letra do parágrafo numa letra capitular grande.',
             section: 'Começa uma nova secção (útil para mudar margens a meio do documento).',
             colBreak: 'Passa o texto para a coluna seguinte.',
-            equation: 'Insere uma equação ou fórmula.',
-            mailMerge: 'Insere um campo de mailing (nome, morada…) para cartas em série.',
+            equation: 'Insere uma equação com pré-visualização e símbolos. Duplo-clique para editar.',
+            mailMerge: 'Insere um campo de mailing e preenche-o com um cliente guardado (Sheets, Excel ou Arquivo).',
+            spelling: 'Revisa a ortografia: sugestões, dicionário pessoal e palavras repetidas (F7).',
+            collabShare: 'Partilha a pasta Drive. Sem nuvem: guarda o seu nome visível e abre as Definições.',
             watermark: 'Coloca um texto em fundo (ex.: CONFIDENCIAL) em todas as páginas.',
             pageBorder: 'Desenha um limite à volta da página.',
             pageColorTitle: 'Altera a cor de fundo da folha.',
@@ -109,6 +111,7 @@
             mdlMeta: 'Preenche cliente, obra, técnico e data da folha de rosto.',
             mdlPresetLetter: 'Aplica o modelo de carta da empresa.',
             mdlPresetMinutes: 'Aplica o modelo de ata de reunião.',
+            mdlPresetTech: 'Aplica o relatório técnico completo: capa, rosto, índice, secções a preencher, checklist, assinaturas e anexos.',
             mdlRemove: 'Retira capa e folha de rosto sem apagar o resto do texto.',
             mdlStyleGr: 'Estilo visual Genius Raros (azul-marinho e dourado).',
             mdlStyleTec: 'Estilo técnico, mais sóbrio.',
@@ -227,7 +230,11 @@
             toReceipt: 'Remplit le reçu à partir du devis ou du rapport.',
             xlBizTpl: 'Crée le classeur métier (clients, articles, devis, TVA).',
             xlFromQuote: 'Copie les lignes du devis Word vers Excel.',
-            xlToQuote: 'Renvoie les quantités d’Excel vers le devis Word.'
+            xlToQuote: 'Renvoie les quantités d’Excel vers le devis Word.',
+            equation: 'Insère une équation avec aperçu et symboles. Double-clic pour modifier.',
+            mailMerge: 'Insère un champ de publipostage et le remplit avec un client enregistré.',
+            spelling: 'Relit l’orthographe : suggestions, dictionnaire personnel et mots répétés (F7).',
+            collabShare: 'Partage le dossier Drive. Hors ligne : enregistre votre nom visible et ouvre les Paramètres.'
         },
         'en-US': {
             paste: 'Pastes copied content. Click to keep formatting, merge, or paste text only.',
@@ -248,7 +255,11 @@
             toReceipt: 'Fills the receipt from the quote or the report.',
             xlBizTpl: 'Creates the business workbook (clients, items, quotes, VAT).',
             xlFromQuote: 'Copies Word quote lines into Excel.',
-            xlToQuote: 'Sends Excel quantities back to the Word quote.'
+            xlToQuote: 'Sends Excel quantities back to the Word quote.',
+            equation: 'Inserts an equation with preview and symbols. Double-click to edit.',
+            mailMerge: 'Inserts a mail-merge field and fills it from a saved client.',
+            spelling: 'Checks spelling: suggestions, personal dictionary and repeated words (F7).',
+            collabShare: 'Shares the Drive folder. Offline: saves your display name and opens Settings.'
         },
         'es-ES': {
             paste: 'Pega el contenido copiado. Pulse para mantener el formato, combinar o solo texto.',
@@ -269,7 +280,11 @@
             toReceipt: 'Rellena el recibo a partir del presupuesto o del informe.',
             xlBizTpl: 'Crea el libro de negocio (clientes, artículos, presupuestos, IVA).',
             xlFromQuote: 'Copia las líneas del presupuesto Word a Excel.',
-            xlToQuote: 'Envía cantidades de Excel de vuelta al presupuesto Word.'
+            xlToQuote: 'Envía cantidades de Excel de vuelta al presupuesto Word.',
+            equation: 'Inserta una ecuación con vista previa y símbolos. Doble clic para editar.',
+            mailMerge: 'Inserta un campo de combinación y lo rellena con un cliente guardado.',
+            spelling: 'Revisa la ortografía: sugerencias, diccionario personal y palabras repetidas (F7).',
+            collabShare: 'Comparte la carpeta Drive. Sin nube: guarda su nombre visible y abre Ajustes.'
         }
     };
 

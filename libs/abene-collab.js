@@ -188,6 +188,10 @@
     function shareDialog() {
         if (!useEngine) return;
         if (!cloudReady()) {
+            if (typeof root.abeneOpenCollabAuthor === 'function') {
+                root.abeneOpenCollabAuthor();
+                return;
+            }
             toast(tt('collabNeedExec', 'Configure o URL /exec nas Definições para colaborar na nuvem. Offline: versões e sugestões locais.'));
             if (typeof root.openCompanySettings === 'function') root.openCompanySettings();
             return;
