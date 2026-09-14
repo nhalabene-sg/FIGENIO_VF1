@@ -245,37 +245,54 @@
             var src = img.src || '';
             if (!/^data:image\//i.test(src)) return orig.apply(this, arguments);
             var pic = img.closest && img.closest('.abene-pic, [data-abene-obj="pic"]');
-            var wrap = pic ? pic.getAttribute('data-wrap') : '';
+            var wrap = pic ? (pic.getAttribute('data-wrap') || '') : '';
             var w = Math.min(500, parseFloat(img.style.width) || img.naturalWidth || img.offsetWidth || 320);
             var h = img.naturalHeight && img.naturalWidth
                 ? Math.round(w * img.naturalHeight / img.naturalWidth)
                 : Math.min(400, parseFloat(img.style.height) || img.offsetHeight || 240);
             var opts = { data: src, transformation: { width: w, height: Math.max(24, h) } };
             var D = root.docx;
-            if (pic && D && D.TextWrappingType && wrap && wrap !== 'none') {
+            if (pic && D && D.TextWrappingType && wrap && wrap !== 'none' && wrap !== 'inline' && wrap !== 'center' && wrap !== 'above' && wrap !== 'below') {
+                var g = geo();
+                var m = g.margins || { top: 96, right: 96, bottom: 96, left: 96 };
                 var dx = Number(pic.getAttribute('data-abene-dx')) || 0;
                 var dy = Number(pic.getAttribute('data-abene-dy')) || 0;
-                var left = parseFloat(pic.style.left) || dx;
-                var top = parseFloat(pic.style.top) || dy;
-                var pageHeight = geo().h || 1123;
-                if (top >= pageHeight) top = top % pageHeight;
+                var left = parseFloat(pic.style.left);
+                var top = parseFloat(pic.style.top);
+                if (!isFinite(left)) left = dx;
+                if (!isFinite(top)) top = dy;
+                var pageH = g.h || 1123;
+                var pageTop = top >= pageH ? (top % pageH) : top;
                 var isFloat = wrap === 'left' || wrap === 'right';
                 var isFree = wrap === 'free' || wrap === 'behind' || wrap === 'front';
-                if (isFloat || isFree) {
+                var relH = D.HorizontalPositionRelativeFrom;
+                var relV = D.VerticalPositionRelativeFrom;
+                if (isFloat) {
+                    var contentW = Math.max(40, (g.w || 794) - (m.left || 0) - (m.right || 0));
                     opts.floating = {
                         horizontalPosition: {
-                            relative: D.HorizontalPositionRelativeFrom ? D.HorizontalPositionRelativeFrom.PAGE : undefined,
-                            offset: pxToEmu(isFloat && wrap === 'right' ? Math.max(0, geo().w - w - geo().margins.right) : Math.max(0, left))
+                            relative: relH ? relH.MARGIN : undefined,
+                            offset: wrap === 'right' ? pxToEmu(Math.max(0, contentW - w)) : 0
                         },
                         verticalPosition: {
-                            relative: D.VerticalPositionRelativeFrom ? D.VerticalPositionRelativeFrom.PAGE : undefined,
-                            offset: pxToEmu(Math.max(0, top))
+                            relative: relV ? relV.PARAGRAPH : undefined,
+                            offset: 0
                         },
-                        wrap: {
-                            type: isFree ? D.TextWrappingType.NONE : D.TextWrappingType.SQUARE
+                        wrap: { type: D.TextWrappingType.SQUARE }
+                    };
+                } else if (isFree) {
+                    opts.floating = {
+                        horizontalPosition: {
+                            relative: relH ? relH.PAGE : undefined,
+                            offset: pxToEmu(Math.max(0, left))
                         },
+                        verticalPosition: {
+                            relative: relV ? relV.PAGE : undefined,
+                            offset: pxToEmu(Math.max(0, pageTop))
+                        },
+                        wrap: { type: D.TextWrappingType.NONE },
                         behindDocument: wrap === 'behind',
-                        allowOverlap: isFree
+                        allowOverlap: true
                     };
                 }
             }
@@ -323,6 +340,30 @@
             }));
         }
     }
+    function emitFlowPics(node, children, api, orig, ctx) {
+        var pics = node.querySelectorAll ? Array.prototype.slice.call(node.querySelectorAll(':scope > .abene-pic, :scope > [data-abene-obj="pic"]')) : [];
+        if (!pics.length) return false;
+        var removed = [];
+        pics.forEach(function (pic) {
+            var w = pic.getAttribute('data-wrap') || 'none';
+            if (w === 'none' || w === 'inline' || w === 'left' || w === 'right') return;
+            removed.push({ pic: pic, next: pic.nextSibling, parent: pic.parentNode, wrap: w });
+            if (pic.parentNode) pic.parentNode.removeChild(pic);
+        });
+        if (!removed.length) return false;
+        removed.forEach(function (r) {
+            if (r.wrap === 'below') return;
+            emitFigure(r.pic, children, api);
+        });
+        orig.apply(ctx || null, [node, children, api]);
+        removed.forEach(function (r) {
+            if (r.wrap === 'below') emitFigure(r.pic, children, api);
+            if (!r.parent) return;
+            if (r.next && r.next.parentNode === r.parent) r.parent.insertBefore(r.pic, r.next);
+            else r.parent.appendChild(r.pic);
+        });
+        return true;
+    }
     function wrapPushBlock() {
         if (typeof root.docxPushBlock !== 'function' || root.docxPushBlock._abeneExport) return;
         var orig = root.docxPushBlock;
@@ -349,6 +390,10 @@
                 if (isPicHost(node)) {
                     emitFigure(node, children, api);
                     return;
+                }
+                if (node.tagName && /^(P|H[1-6]|LI)$/i.test(node.tagName) &&
+                    node.querySelector && node.querySelector(':scope > .abene-pic, :scope > [data-abene-obj="pic"]')) {
+                    if (emitFlowPics(node, children, api, orig, this)) return;
                 }
             }
             return orig.apply(this, arguments);
@@ -709,27 +754,148 @@
         });
     }
 
-    function savePagedPdf(tree, g, filename) {
+    function pdfFromPageImages(canvases, g) {
+        var orient = g.orientation === 'landscape' ? 'landscape' : 'portrait';
+        return createJsPdf(g).then(function (pdf) {
+            var stamped = 0;
+            canvases.forEach(function (c, i) {
+                if (i > 0) pdf.addPage([g.wmm, g.hmm], orient);
+                else {
+                    try { pdf.setPage(1); } catch (e0) {}
+                }
+                if (stampCanvas(pdf, c, g)) stamped++;
+            });
+            if (!stamped) throw new Error('pdf-stamp');
+            return pdf;
+        });
+    }
+
+    function renderPagedPdf(tree, g) {
         flattenExportDom(tree);
         sanitizeExportRoot(tree);
         showCaptureRoot(tree, g);
-        var orient = g.orientation === 'landscape' ? 'landscape' : 'portrait';
         return afterLayout().then(function () {
             return captureSheets(tree, g);
         }).then(function (canvases) {
             if (!canvases.length) throw new Error('blank-canvas');
-            return createJsPdf(g).then(function (pdf) {
-                var stamped = 0;
-                canvases.forEach(function (c, i) {
-                    if (i > 0) pdf.addPage([g.wmm, g.hmm], orient);
-                    else {
-                        try { pdf.setPage(1); } catch (e0) {}
-                    }
-                    if (stampCanvas(pdf, c, g)) stamped++;
-                });
-                if (!stamped) throw new Error('pdf-stamp');
-                pdf.save(filename);
-            });
+            return pdfFromPageImages(canvases, g);
+        });
+    }
+
+    function savePagedPdf(tree, g, filename) {
+        return renderPagedPdf(tree, g).then(function (pdf) {
+            pdf.save(filename);
+            return pdf;
+        });
+    }
+
+    function pagedPdfToBlob(tree, g) {
+        return renderPagedPdf(tree, g).then(function (pdf) {
+            return pdf.output('blob');
+        });
+    }
+
+    function cleanupExportCapture(tree) {
+        if (root.abeneRemoveExportRoot) root.abeneRemoveExportRoot();
+        else if (tree && tree.parentNode) tree.parentNode.removeChild(tree);
+        if (root.abeneReleaseViewZoom) root.abeneReleaseViewZoom();
+    }
+
+    function captureLivePagedBlob(filterFn) {
+        if (!useEngine || !root.html2pdf || typeof root.abeneBuildPagedExport !== 'function') {
+            return Promise.reject(new Error('no-engine'));
+        }
+        if (root.abeneRemoveExportRoot) root.abeneRemoveExportRoot();
+        prepare();
+        var tree = root.abeneBuildPagedExport();
+        if (!tree) return Promise.reject(new Error('no-tree'));
+        if (typeof filterFn === 'function') {
+            try { filterFn(tree); } catch (eF) {}
+        }
+        if (!tree.querySelector('.abene-export-sheet')) return Promise.reject(new Error('no-sheets'));
+        var g = geo();
+        if (root.abeneInjectPrintPageSize) root.abeneInjectPrintPageSize();
+        document.body.appendChild(tree);
+        if (root.abeneHoldViewZoom) root.abeneHoldViewZoom();
+        return waitImages(tree).then(function () {
+            return pagedPdfToBlob(tree, g);
+        }).then(function (blob) {
+            cleanupExportCapture(tree);
+            if (!blob || blob.size < 4000) throw new Error('empty');
+            return blob;
+        }, function (err) {
+            cleanupExportCapture(tree);
+            throw err;
+        });
+    }
+
+    function buildHtmlExportTree(html, g) {
+        g = g || geo();
+        var m = g.margins || { top: 96, right: 96, bottom: 96, left: 96 };
+        var editor = ed();
+        var measure = document.createElement('div');
+        measure.className = 'page';
+        measure.setAttribute('data-abene-export-measure', '1');
+        measure.style.cssText = 'position:absolute;left:-16000px;top:0;width:' + g.w + 'px;box-sizing:border-box;background:#fff;color:#1a1a1a;margin:0;overflow:visible;';
+        measure.style.padding = m.top + 'px ' + m.right + 'px ' + m.bottom + 'px ' + m.left + 'px';
+        if (editor) {
+            try {
+                var cs = root.getComputedStyle(editor);
+                if (cs.fontFamily) measure.style.fontFamily = cs.fontFamily;
+                if (cs.fontSize) measure.style.fontSize = cs.fontSize;
+            } catch (eCs) {}
+        }
+        measure.innerHTML = html || '<p></p>';
+        measure.querySelectorAll('.abene-page-flow, .page-decoration, .page-header-zone, .page-footer-zone, .page-gap-band, .abene-obj-resize, .abene-tbox-bar').forEach(function (n) { n.remove(); });
+        flattenExportDom(measure);
+        sanitizeExportRoot(measure);
+        document.body.appendChild(measure);
+        var total = Math.max(g.h, measure.scrollHeight || measure.offsetHeight || g.h);
+        var pages = Math.max(1, Math.ceil(total / g.h));
+        var tree = document.createElement('div');
+        tree.id = 'abeneExportRoot';
+        tree.className = 'abene-export-root';
+        tree.setAttribute('data-abene-export', '1');
+        var i;
+        for (i = 0; i < pages; i++) {
+            var sheet = document.createElement('div');
+            sheet.className = 'abene-export-sheet';
+            sheet.style.cssText = 'width:' + g.w + 'px;height:' + g.h + 'px;position:relative;overflow:hidden;background:#fff;margin:0;padding:0;border:0;box-sizing:border-box;';
+            var clip = document.createElement('div');
+            clip.className = 'abene-export-clip';
+            clip.style.cssText = 'position:absolute;left:0;top:0;width:' + g.w + 'px;height:' + g.h + 'px;overflow:hidden;';
+            var clone = measure.cloneNode(true);
+            clone.removeAttribute('data-abene-export-measure');
+            clone.style.position = 'relative';
+            clone.style.left = '0';
+            clone.style.top = (-i * g.h) + 'px';
+            clone.style.width = g.w + 'px';
+            clip.appendChild(clone);
+            sheet.appendChild(clip);
+            tree.appendChild(sheet);
+        }
+        if (measure.parentNode) measure.parentNode.removeChild(measure);
+        return tree;
+    }
+
+    function htmlToPagedBlob(html) {
+        if (!useEngine || !root.html2pdf) return Promise.reject(new Error('no-engine'));
+        var g = geo();
+        if (root.abeneRemoveExportRoot) root.abeneRemoveExportRoot();
+        var tree = buildHtmlExportTree(html, g);
+        document.body.appendChild(tree);
+        if (root.abeneHoldViewZoom) root.abeneHoldViewZoom();
+        return waitImages(tree).then(function () {
+            return embedImages(tree);
+        }).then(function () {
+            return pagedPdfToBlob(tree, g);
+        }).then(function (blob) {
+            cleanupExportCapture(tree);
+            if (!blob || blob.size < 4000) throw new Error('empty');
+            return blob;
+        }, function (err) {
+            cleanupExportCapture(tree);
+            throw err;
         });
     }
 
@@ -777,6 +943,9 @@
         logoPng: logoPng,
         rasterizeImages: rasterizeImages,
         savePagedPdf: savePagedPdf,
+        pagedPdfToBlob: pagedPdfToBlob,
+        captureLivePagedBlob: captureLivePagedBlob,
+        htmlToPagedBlob: htmlToPagedBlob,
         htmlElementToPdfBlob: htmlElementToPdfBlob,
         buildDocxSections: buildDocxSections
     };

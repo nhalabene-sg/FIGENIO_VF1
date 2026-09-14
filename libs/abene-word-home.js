@@ -4178,9 +4178,24 @@
         var pad = editor.style.padding || (m.top + 'px ' + m.right + 'px ' + m.bottom + 'px ' + m.left + 'px');
         var bg = editor.style.backgroundColor || '#fff';
         var sourceChildren = Array.prototype.slice.call(editor.children || []);
+        function isOverlayObj(el) {
+            if (!el || !el.classList) return false;
+            if (el.classList.contains('abene-obj-free') || el.classList.contains('abene-obj-front') || el.classList.contains('abene-obj-behind')) return true;
+            return /^(free|behind|front)$/.test(el.getAttribute('data-wrap') || '');
+        }
+        function overlayDocTop(node) {
+            var t = parseFloat(node && node.style && node.style.top);
+            if (isFinite(t)) return t;
+            return Number(node && node.offsetTop) || 0;
+        }
+        function overlayDocLeft(node) {
+            var l = parseFloat(node && node.style && node.style.left);
+            if (isFinite(l)) return l;
+            return Number(node && node.offsetLeft) || 0;
+        }
         function sourcePageIndex(node) {
             if (!node || (node.classList && (node.classList.contains('abene-page-flow') || node.classList.contains('page-gap-band')))) return -1;
-            var top = Number(node.offsetTop);
+            var top = isOverlayObj(node) ? overlayDocTop(node) : Number(node.offsetTop);
             if (!isFinite(top)) top = 0;
             return Math.max(0, Math.min(pages - 1, Math.floor((top + 1) / h)));
         }
@@ -4217,20 +4232,38 @@
             edClone.style.setProperty('--write-h', Math.max(80, h - m.top - m.bottom) + 'px');
             Array.prototype.slice.call(edClone.children || []).forEach(function (child, childIndex) {
                 var source = sourceChildren[childIndex];
+                if (isOverlayObj(child) || isOverlayObj(source)) {
+                    child.remove();
+                    return;
+                }
                 if (!source || sourcePageIndex(source) !== i) child.remove();
             });
-            /* Les objets libres sont positionnés dans les coordonnées du document
-               complet. L'export travaille page par page : ramener leur top dans
-               la page courante évite tout déplacement ou disparition au PDF. */
-            edClone.querySelectorAll('.abene-obj-free, .abene-obj-front, .abene-obj-behind').forEach(function (obj) {
-                var top = parseFloat(obj.style.top);
-                var left = parseFloat(obj.style.left);
-                if (isFinite(top)) obj.style.setProperty('top', Math.max(0, top - i * h) + 'px', 'important');
-                if (isFinite(left)) obj.style.setProperty('left', Math.max(0, left) + 'px', 'important');
+            /* Images libres / atrás / frente : recopier depuis le document
+               (coordonnées page) au lieu de se fier à offsetTop + zoom. */
+            sourceChildren.forEach(function (source) {
+                if (!isOverlayObj(source)) return;
+                if (sourcePageIndex(source) !== i) return;
+                var obj = source.cloneNode(true);
+                obj.querySelectorAll('.abene-obj-resize, .image-handle, .abene-tbox-bar').forEach(function (n) { n.remove(); });
+                var top = overlayDocTop(source);
+                var left = overlayDocLeft(source);
+                var wrap = obj.getAttribute('data-wrap') || '';
                 obj.style.setProperty('position', 'absolute', 'important');
-                if (obj.classList.contains('abene-obj-behind')) obj.style.setProperty('z-index', '0', 'important');
-                else if (obj.classList.contains('abene-obj-front')) obj.style.setProperty('z-index', '20', 'important');
-                else obj.style.setProperty('z-index', '6', 'important');
+                obj.style.setProperty('top', Math.max(0, top - i * h) + 'px', 'important');
+                obj.style.setProperty('left', Math.max(0, left) + 'px', 'important');
+                obj.style.setProperty('margin', '0', 'important');
+                obj.style.setProperty('float', 'none', 'important');
+                obj.style.setProperty('display', 'block', 'important');
+                if (obj.classList.contains('abene-obj-behind') || wrap === 'behind') {
+                    obj.style.setProperty('z-index', '0', 'important');
+                    edClone.insertBefore(obj, edClone.firstChild);
+                } else if (obj.classList.contains('abene-obj-front') || wrap === 'front') {
+                    obj.style.setProperty('z-index', '8', 'important');
+                    edClone.appendChild(obj);
+                } else {
+                    obj.style.setProperty('z-index', '6', 'important');
+                    edClone.appendChild(obj);
+                }
             });
             /* Un filigrane appartient à la page, pas seulement au premier écran. */
             var liveWatermark = editor.querySelector(':scope > .watermark');

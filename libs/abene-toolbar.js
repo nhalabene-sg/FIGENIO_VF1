@@ -375,7 +375,10 @@
     };
     window.abeneInsertIcon = function (s) {
         hideFly();
-        insertHTML('<span data-icon="true" style="font-size:32px;">' + s + '</span>');
+        var glyph = String(s || '').trim() || '⭐';
+        insertHTML('<span class="abene-pic abene-icon abene-obj-inline" data-abene-obj="pic" data-wrap="none" contenteditable="false">' +
+            '<span data-icon="true" class="abene-icon-glyph" style="font-size:32px;line-height:1;display:block;width:32px;height:32px;">' + glyph + '</span>' +
+            '<span class="abene-obj-resize" data-resize="se"></span></span>');
     };
     window.insertShape = function (ev) {
         if (ev && ev.currentTarget) {

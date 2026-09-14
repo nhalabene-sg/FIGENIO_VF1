@@ -98,34 +98,48 @@
         out.site = grab('[data-abene-field="site"]');
         out.tech = grab('[data-abene-field="tech"]');
         out.version = grab('[data-abene-field="version"]');
+        out.inspType = grab('[data-abene-field="inspType"]');
+        out.norm = grab('[data-abene-field="norm"]');
+        out.fraction = grab('[data-abene-field="fraction"]');
         var hf = A().pageHeaderFields || {};
         if (!out.ref && hf.ref) out.ref = hf.ref;
         if (!out.date && hf.date) out.date = hf.date;
         return out;
     }
 
-    function defaultMeta() {
+    function isInspection(opts) {
+        return !!(opts && (opts.kind === 'inspection' || opts.skeleton === 'inspection' || opts.style === 'inspecao'));
+    }
+    function isGuidedReport(opts) {
+        return !!(opts && (opts.skeleton === 'tech' || opts.kind === 'tech' || isInspection(opts)));
+    }
+
+    function defaultMeta(opts) {
         var y = new Date().getFullYear();
         var iso = new Date().toISOString().slice(0, 10);
         var stored = window._abeneModeloMeta || {};
         var prev = fieldsFromDoc();
+        var insp = isInspection(opts);
         return {
-            work: stored.work || prev.work || tt('mdlWorkDef') || 'Título do relatório',
-            ref: stored.ref || prev.ref || 'GR-RAP-' + y + '-001',
+            work: stored.work || prev.work || (insp ? (tt('mdlWorkDefInsp') || 'Inspeção de canalização') : (tt('mdlWorkDef') || 'Título do relatório')),
+            ref: stored.ref || prev.ref || (insp ? 'GR-INSP-' + y + '-001' : 'GR-RAP-' + y + '-001'),
             date: stored.date || prev.date || iso,
             client: stored.client || prev.client || tt('mdlClientDef') || 'Cliente',
             site: stored.site || prev.site || tt('mdlSiteDef') || 'Obra / local',
             tech: stored.tech || prev.tech || tt('mdlTechDef') || 'Técnico responsável',
-            version: stored.version || prev.version || '1.0'
+            version: stored.version || prev.version || '1.0',
+            inspType: stored.inspType || prev.inspType || (insp ? (tt('mdlInspTypeDef') || 'Inspeção de canalização') : ''),
+            norm: stored.norm || prev.norm || (insp ? (tt('mdlInspNormDef') || 'Regulamento / caderno de encargos') : ''),
+            fraction: stored.fraction || prev.fraction || (insp ? (tt('mdlInspFracDef') || 'Fração / piso') : '')
         };
     }
 
     function kindTitle(opts) {
         if (opts && opts.kind === 'minutes') return tt('mdlKindMinutes') || tt('tplMinutesTitle') || 'ATA';
         if (opts && (opts.kind === 'tech' || opts.skeleton === 'tech')) return tt('mdlKindTech') || 'RELATÓRIO TÉCNICO';
+        if (isInspection(opts)) return tt('mdlKindInsp') || 'RELATÓRIO DE INSPEÇÃO';
         if (opts && opts.style === 'carta') return tt('hfTplLetterTitle') || 'CARTA';
         if (opts && opts.style === 'simples') return tt('mdlStyleSimple') || 'TEXTO';
-        if (opts && opts.style === 'inspecao') return tt('mdlStyleInsp') || 'INSPEÇÃO';
         return tt('hfTplReportTitle') || 'RELATÓRIO';
     }
 
@@ -151,7 +165,7 @@
             '<div class="abene-cover-brand">' + logo +
             '<div class="abene-cover-brand-copy"><div class="abene-cover-name">' + name + '</div>' +
             (co.legalForm ? '<div class="abene-cover-legal">' + esc(co.legalForm) + '</div>' : '') + '</div></div>' +
-            '<div class="abene-cover-kicker">' + esc(tt('mdlCoverKicker')) + '</div>' +
+            '<div class="abene-cover-kicker">' + esc(isInspection(opts) ? (tt('mdlCoverKickerInsp') || tt('mdlCoverKicker')) : tt('mdlCoverKicker')) + '</div>' +
             '</div>' +
             '<div class="abene-cover-mid">' +
             '<div class="abene-cover-accent"></div>' +
@@ -225,7 +239,7 @@
     }
 
     function buildSigns(meta, opts) {
-        var extra = !!(opts && (opts.skeleton === 'tech' || opts.kind === 'tech'));
+        var extra = isGuidedReport(opts);
         function col(name, role) {
             return '<div>' +
                 (extra ? '<div class="abene-sign-space"></div>' : '') +
@@ -241,11 +255,13 @@
     }
 
     function buildAnnex(opts) {
-        var tech = !!(opts && (opts.skeleton === 'tech' || opts.kind === 'tech'));
+        var guided = isGuidedReport(opts);
+        var insp = isInspection(opts);
         return '<div class="abene-annex" data-abene-block="annex">' +
             '<h1 data-abene-style="h1">' + esc(tt('mdlAnnexTitle')) + '</h1>' +
             '<p>' + esc(tt('mdlAnnexHint')) + '</p>' +
-            (tech ? heading(2, tt('mdlAnnexA')) + fill('annex-a', tt('mdlFillAnnex')) : '') +
+            (guided ? heading(2, tt('mdlAnnexA')) + fill('annex-a', tt('mdlFillAnnex')) : '') +
+            (insp ? heading(2, tt('mdlAnnexPhotos')) + fill('annex-photos', tt('mdlFillAnnexPhotos')) : '') +
             '</div>';
     }
 
@@ -293,6 +309,61 @@
             heading(2, tt('mdlSecReco')) + fill('reco', tt('mdlFillReco'));
     }
 
+    function checkRows(rows) {
+        return '<table class="abene-check-table"><thead><tr>' +
+            '<th>' + esc(tt('mdlCheckItem')) + '</th><th>' + esc(tt('mdlCheckResult')) + '</th><th>' + esc(tt('mdlCheckNotes')) + '</th>' +
+            '</tr></thead><tbody>' + rows.map(function (r) {
+                return '<tr><td>' + esc(r[0]) + '</td><td>' + esc(r[1]) + '</td><td></td></tr>';
+            }).join('') + '</tbody></table>';
+    }
+
+    function inspSkeleton(meta) {
+        meta = meta || defaultMeta({ kind: 'inspection', skeleton: 'inspection', style: 'inspecao' });
+        var ok = tt('mdlCheckOk');
+        var na = tt('mdlCheckNa');
+        var nok = tt('mdlCheckNok');
+        return heading(1, tt('mdlInspBody')) +
+            '<h3 data-abene-style="h3" data-abene-lock="1" contenteditable="false">' + esc(tt('mdlRevTitle')) + '</h3>' +
+            '<table class="abene-rev-table"><thead><tr>' +
+            '<th>' + esc(tt('mdlRevRev')) + '</th><th>' + esc(tt('mdlRevDate')) + '</th>' +
+            '<th>' + esc(tt('mdlRevDesc')) + '</th><th>' + esc(tt('mdlRevAuthor')) + '</th>' +
+            '</tr></thead><tbody><tr>' +
+            '<td>' + esc(meta.version || '1.0') + '</td><td>' + esc(meta.date || '') + '</td>' +
+            '<td>' + esc(tt('mdlRevFirst')) + '</td><td>' + esc(meta.tech || '') + '</td>' +
+            '</tr></tbody></table>' +
+            heading(2, tt('mdlInspSecId')) +
+            '<div class="abene-tp-table-wrap"><table class="abene-tp-table">' +
+            idRow(tt('mdlFieldRef'), 'ref', meta.ref) +
+            idRow(tt('mdlFieldDate'), 'date', meta.date) +
+            idRow(tt('mdlFieldClient'), 'client', meta.client) +
+            idRow(tt('mdlFieldSite'), 'site', meta.site) +
+            idRow(tt('mdlFieldFraction'), 'fraction', meta.fraction) +
+            idRow(tt('mdlFieldInspType'), 'inspType', meta.inspType) +
+            idRow(tt('mdlFieldNorm'), 'norm', meta.norm) +
+            idRow(tt('mdlFieldTech'), 'tech', meta.tech) +
+            idRow(tt('mdlFieldVersion'), 'version', meta.version) +
+            '</table></div>' +
+            heading(2, tt('mdlInspSecObject')) + fill('insp-object', tt('mdlFillInspObject')) +
+            heading(2, tt('mdlInspSecInstall')) + fill('insp-install', tt('mdlFillInspInstall')) +
+            heading(2, tt('mdlInspSecMethod')) + fill('insp-method', tt('mdlFillInspMethod')) +
+            heading(2, tt('mdlInspSecObs')) + fill('insp-obs', tt('mdlFillInspObs')) +
+            '<p class="abene-fill-hint">' + esc(tt('mdlPhotoInspHint')) + '</p>' +
+            '<h3 data-abene-style="h3" data-abene-lock="1" contenteditable="false">' + esc(tt('mdlCheckTitle')) + '</h3>' +
+            checkRows([
+                [tt('mdlInspCheck1'), ok],
+                [tt('mdlInspCheck2'), ok],
+                [tt('mdlInspCheck3'), na],
+                [tt('mdlInspCheck4'), ok],
+                [tt('mdlInspCheck5'), na],
+                [tt('mdlInspCheck6'), ok],
+                [tt('mdlInspCheck7'), nok],
+                [tt('mdlInspCheck8'), na]
+            ]) +
+            heading(2, tt('mdlInspSecNonconf')) + fill('insp-nonconf', tt('mdlFillInspNonconf')) +
+            heading(2, tt('mdlInspSecConclusions')) + fill('insp-conclusions', tt('mdlFillInspConclusions')) +
+            heading(2, tt('mdlInspSecReco')) + fill('insp-reco', tt('mdlFillInspReco'));
+    }
+
     function reportSkeleton() {
         return '<h1>' + esc(tt('tplReportBody')) + '</h1>' +
             '<h2>' + esc(tt('tplIntro')) + '</h2><p></p>' +
@@ -326,6 +397,9 @@
         if (opts && (opts.skeleton === 'letter' || opts.style === 'carta')) return letterSkeleton();
         if (opts && (opts.skeleton === 'minutes' || opts.kind === 'minutes')) return minutesSkeleton();
         if (opts && (opts.skeleton === 'tech' || opts.kind === 'tech')) return techSkeleton(meta);
+        if (opts && (opts.skeleton === 'inspection' || opts.kind === 'inspection' || opts.style === 'inspecao')) {
+            return inspSkeleton(meta);
+        }
         return reportSkeleton();
     }
 
@@ -370,7 +444,7 @@
         if (opts.footer) {
             var co = company();
             var foot = (co.name || 'Genius Raros') + '  ·  {PAGE} / {NUMPAGES}';
-            if (meta && (opts.skeleton === 'tech' || opts.kind === 'tech') && meta.version) {
+            if (meta && isGuidedReport(opts) && meta.version) {
                 foot = (co.name || 'Genius Raros') + '  ·  Rev. ' + meta.version + '  ·  {PAGE} / {NUMPAGES}';
             }
             A().pageFooterText = foot;
@@ -396,19 +470,23 @@
             btn.setAttribute('aria-pressed', selected ? 'true' : 'false');
         });
         if (ev) ev.stopPropagation();
-        /* La carte Técnico doit produire le même rapport guidé complet que
-           le bouton « Modelo relatório técnico », pas seulement recolorer. */
+        /* La carte Técnico / Inspeção doit produire le rapport guidé complet,
+           pas seulement recolorer la capa. */
         if (style === 'tecnico') {
             window.applyModeloPreset('tech');
+            return;
+        }
+        if (style === 'inspecao') {
+            window.applyModeloPreset('inspection');
             return;
         }
         var o = readUi();
         o.style = style;
         if (style === 'carta') o.skeleton = 'letter';
         else if (o.skeleton === 'letter' || o.skeleton === 'minutes') o.skeleton = '';
-        if (style !== 'tecnico') {
+        if (style !== 'tecnico' && style !== 'inspecao') {
             o.kind = '';
-            if (o.skeleton === 'tech') o.skeleton = '';
+            if (o.skeleton === 'tech' || o.skeleton === 'inspection') o.skeleton = '';
         }
         saveOpts(o);
         window.applyReportModel(o, true);
@@ -422,7 +500,7 @@
         }
         saveOpts(o);
         if (which === 'header' || which === 'logo' || which === 'footer' || which === 'diff') {
-            applyHeaderFooter(o, defaultMeta());
+            applyHeaderFooter(o, defaultMeta(o));
             window._abeneChromeSig = '';
             if (typeof renderPageDecorations === 'function') renderPageDecorations();
             if (typeof refreshPagination === 'function') refreshPagination();
@@ -438,7 +516,7 @@
         var replaceBody = !!opts.replaceBody;
         opts.replaceBody = false;
         saveOpts(opts);
-        var meta = defaultMeta();
+        var meta = defaultMeta(opts);
         window._abeneModeloMeta = meta;
         window._abeneModeloApplied = true;
         var keep = isAlmostEmpty(editor) ? '' : (function () {
@@ -492,6 +570,21 @@
             o.skeleton = 'tech';
             o.kind = 'tech';
             o.replaceBody = true;
+        } else if (kind === 'inspection') {
+            o.style = 'inspecao';
+            o.cover = true;
+            o.titlepage = true;
+            o.toc = true;
+            o.annex = true;
+            o.confidential = false;
+            o.signs = true;
+            o.header = true;
+            o.logo = true;
+            o.footer = true;
+            o.differentFirst = true;
+            o.skeleton = 'inspection';
+            o.kind = 'inspection';
+            o.replaceBody = true;
         } else if (kind === 'letter') {
             o.style = 'carta';
             o.cover = false;
@@ -535,7 +628,7 @@
     };
 
     window.editModeloMeta = function () {
-        var m = defaultMeta();
+        var m = defaultMeta(loadOpts());
         if (typeof openGenericModal !== 'function') return;
         function field(id, label, val) {
             return '<div class="form-group"><label for="mdlMeta_' + id + '">' + esc(label) + '</label>' +
@@ -560,6 +653,7 @@
             var el = document.getElementById('mdlMeta_' + id);
             return el ? el.value : '';
         }
+        var prev = window._abeneModeloMeta || {};
         var meta = {
             work: val('work'),
             ref: val('ref'),
@@ -567,7 +661,10 @@
             client: val('client'),
             site: val('site'),
             tech: val('tech'),
-            version: val('version')
+            version: val('version'),
+            inspType: prev.inspType || '',
+            norm: prev.norm || '',
+            fraction: prev.fraction || ''
         };
         window._abeneModeloMeta = meta;
         applyMetaToDoc(meta);

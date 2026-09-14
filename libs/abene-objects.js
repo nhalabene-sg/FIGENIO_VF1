@@ -32,9 +32,14 @@
         if (!el) return;
         el.classList.add('abene-obj-on');
         var img = el.matches('img') ? el : el.querySelector('img');
+        var icon = !img ? (el.querySelector('[data-icon]') || (el.getAttribute && el.getAttribute('data-icon') ? el : null)) : null;
         if (img) {
             window.selectedImage = img;
             img.classList.add('selected');
+            if (typeof showImageToolbar === 'function') showImageToolbar({ clientX: 0, clientY: 0 });
+        } else if (icon) {
+            window.selectedImage = icon;
+            icon.classList.add('selected');
             if (typeof showImageToolbar === 'function') showImageToolbar({ clientX: 0, clientY: 0 });
         } else {
             window.selectedImage = null;
@@ -197,6 +202,30 @@
         if (rs) wrap.insertBefore(cap, rs);
         else wrap.appendChild(cap);
     }
+    function isEmptyBlock(node) {
+        if (!node || !node.parentNode) return false;
+        var t = String(node.textContent || '').replace(/\u200b/g, '').replace(/\s+/g, '');
+        if (t) return false;
+        if (node.querySelector && node.querySelector('img, [data-icon], table, .abene-pic, .abene-tbox')) return false;
+        return true;
+    }
+    function placeAboveBelow(el, mode) {
+        var host = el.closest && el.closest('p, h1, h2, h3, h4, h5, h6, li, td, th, .abene-normal');
+        if (!host || host === el || !host.parentNode) return;
+        var inCell = /^(TD|TH|LI)$/.test(host.tagName);
+        var parent = host.parentNode;
+        if (mode === 'below') {
+            if (inCell || host.tagName === 'P' || (host.classList && host.classList.contains('abene-normal'))) {
+                host.appendChild(el);
+            } else if (host.nextSibling) parent.insertBefore(el, host.nextSibling);
+            else parent.appendChild(el);
+        } else {
+            if (inCell || host.tagName === 'P' || (host.classList && host.classList.contains('abene-normal'))) {
+                host.insertBefore(el, host.firstChild);
+            } else parent.insertBefore(el, host);
+        }
+        if (!inCell && isEmptyBlock(host)) parent.removeChild(host);
+    }
     function applyWrap(el, mode) {
         if (!el) return;
         stickCaptionToPic(el);
@@ -209,6 +238,7 @@
         el.style.marginLeft = '';
         el.style.marginRight = '';
         el.style.zIndex = '';
+        el.style.clear = '';
         var editor = editorEl();
         if (mode !== 'free' && mode !== 'behind' && mode !== 'front') {
             el.style.position = '';
@@ -222,12 +252,7 @@
         else if (mode === 'center') el.classList.add('abene-obj-center');
         else if (mode === 'above' || mode === 'below') {
             el.classList.add(mode === 'above' ? 'abene-obj-above' : 'abene-obj-below');
-            var block = el.closest && el.closest('p, h1, h2, h3, h4, h5, h6, li, td, th, .abene-normal');
-            if (block && block !== el && block.parentNode) {
-                if (mode === 'above') block.parentNode.insertBefore(el, block);
-                else if (block.nextSibling) block.parentNode.insertBefore(el, block.nextSibling);
-                else block.parentNode.appendChild(el);
-            }
+            placeAboveBelow(el, mode);
         }
         else if (isOverlayWrap(mode)) {
             var mark = ensureAnchor(el);
@@ -263,6 +288,43 @@
         rs.setAttribute('data-resize', 'se');
         wrap.appendChild(rs);
         stickCaptionToPic(wrap);
+        return wrap;
+    }
+    function isIconNode(el) {
+        return !!(el && el.getAttribute && el.getAttribute('data-icon') === 'true');
+    }
+    function applyIconSize(glyph, px) {
+        if (!glyph) return;
+        px = Math.max(16, Math.min(400, Math.round(Number(px) || 32)));
+        glyph.style.fontSize = px + 'px';
+        glyph.style.width = px + 'px';
+        glyph.style.height = px + 'px';
+        glyph.style.lineHeight = '1';
+        glyph.style.display = 'block';
+        var box = glyph.closest && glyph.closest('.abene-pic');
+        if (box) {
+            box.style.width = px + 'px';
+            box.style.height = 'auto';
+        }
+    }
+    function wrapIcon(el) {
+        if (!el || !isIconNode(el)) return el && el.closest && el.closest('.abene-pic');
+        if (el.closest('.abene-pic')) return el.closest('.abene-pic');
+        var wrap = document.createElement('span');
+        wrap.className = 'abene-pic abene-icon abene-obj-inline';
+        wrap.setAttribute('data-abene-obj', 'pic');
+        wrap.setAttribute('data-wrap', 'none');
+        wrap.contentEditable = 'false';
+        el.parentNode.insertBefore(wrap, el);
+        wrap.appendChild(el);
+        el.classList.add('abene-icon-glyph');
+        if (!el.style.fontSize) el.style.fontSize = '32px';
+        el.style.lineHeight = '1';
+        el.style.display = 'block';
+        var rs = document.createElement('span');
+        rs.className = 'abene-obj-resize';
+        rs.setAttribute('data-resize', 'se');
+        wrap.appendChild(rs);
         return wrap;
     }
     function picHtml(src, alt, style) {
@@ -415,6 +477,8 @@
             var tbox = ev.target.closest && ev.target.closest('.abene-tbox');
             var pic = ev.target.closest && ev.target.closest('.abene-pic');
             var img = ev.target.closest && ev.target.closest('#editor img');
+            var looseIcon = ev.target.closest && ev.target.closest('#editor [data-icon]');
+            if (!pic && looseIcon && !looseIcon.closest('.abene-pic')) pic = wrapIcon(looseIcon);
             if (!pic && !tbox && !rs) {
                 var overlayHit = null;
                 editor.querySelectorAll('.abene-pic, .abene-tbox').forEach(function (el) {
@@ -474,6 +538,8 @@
                 drag.el.style.width = w + 'px';
                 var im = drag.el.querySelector('img');
                 if (im) { im.style.width = w + 'px'; im.style.height = 'auto'; im.style.maxWidth = 'none'; }
+                var ic = drag.el.querySelector('[data-icon]');
+                if (ic) applyIconSize(ic, w);
                 if (typeof positionImageHandles === 'function') positionImageHandles();
                 return;
             }
@@ -555,7 +621,14 @@
 
     function init() {
         bindEditor(editorEl());
-        try { syncAnchors(); } catch (e) {}
+        try {
+            var ed0 = editorEl();
+            if (ed0) ed0.querySelectorAll('[data-icon]').forEach(function (el) {
+                if (el.closest('.abene-pic, [data-abene-block], .page-header-zone, .page-footer-zone')) return;
+                wrapIcon(el);
+            });
+            syncAnchors();
+        } catch (e) {}
         document.addEventListener('keydown', function (e) {
             if (e.key !== 'Delete' && e.key !== 'Backspace') return;
             var editor = editorEl();
@@ -602,8 +675,24 @@
     };
     var origReset = window.resetImageStyle;
     window.resetImageStyle = function () {
-        if (typeof origReset === 'function') origReset.apply(this, arguments);
         var img = window.selectedImage;
+        if (isIconNode(img)) {
+            applyIconSize(img, 32);
+            img.style.border = '';
+            img.style.boxShadow = '';
+            img.style.borderRadius = '';
+            img.style.transform = '';
+            var box = img.closest && img.closest('.abene-pic');
+            if (box) {
+                box.removeAttribute('data-abene-rotate');
+                applyWrap(box, 'none');
+            }
+            if (typeof saveUndoState === 'function') saveUndoState();
+            if (typeof showImageToolbar === 'function') showImageToolbar({ clientX: 0, clientY: 0 });
+            return;
+        }
+        if (typeof origReset === 'function') origReset.apply(this, arguments);
+        img = window.selectedImage;
         var wrap = img && img.closest && img.closest('.abene-pic');
         if (img && img.getAttribute('data-abene-orig')) {
             img.src = img.getAttribute('data-abene-orig');
@@ -643,9 +732,58 @@
         else if (typeof saveUndoState === 'function') saveUndoState();
         if (typeof showImageToolbar === 'function') showImageToolbar({ clientX: 0, clientY: 0 });
     }
+    function wrapSizeFns() {
+        var origResize = window.resizeSelectedImage;
+        if (typeof origResize === 'function' && !origResize._abeneIcon) {
+            window.resizeSelectedImage = function (dim) {
+                var el = window.selectedImage;
+                if (isIconNode(el)) {
+                    var wEl = document.getElementById('imgWidth');
+                    var hEl = document.getElementById('imgHeight');
+                    var px = dim === 'h' ? parseInt(hEl && hEl.value, 10) : parseInt(wEl && wEl.value, 10);
+                    applyIconSize(el, px);
+                    if (wEl) wEl.value = Math.round(el.offsetWidth || px);
+                    if (hEl) hEl.value = Math.round(el.offsetHeight || px);
+                    if (typeof saveUndoState === 'function') saveUndoState();
+                    if (typeof positionImageHandles === 'function') positionImageHandles();
+                    return;
+                }
+                return origResize.apply(this, arguments);
+            };
+            window.resizeSelectedImage._abeneIcon = true;
+        }
+        var origPct = window.setImageSizePercent;
+        if (typeof origPct === 'function' && !origPct._abeneIcon) {
+            window.setImageSizePercent = function (percent) {
+                var el = window.selectedImage;
+                if (isIconNode(el)) {
+                    applyIconSize(el, 16 + (Math.max(10, Math.min(100, Number(percent) || 50)) / 100) * 160);
+                    if (typeof showImageToolbar === 'function') showImageToolbar({ clientX: 0, clientY: 0 });
+                    if (typeof saveUndoState === 'function') saveUndoState();
+                    return;
+                }
+                return origPct.apply(this, arguments);
+            };
+            window.setImageSizePercent._abeneIcon = true;
+        }
+    }
+    wrapSizeFns();
+    document.addEventListener('DOMContentLoaded', wrapSizeFns);
+
     window.abeneRotateImage = function (delta) {
         endCrop(false);
         var img = window.selectedImage;
+        if (isIconNode(img)) {
+            var box = img.closest && img.closest('.abene-pic') || img;
+            var cur = Number(box.getAttribute('data-abene-rotate')) || 0;
+            cur = (cur + (delta < 0 ? -90 : 90) + 360) % 360;
+            box.setAttribute('data-abene-rotate', String(cur));
+            img.style.transform = cur ? 'rotate(' + cur + 'deg)' : '';
+            img.style.display = 'block';
+            save();
+            if (typeof showImageToolbar === 'function') showImageToolbar({ clientX: 0, clientY: 0 });
+            return;
+        }
         if (!img || img.tagName !== 'IMG') return;
         if (!img.complete || !img.naturalWidth) {
             img.onload = function () { window.abeneRotateImage(delta); };

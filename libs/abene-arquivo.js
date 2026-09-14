@@ -763,6 +763,68 @@
         if (etape === 'recibo') return 'receipt';
         return 'relatorio';
     }
+    function sheetHasBody(sheet) {
+        var probe = sheet.cloneNode(true);
+        probe.querySelectorAll('.page-header-zone, .page-footer-zone, .page-chrome, .watermark, .abene-page-flow, .hf-tab, .hf-rule').forEach(function (n) { n.remove(); });
+        var text = String(probe.innerText || '').replace(/\s+/g, ' ').trim();
+        return text.length > 8 || !!probe.querySelector('img, table, [data-abene-block]');
+    }
+    function filterExportTree(tree, etape) {
+        if (!tree || !tree.querySelectorAll) return;
+        var key = extractKey(etape);
+        var sheets = Array.prototype.slice.call(tree.querySelectorAll('.abene-export-sheet'));
+        if (key === 'devis' || key === 'receipt') {
+            var sel = key === 'devis' ? '[data-abene-block="devis"]' : '[data-abene-block="receipt"]';
+            sheets.forEach(function (sheet) {
+                if (!sheet.querySelector(sel)) {
+                    sheet.remove();
+                    return;
+                }
+                Array.prototype.slice.call(sheet.querySelectorAll('.abene-export-clip > *')).forEach(function (node) {
+                    if (node.querySelector && (node.querySelector('.page-header-zone') || node.querySelector('.page-footer-zone'))) return;
+                    Array.prototype.slice.call(node.children || []).forEach(function (ch) {
+                        if (ch.matches && ch.matches(sel)) return;
+                        if (ch.querySelector && ch.querySelector(sel)) return;
+                        if (ch.classList && (ch.classList.contains('watermark') || ch.classList.contains('abene-page-flow'))) return;
+                        ch.remove();
+                    });
+                });
+            });
+        } else {
+            tree.querySelectorAll('[data-abene-block="devis"], [data-abene-block="receipt"]').forEach(function (n) { n.remove(); });
+        }
+        Array.prototype.slice.call(tree.querySelectorAll('.abene-export-sheet')).forEach(function (sheet) {
+            if (!sheetHasBody(sheet)) sheet.remove();
+        });
+    }
+    function canUseLivePaged(entry, opts) {
+        var live = editorEl();
+        if (!live) return false;
+        var Ex = window.ABENE && window.ABENE.Export;
+        if (!Ex || typeof Ex.captureLivePagedBlob !== 'function') return false;
+        if (opts && opts.html && opts.html === live.innerHTML) return true;
+        if (entry && (entry.id === 'current' || entry.source === 'current')) return true;
+        try {
+            var archived = cleanArchiveHtml((entry && entry.html) || '');
+            if (archived && archived === liveEditorHtml()) return true;
+            if (archived && archived === cleanArchiveHtml(live.innerHTML)) return true;
+        } catch (e) {}
+        return false;
+    }
+    function pdfBlobForEtape(etape, entry, chunk, opts) {
+        var Ex = window.ABENE && window.ABENE.Export;
+        if (canUseLivePaged(entry, opts) && Ex && typeof Ex.captureLivePagedBlob === 'function') {
+            return Ex.captureLivePagedBlob(function (tree) {
+                filterExportTree(tree, etape);
+            }).then(function (blob) {
+                if (!blob || blob.size < 4000) throw new Error('empty');
+                return blob;
+            }).catch(function () {
+                return htmlToPdfBlob(chunk);
+            });
+        }
+        return htmlToPdfBlob(chunk);
+    }
     function openPdfDb() {
         return new Promise(function (resolve, reject) {
             if (!window.indexedDB) {
@@ -869,7 +931,7 @@
             jsPDF: { unit: 'mm', format: fmt, orientation: ori === 'landscape' ? 'landscape' : 'portrait' }
         };
     }
-    function htmlToPdfBlob(html) {
+    function htmlToPdfBlobLegacy(html) {
         return new Promise(function (resolve, reject) {
             if (!window.html2pdf) {
                 reject(new Error('nolib'));
@@ -921,6 +983,15 @@
                 });
             }).then(capture).then(done).catch(fail);
         });
+    }
+    function htmlToPdfBlob(html) {
+        var Ex = window.ABENE && window.ABENE.Export;
+        if (Ex && typeof Ex.htmlToPagedBlob === 'function') {
+            return Ex.htmlToPagedBlob(html).catch(function () {
+                return htmlToPdfBlobLegacy(html);
+            });
+        }
+        return htmlToPdfBlobLegacy(html);
     }
     function partHasContent(html, etape) {
         var chunk = extractPart(html, extractKey(etape));
@@ -2286,7 +2357,7 @@
             var same = rows.filter(function (r) { return r.etape === etape; });
             var lastRev = same.length ? Math.max.apply(null, same.map(function (r) { return Number(r.rev) || 0; })) : 0;
             var next = lastRev + 1;
-            return htmlToPdfBlob(chunk).then(function (blob) {
+            return pdfBlobForEtape(etape, entry, chunk, opts).then(function (blob) {
                 var rec = {
                     id: ownerIdOf(entry) + ':' + etape + ':v' + next,
                     ownerId: ownerIdOf(entry),
