@@ -1406,6 +1406,11 @@
             '.arq-row-wrap{grid-template-columns:48px minmax(0,1fr);}' +
             '.arq-preview iframe,#arqPdfFrame,#arqPdfFrame.show{min-height:180px;}' +
             '.arq-preview{padding-bottom:max(12px,env(safe-area-inset-bottom,0px));}' +
+            '.arq-top,.arq-mobile-nav{flex-shrink:0;}' +
+            '.arq-tools{max-height:35dvh;overflow-y:auto;flex-shrink:0;}' +
+            '.arq-list,.arq-folders-col{min-height:0;overflow:auto;overscroll-behavior:contain;}' +
+            '.arq-preview>*{flex-shrink:0;max-width:100%;box-sizing:border-box;}' +
+            '.arq-preview .arq-actions .arq-btn{white-space:normal;overflow-wrap:anywhere;}' +
             '}' +
             '@media(max-width:960px) and (max-height:480px) and (orientation:landscape){' +
             '.arq-top{flex-wrap:nowrap;padding:5px 8px;}.arq-top p{display:none;}.arq-top-actions{width:auto;margin-left:auto;display:flex;flex-wrap:nowrap;}' +
@@ -2414,7 +2419,7 @@
         }
         return html;
     }
-    function applyToEditor(html, name, asCopy, readOnly) {
+    function applyToEditor(html, name, asCopy, readOnly, archiveEntryId) {
         var editor = editorEl();
         if (!editor) return false;
         try {
@@ -2424,6 +2429,7 @@
             ? window.abenePrepareCopyAsNewHtml(html)
             : cleanArchiveHtml(html);
         editor.innerHTML = prepared || '<p></p>';
+        docState().archiveEntryId = !asCopy && !readOnly ? (archiveEntryId || '') : '';
         if (typeof window.abeneEnhanceCheckTables === 'function') window.abeneEnhanceCheckTables(editor);
         editor.contentEditable = readOnly ? 'false' : 'true';
         if (typeof renameDocument === 'function') renameDocument(name);
@@ -2538,7 +2544,7 @@
                 if (applyToEditor(e.html, e.name, false, true)) toast(tr('protectedOpened'));
                 return;
             }
-            if (applyToEditor(e.html, e.name, false)) toast(tr('opened'));
+            if (applyToEditor(e.html, e.name, false, false, e.id)) toast(tr('opened'));
             return;
         }
         if (act === 'trash') {
@@ -2819,6 +2825,21 @@
     window.closeArquivoWindow = closeArquivo;
     window.abeneArquivoArchive = function (opts) { return archiveCurrent(opts || { silent: true }); };
     window.abeneArquivoApi = {
+        saveOpenedDocument: function (html, name) {
+            var id = docState().archiveEntryId;
+            if (!id) return;
+            var list = loadStore();
+            var entry = list.filter(function (item) { return item.id === id; })[0];
+            if (!entry || entry.deletedAt || entry.protected || entry.concluded || entry.readOnlyOrigin) return;
+            var clean = cleanArchiveHtml(html);
+            if (entry.html === clean && entry.name === name) return;
+            localStorage.setItem('abeneArchiveBeforeSave', JSON.stringify(entry));
+            entry.html = clean;
+            entry.name = name || entry.name;
+            entry.updatedAt = new Date().toISOString();
+            if (!saveStore(list)) throw new Error('Não foi possível atualizar o documento no Arquivo.');
+            refreshArquivoIfOpen();
+        },
         visibleEntries: function () { return visibleEntries(); },
         allEntries: function () { return allEntries(); },
         trashedEntries: function () { return trashedEntries(); },

@@ -2830,6 +2830,18 @@
         nextP.innerHTML = '<br>';
         var host = block && editor.contains(block) ? block : editor.lastElementChild;
         while (host && host.parentNode && host.parentNode !== editor) host = host.parentNode;
+        // Split ordinary paragraphs at the caret, preserving inline formatting.
+        var caret = window.getSelection();
+        if (host && /^(P|H[1-6])$/.test(host.tagName) && caret && caret.rangeCount &&
+                host.contains(caret.anchorNode) && host.contains(caret.focusNode)) {
+            var tail = caret.getRangeAt(0).cloneRange();
+            tail.deleteContents();
+            tail.setEnd(host, host.childNodes.length);
+            nextP.innerHTML = '';
+            nextP.appendChild(tail.extractContents());
+            if (!nextP.hasChildNodes()) nextP.innerHTML = '<br>';
+            if (!host.hasChildNodes()) host.innerHTML = '<br>';
+        }
         if (host && host.parentNode === editor && host !== editor) {
             if (host.nextSibling) editor.insertBefore(marker, host.nextSibling);
             else editor.appendChild(marker);
@@ -2850,6 +2862,11 @@
         window.abeneSchedulePageFlow(true);
         if (typeof window.abeneFitEditorSheets === 'function') window.abeneFitEditorSheets(editor);
         if (typeof window.renderPageDecorations === 'function') window.renderPageDecorations();
+        requestAnimationFrame(function () {
+            requestAnimationFrame(function () {
+                if (nextP.isConnected) nextP.scrollIntoView({ block: 'center', inline: 'nearest' });
+            });
+        });
     };
     window.insertPageBreak = window.abeneInsertPageBreak;
 

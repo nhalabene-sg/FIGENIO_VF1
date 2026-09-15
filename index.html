@@ -677,6 +677,11 @@
         .nav-heading-item:hover {
             background: #e0e8f0;
         }
+        .nav-heading-item.nav-current {
+            background: #e8f0fe;
+            color: #1a365d;
+            font-weight: 600;
+        }
 
         .nav-page-thumb {
             border: 1px solid #d0d0d0;
@@ -786,7 +791,8 @@
         .page .abene-caption-num { font-weight: 600; }
         .abene-toc-row,
         .field-toc [data-toc-level],
-        .abene-lof-row {
+        .abene-lof-row,
+        .abene-idx-row {
             display: flex;
             align-items: baseline;
             gap: 8px;
@@ -794,9 +800,12 @@
             font-size: 10pt;
         }
         .abene-toc-row a,
-        .abene-lof-row a { color: #1f2937; text-decoration: none; }
+        .abene-lof-row a,
+        .abene-idx-row a { color: #1f2937; text-decoration: none; }
         .abene-toc-row a:hover,
-        .abene-lof-row a:hover { color: #2b579a; text-decoration: underline; }
+        .abene-lof-row a:hover,
+        .abene-idx-row a:hover { color: #2b579a; text-decoration: underline; }
+        #editor [data-index-entry] { border-bottom: 1px dotted #2b579a; }
         .abene-toc-dots {
             flex: 1;
             border-bottom: 1px dotted #9aa3ad;
@@ -917,6 +926,16 @@
             pointer-events: none;
             z-index: 8;
         }
+        .abene-page-border {
+            position: absolute;
+            left: 10px;
+            box-sizing: border-box;
+            pointer-events: none;
+            z-index: 11;
+            background: transparent;
+            print-color-adjust: exact;
+            -webkit-print-color-adjust: exact;
+        }
         .page-header-zone, .page-footer-zone {
             position: absolute;
             left: 0;
@@ -940,8 +959,8 @@
             position: absolute;
             left: 0;
             width: 100%;
-            background: #fff;
-            box-shadow: inset 0 1px 0 #e4e4e4, inset 0 -1px 0 #e4e4e4;
+            background: #808080;
+            box-shadow: none;
             pointer-events: none;
             cursor: default;
             user-select: none;
@@ -1326,7 +1345,9 @@
         .page table {
             border-collapse: collapse;
             width: 100%;
+            max-width: 100%;
             margin: 10px 0;
+            table-layout: auto;
         }
 
         .page table td, .page table th {
@@ -1335,6 +1356,8 @@
             min-width: 50px;
             min-height: 25px;
             vertical-align: top;
+            overflow-wrap: anywhere;
+            word-break: break-word;
         }
 
         .page table th {
@@ -1885,6 +1908,27 @@
             display: flex;
             gap: 8px;
             flex-wrap: wrap;
+        }
+        .find-status {
+            margin-top: 8px;
+            font-size: 12px;
+            color: #2b579a;
+            min-height: 1.2em;
+        }
+        .find-status.is-empty { color: #a1260d; }
+
+        #editor hr.abene-hr,
+        #editor hr[data-abene-hr] {
+            cursor: pointer;
+            display: block;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        #editor hr.abene-hr-selected,
+        #editor hr.selected {
+            outline: 2px solid #2b579a;
+            outline-offset: 4px;
+            background: rgba(43, 87, 154, 0.06);
         }
 
         /* Devis & Receipt Styles */
@@ -3555,7 +3599,12 @@
         }
         .abene-export-root .page-chrome { pointer-events: none; }
         .abene-export-root .abene-footnotes.abene-notes-source,
-        #abeneFnMeasure { display: none !important; }
+        .abene-export-root #abeneFnMeasure { display: none !important; }
+        .abene-export-root .page-fn-zone {
+            z-index: 14 !important;
+            pointer-events: none !important;
+            background: transparent !important;
+        }
         .abene-export-root .abene-obj-resize,
         .abene-export-root .abene-tbox-bar,
         .abene-export-root .image-handle,
@@ -3630,6 +3679,7 @@
         .comments-pane-header { padding:10px 12px; font-weight:700; font-size:12px; border-bottom:1px solid #f0d78c; display:flex; justify-content:space-between; align-items:center; }
         .comments-pane-body { flex:1; overflow:auto; padding:8px; font-size:12px; }
         .comment-row { background:#fff; border:1px solid #f0d78c; border-radius:6px; padding:8px; margin-bottom:8px; }
+        .comment-row button { margin:4px 6px 0 0; }
         .doc-title-input { background:transparent; border:1px solid transparent; color:#fff; font-size:13px; min-width:180px; max-width:280px; padding:2px 6px; border-radius:3px; }
         .doc-title-input:hover, .doc-title-input:focus { border-color:rgba(255,255,255,.45); outline:none; background:rgba(255,255,255,.08); }
         .ribbon-btn-demo-hidden { display:none !important; }
@@ -3656,7 +3706,7 @@
         body.app-minimized > *:not(.title-bar) { display:none !important; }
         body.app-minimized .title-bar { flex:1; align-items:flex-start; }
         body.app-maximized .editor-area { padding:0; }
-        body.app-maximized .page-container { transform:none !important; }
+        body.app-maximized .page-container { transform-origin: top center; }
         .abene-style-list {
             display: flex;
             flex-direction: column;
@@ -3952,13 +4002,16 @@
         .page .abene-notes { margin-top: 18px; padding-top: 8px; border-top: 1px solid #999; font-size: 10pt; color: #333; column-span: all; }
         .page .abene-notes h3 { font-size: 11pt; color: #2b579a; margin: 0 0 8px 0; }
         .page .abene-notes p { font-size: 10pt; margin: 2px 0; }
+        #editor .abene-footnotes.abene-notes-source,
         .page .abene-footnotes.abene-notes-source {
-            position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden;
-            margin: 0; padding: 0; border: 0;
+            position: absolute !important; left: -9999px !important; top: 0 !important;
+            width: 1px !important; height: 1px !important; overflow: hidden !important;
+            margin: 0 !important; padding: 0 !important; border: 0 !important;
+            clip: rect(0, 0, 0, 0); pointer-events: none !important;
         }
         .page-fn-zone {
             position: absolute; left: 0; right: 0; box-sizing: border-box;
-            font-size: 9pt; line-height: 1.25; color: #333; z-index: 9;
+            font-size: 9pt; line-height: 1.25; color: #333; z-index: 14;
             overflow: hidden; pointer-events: auto;
         }
         .page-fn-zone .page-fn-rule { border-top: 1px solid #666; width: 33%; margin: 0 0 4px; }
@@ -6924,14 +6977,17 @@
                 <input type="number" id="gotoPageInput" min="1" value="1">
             </div>
             <div class="btn-row" style="flex-wrap: wrap; gap: 5px;">
+                <button class="btn-secondary" onclick="findPrev()" data-i18n="findPrev">Anterior</button>
                 <button class="btn-primary" onclick="findNext()" data-i18n="next">Seguinte</button>
                 <button class="btn-secondary" onclick="replaceOne()" data-i18n="replaceOne">Substituir</button>
                 <button class="btn-secondary" onclick="replaceAll()" data-i18n="replaceAll">Substituir tudo</button>
                 <button class="btn-secondary" onclick="gotoPage()" data-i18n="gotoBtn">Ir para</button>
             </div>
-            <div style="margin-top: 8px;">
+            <div style="margin-top: 8px; display:flex; flex-wrap:wrap; gap:10px;">
                 <label style="font-size: 11px;"><input type="checkbox" id="findCaseSensitive"> <span data-i18n="matchCase">Respeitar maiúsculas</span></label>
+                <label style="font-size: 11px;"><input type="checkbox" id="findWholeWord"> <span data-i18n="findWhole">Palavra inteira</span></label>
             </div>
+            <div id="findStatus" class="find-status" role="status" aria-live="polite"></div>
         </div>
     </div>
 
@@ -7560,8 +7616,8 @@
     <input type="file" id="imageInput" style="display:none" accept="image/*" multiple onchange="handleImageUpload(event)">
     <input type="file" id="excelFileInput" style="display:none" accept=".xlsx,.csv,.txt">
 
-    <script src="libs/abene-i18n.js?v=20260914-spell-1"></script>
-    <script src="libs/abene-tips.js?v=20260914-spell-1"></script>
+    <script src="libs/abene-i18n.js?v=20260915-open-1"></script>
+    <script src="libs/abene-tips.js?v=20260915-cite-1"></script>
     <script src="libs/abene-page-geometry.js?v=20260914-review-1"></script>
     <script>
         window.abeneBrandName = function () {
@@ -7628,7 +7684,7 @@
             driveFolderUrl: '',
             driveFolderId: '',
             installerEmail: (typeof ACCOUNT_EMAIL === 'string' && ACCOUNT_EMAIL) ? ACCOUNT_EMAIL : '',
-            googleOwnerEmail: '',
+            googleOwnerEmail: (typeof ACCOUNT_EMAIL === 'string' && ACCOUNT_EMAIL) ? ACCOUNT_EMAIL : '',
             databaseEnabled: true,
             excelEnabled: true,
             tocDiario: 'VEN',
@@ -7636,10 +7692,7 @@
         };
         let companyData = { ...defaultCompanyData, ...JSON.parse(localStorage.getItem('abeneCompanyData') || '{}') };
         delete companyData.brandName;
-        if (/Abené|Mon Entreprise|abene\.pt|NHALABENE/i.test(companyData.name + (companyData.email || ''))) {
-            companyData = { ...defaultCompanyData };
-            localStorage.setItem('abeneCompanyData', JSON.stringify(companyData));
-        }
+        // Saved company settings belong to the user, including legacy names and emails.
         if (!localStorage.getItem('abeneExcelCompleteOn')) {
             companyData.excelEnabled = true;
             try {
@@ -7655,7 +7708,10 @@
         if (typeof ACCOUNT_EMAIL === 'string' && ACCOUNT_EMAIL) {
             var accountChanged = false;
             if (!companyData.email) { companyData.email = ACCOUNT_EMAIL; accountChanged = true; }
-            if (!companyData.installerEmail) { companyData.installerEmail = ACCOUNT_EMAIL; accountChanged = true; }
+            if (!companyData.installerEmail) {
+                companyData.installerEmail = ACCOUNT_EMAIL; accountChanged = true;
+            }
+            if (!companyData.googleOwnerEmail) { companyData.googleOwnerEmail = ACCOUNT_EMAIL; accountChanged = true; }
             if (accountChanged) {
                 try { localStorage.setItem('abeneCompanyData', JSON.stringify(companyData)); } catch (eEmail) {}
             }
@@ -7675,6 +7731,7 @@
         let pageColumns = '1';
         let pageColRule = false;
         let pageSizeId = 'a4';
+        let pageBorder = '';
 
         const editor = document.getElementById('editor');
         window.abene = {
@@ -7701,6 +7758,11 @@
             set pageColumns(v) { pageColumns = String(v || '1'); },
             get pageColRule() { return pageColRule; },
             set pageColRule(v) { pageColRule = !!v; },
+            get pageBorder() { return pageBorder; },
+            set pageBorder(v) {
+                var k = String(v || '').trim();
+                pageBorder = (k && k !== 'none') ? k : '';
+            },
             get pageSizeId() { return pageSizeId; },
             set pageSizeId(v) { pageSizeId = String(v || 'a4'); },
             get documentState() { return documentState; },
@@ -7778,6 +7840,11 @@
             try { pageHeaderFields = JSON.parse(localStorage.getItem('abeneHeaderFields') || '{}') || {}; } catch (e) { pageHeaderFields = {}; }
             pageFooterText = localStorage.getItem('abeneFooter');
             if (pageFooterText === null) pageFooterText = 'Página {PAGE} / {NUMPAGES}';
+            try {
+                pageBorder = localStorage.getItem('abenePageBorder') || '';
+                if (pageBorder === 'none') pageBorder = '';
+            } catch (ePb) { pageBorder = ''; }
+            if (pageBorder && editor) editor.setAttribute('data-abene-page-border', pageBorder);
             const savedMargin = Number(localStorage.getItem('abeneMargin')) || 96;
             try { pageMargins = JSON.parse(localStorage.getItem('abeneMargins')) || { left: savedMargin, right: savedMargin, top: savedMargin, bottom: savedMargin }; } catch { pageMargins = { left: savedMargin, right: savedMargin, top: savedMargin, bottom: savedMargin }; }
             try {
@@ -10066,6 +10133,7 @@
 
         /** Remet l’éditeur à l’état d’origine (sans mélange avec le document précédent). */
         function resetEditorToOriginal(options) {
+            documentState.archiveEntryId = '';
             const opts = options || {};
             undoStack = [];
             redoStack = [];
@@ -10097,6 +10165,10 @@
                 pageHeaderFields = {};
                 pageHeaderDifferentFirst = false;
                 pageFooterText = 'Página {PAGE} / {NUMPAGES}';
+                pageBorder = '';
+                editor.removeAttribute('data-abene-page-border');
+                editor.style.outline = '';
+                editor.style.outlineOffset = '';
                 editor.style.padding = `${pageMargins.top}px ${pageMargins.right}px ${pageMargins.bottom}px ${pageMargins.left}px`;
                 applyPageGeometry();
                 try {
@@ -10109,6 +10181,7 @@
                     localStorage.setItem('abeneHeaderFields', '{}');
                     localStorage.setItem('abeneHeaderDifferentFirst', '0');
                     localStorage.setItem('abeneFooter', pageFooterText);
+                    localStorage.setItem('abenePageBorder', '');
                 } catch (e) {}
             }
             if (typeof hideImageToolbar === 'function') hideImageToolbar();
@@ -10458,11 +10531,14 @@
             documentVersions.unshift({ name: documentState.name, html: html, date: new Date().toISOString() });
             documentVersions = documentVersions.slice(0, 20);
             localStorage.setItem('abeneVersions', JSON.stringify(documentVersions));
+            if (window.abeneArquivoApi && window.abeneArquivoApi.saveOpenedDocument) {
+                window.abeneArquivoApi.saveOpenedDocument(html, documentState.name);
+            }
             documentState.dirty = false;
             updateSaveStatus();
             if (!opts.silent) showToast(t('toastSaved'));
             closeAllDropdowns();
-            if (typeof window.abeneSheetsPush === 'function') window.abeneSheetsPush('save').catch(function () {});
+            if (typeof window.abeneDocumentSyncSave === 'function') window.abeneDocumentSyncSave();
         }
 
         function saveForAccountant() {
@@ -10474,7 +10550,10 @@
         }
 
         function openSaveChooser() {
-            try { saveDocument({ silent: true }); } catch (e) {}
+            try { saveDocument(); } catch (e) { showToast(String(e.message || e)); }
+        }
+
+        function openExportChooser() {
             closeAllDropdowns();
             if (typeof openGenericModal !== 'function') {
                 if (typeof exportPDF === 'function') exportPDF();
@@ -10512,10 +10591,12 @@
                 columns: pageColumns,
                 gutter: pageGutter,
                 colRule: pageColRule,
+                pageBorder: pageBorder || '',
                 gdocsFileId: documentState.gdocsFileId || '',
                 gdocsUrl: documentState.gdocsUrl || '',
                 sentToClient: !!documentState.sentToClient,
                 pdfOwnerId: documentState.pdfOwnerId || '',
+                archiveEntryId: documentState.archiveEntryId || '',
                 styles: (function () {
                     try { return JSON.parse(localStorage.getItem('abeneDocStyles') || '{}'); } catch (e) { return {}; }
                 })()
@@ -10535,6 +10616,7 @@
                 } else if (window.abeneGdocsClearLink) window.abeneGdocsClearLink();
                 documentState.sentToClient = !!settings.sentToClient;
                 documentState.pdfOwnerId = settings.pdfOwnerId ? String(settings.pdfOwnerId) : '';
+                documentState.archiveEntryId = settings.archiveEntryId ? String(settings.archiveEntryId) : '';
                 if (settings.language) { localStorage.setItem('abeneLanguage', settings.language); applyLanguage(settings.language); }
                 if (settings.company) { companyData = { ...defaultCompanyData, ...settings.company }; localStorage.setItem('abeneCompanyData', JSON.stringify(companyData)); }
                 if (settings.header !== undefined) { pageHeaderText = settings.header; localStorage.setItem('abeneHeader', pageHeaderText); }
@@ -10570,6 +10652,13 @@
                 }
                 if (settings.columns) pageColumns = String(settings.columns);
                 if (settings.colRule !== undefined) pageColRule = !!settings.colRule;
+                if (settings.pageBorder !== undefined) {
+                    pageBorder = String(settings.pageBorder || '').trim();
+                    if (pageBorder === 'none') pageBorder = '';
+                    try { localStorage.setItem('abenePageBorder', pageBorder); } catch (ePbR) {}
+                    if (pageBorder) editor.setAttribute('data-abene-page-border', pageBorder);
+                    else editor.removeAttribute('data-abene-page-border');
+                }
                 if (settings.orientation) {
                     pageOrientation = settings.orientation === 'landscape' ? 'landscape' : 'portrait';
                     try { localStorage.setItem('abeneOrientation', pageOrientation); } catch (e) {}
@@ -10593,10 +10682,14 @@
             const savedContent = localStorage.getItem('docContent');
             if (savedContent) {
                 editor.innerHTML = savedContent;
-                editor.querySelectorAll('.page-decoration, .page-header-zone, .page-footer-zone, .abene-page-flow').forEach(element => element.remove());
+                editor.querySelectorAll('.page-decoration, .page-header-zone, .page-footer-zone, .page-gap-band, .abene-page-flow').forEach(element => element.remove());
                 saveUndoState();
                 updateStats();
             }
+            window._abeneChromeSig = '';
+            window._abeneFlowForce = true;
+            if (typeof refreshPagination === 'function') refreshPagination();
+            window._abeneFlowForce = false;
         }
 
         function saveAsText() {
@@ -12796,9 +12889,13 @@ table { border-collapse: collapse; }
             if (window.abeneComercial && window.abeneComercial.ensurePaperLetterhead) {
                 window.abeneComercial.ensurePaperLetterhead();
             }
+            window._abeneChromeSig = '';
+            window._abeneFlowForce = true;
+            if (typeof refreshPagination === 'function') refreshPagination();
+            window._abeneFlowForce = false;
         });
 
-        // Auto-save every 30 seconds
+        // Local recovery copy every 12 seconds; cloud sync has its own queue.
         setInterval(function() {
             try {
                 localStorage.setItem('docContent', persistableEditorHtml());
@@ -12808,30 +12905,31 @@ table { border-collapse: collapse; }
             } catch (e) {}
         }, 12000);
     </script>
-    <script src="libs/abene-word-home.js?v=20260914-imgexp-1"></script>
-    <script src="libs/abene-pagination-engine.js?v=20260914-essential-1"></script>
-    <script src="libs/abene-sections.js?v=20260914-essential-1"></script>
-    <script src="libs/abene-toolbar.js?v=20260914-essential-1"></script>
-    <script src="libs/abene-commands.js?v=20260914-essential-1"></script>
-    <script src="libs/abene-notes.js?v=20260914-essential-1"></script>
-    <script src="libs/abene-objects.js?v=20260914-essential-1"></script>
-    <script src="libs/abene-modals.js?v=20260914-essential-1"></script>
-    <script src="libs/abene-tables.js?v=20260914-essential-1"></script>
-    <script src="libs/abene-document.js?v=20260914-essential-1"></script>
-    <script src="libs/abene-history.js?v=20260914-essential-1"></script>
-    <script src="libs/abene-export.js?v=20260914-merge-1"></script>
+    <script src="libs/abene-word-home.js?v=20260915-save-2"></script>
+    <script src="libs/abene-pagination-engine.js?v=20260915-layout-1"></script>
+    <script src="libs/abene-sections.js?v=20260915-hfdist-1"></script>
+    <script src="libs/abene-toolbar.js?v=20260915-webimg-1"></script>
+    <script src="libs/abene-commands.js?v=20260915-fx-1"></script>
+    <script src="libs/abene-notes.js?v=20260915-dark-1"></script>
+    <script src="libs/abene-objects.js?v=20260915-date-1"></script>
+    <script src="libs/abene-modals.js?v=20260915-capture-1"></script>
+    <script src="libs/abene-tables.js?v=20260915-sort-1"></script>
+    <script src="libs/abene-document.js?v=20260915-vers-1"></script>
+    <script src="libs/abene-history.js?v=20260915-outline-1"></script>
+    <script src="libs/abene-export.js?v=20260915-web-1"></script>
     <script src="libs/abene-modelo.js?v=20260914-meta-1"></script>
     <script src="libs/abene-comercial.js?v=20260914-essential-1"></script>
-    <script src="libs/abene-contabilidade.js?v=20260914-essential-1"></script>
-    <script src="libs/abene-arquivo.js?v=20260914-check-1"></script>
+    <script src="libs/abene-contabilidade.js?v=20260915-email-2"></script>
+    <script src="libs/abene-arquivo.js?v=20260915-mobile-2"></script>
     <script src="libs/abene-phone.js?v=20260914-essential-1"></script>
     <script src="libs/abene-excel-engine.js?v=20260914-essential-1"></script>
-    <script src="libs/abene-excel.js?v=20260914-essential-1"></script>
-    <script src="libs/abene-sheets.js?v=20260914-essential-1"></script>
-    <script src="libs/abene-collab.js?v=20260914-essential-1"></script>
-    <script src="libs/abene-gdocs.js?v=20260914-essential-1"></script>
-    <script src="libs/abene-pickers.js?v=20260914-essential-1"></script>
-    <script src="libs/abene-proof.js?v=20260914-spell-1"></script>
+    <script src="libs/abene-excel.js?v=20260915-calc-1"></script>
+    <script src="libs/abene-sheets.js?v=20260915-safe-sync-1"></script>
+    <script src="libs/abene-document-sync.js?v=20260915-safe-sync-1"></script>
+    <script src="libs/abene-collab.js?v=20260915-share-1"></script>
+    <script src="libs/abene-gdocs.js?v=20260915-gdocs-2"></script>
+    <script src="libs/abene-pickers.js?v=20260915-modo-2"></script>
+    <script src="libs/abene-proof.js?v=20260915-smart-1"></script>
 
 </body>
 </html>

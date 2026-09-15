@@ -270,7 +270,7 @@
         return {
             reason: reason || 'manual',
             company: co,
-            document: { id: 'current', name: name, html: html, settings: settings },
+            // Editable documents use the revision-checked SYNC_DOCUMENT endpoint.
             excel: excel,
             arquivo: arquivo,
             folders: deriveFolders(arquivo, folders),
@@ -569,13 +569,7 @@
         }
         ping().then(function (json) {
             markSynced(json.at, json.spreadsheetId, json);
-            var localHtml = localStorage.getItem('abeneAutosave') || localStorage.getItem('docContent') || '';
-            var empty = !localHtml || localHtml.length < 80;
-            if (empty) {
-                return callApi('PULL').then(function (p) {
-                    if (p && p.document && p.document.html) applyPull(p);
-                });
-            }
+            // Document adoption is handled by the conflict-aware sync queue.
             if (localStorage.getItem(PENDING) === '1') return push('reconnect');
         }).catch(function () {
             markPending();
@@ -615,6 +609,7 @@
     }
 
     window.abeneSheetsPush = push;
+    window.abeneSheetsApplyDocument = function (doc) { applyPull({ document: doc }); };
     window.abeneSheetsPull = pull;
     window.abeneSheetsRefresh = refreshFromSheet;
     window.abeneSheetsCall = callApi;

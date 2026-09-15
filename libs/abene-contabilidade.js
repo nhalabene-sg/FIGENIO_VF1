@@ -1213,6 +1213,8 @@
             '<div class="pack-section"><div class="pack-group-title">' + esc(tt('packContents', 'Conteúdo do ficheiro')) + '</div><div class="pack-outputs">' +
             '<label><input type="checkbox" id="packIncludeCsv" checked> ' + esc(tt('packIncludeCsv', 'CSV para Excel / importação ERP')) + '</label>' +
             '<label><input type="checkbox" id="packIncludePdf" checked> ' + esc(tt('packIncludePdf', 'PDFs finais gravados no Arquivo')) + '</label></div></div>' +
+            '<div class="pack-section"><label><input type="checkbox" id="packEmail"> Enviar também por email ao contabilista</label>' +
+            '<label style="display:block">Email do contabilista <input type="email" id="packEmailTo" autocomplete="email" style="max-width:100%;width:320px"></label></div>' +
             '<div class="pack-section"><div class="pack-actions"><label class="pack-check"><input type="checkbox" id="packAllDocs" checked> ' + esc(tt('packAllDocs', 'Selecionar todos os resultados filtrados')) + '</label>' +
             '<button type="button" class="btn-secondary" id="packSelectAllBtn">' + esc(tt('packSelectAll', 'Selecionar tudo')) + '</button>' +
             '<button type="button" class="btn-secondary" id="packSelectNoneBtn">' + esc(tt('packSelectNone', 'Limpar seleção')) + '</button></div>' +
@@ -1367,12 +1369,24 @@
                         finalsOnly: !!(document.getElementById('packFinalsOnly') || {}).checked,
                         documentCount: selected.length
                     };
+                    var emailTo = '';
+                    if ((document.getElementById('packEmail') || {}).checked) {
+                        var emailInput = document.getElementById('packEmailTo');
+                        emailTo = emailInput.value.trim();
+                        if (!emailTo || !emailInput.checkValidity()) {
+                            emailInput.reportValidity();
+                            if (typeof showToast === 'function') showToast('Indique um email válido para o contabilista.');
+                            return;
+                        }
+                        if (!window.confirm('Enviar os ' + selected.length + ' documentos selecionados para ' + emailTo + '?')) return;
+                    }
                     if (typeof closeModal === 'function') closeModal('genericModal');
                     runPackDownload({ papers: selected, entries: selectedEntries }, {
                         skipChooser: true,
                         includeCsv: includeCsv,
                         includePdf: includePdf,
-                        exportMeta: meta
+                        exportMeta: meta,
+                        emailTo: emailTo
                     });
                 };
             }, 40);
@@ -1406,14 +1420,33 @@
                 ? [meta.dateFrom || 'inicio', meta.dateTo || 'fim'].join('_a_')
                 : (meta.period && meta.period !== 'all' ? meta.period : 'todas-as-datas');
             downloadBlob('Pacote_Contabilista_PT_' + period.replace(/[^a-zA-Z0-9_-]+/g, '-') + '_' + stamp + '.zip', blob, 'application/zip');
+            if (opts.emailTo) {
+                if (blob.size > 15 * 1024 * 1024) throw new Error('O pack foi descarregado, mas excede 15 MB para envio. Selecione menos documentos.');
+                return new Promise(function (resolve, reject) {
+                    var reader = new FileReader();
+                    reader.onerror = function () { reject(new Error('Não foi possível ler o pack para envio.')); };
+                    reader.onload = function () { resolve(String(reader.result).split(',')[1]); };
+                    reader.readAsDataURL(blob);
+                }).then(function (base64) {
+                    if (typeof window.abeneSheetsCall !== 'function') throw new Error('Ligação ao email indisponível.');
+                    return window.abeneSheetsCall('SEND_EMAIL', {
+                        to: opts.emailTo,
+                        subject: 'Pack contabilista — ' + stamp,
+                        body: 'Segue o pack dos documentos selecionados. Não substitui faturação certificada.',
+                        attachments: [{ name: 'Pacote_Contabilista_' + stamp + '.zip', mimeType: 'application/zip', data: base64 }]
+                    });
+                }).then(function () {
+                    if (typeof showToast === 'function') showToast('Pack descarregado e enviado para ' + opts.emailTo);
+                });
+            }
             var emit = issuerNifPack(company().nif);
             var msg = tt('packOk', 'Pack contabilista PT descarregado (' + src.papers.length + ' documento(s)).');
             if (!onlyDigits(company().nif) || emit.valido === 'NAO') {
                 msg = 'Pack descarregado. Ver 00_controlo.csv: NIF da empresa em falta ou inválido.';
             }
             if (typeof showToast === 'function') showToast(msg);
-        }).catch(function () {
-            if (typeof showToast === 'function') showToast(tt('packFail', 'Não foi possível criar o pack. Tente novamente.'));
+        }).catch(function (error) {
+            if (typeof showToast === 'function') showToast('Pack / email: ' + String(error.message || error));
         });
     }
 
