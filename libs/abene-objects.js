@@ -347,13 +347,66 @@
         }
         save();
     }
-    function insertImageFile(file) {
-        if (!file || !/^image\//.test(file.type)) return;
-        var reader = new FileReader();
-        reader.onload = function (e) {
-            insertAtCaret(picHtml(e.target.result, file.name || 'imagem'));
+    var savedImgRange = null;
+    function saveImgCaret() {
+        var sel = window.getSelection && window.getSelection();
+        if (!sel || !sel.rangeCount) return;
+        try { savedImgRange = sel.getRangeAt(0).cloneRange(); } catch (e) { savedImgRange = null; }
+    }
+    function restoreImgCaret() {
+        var editor = editorEl();
+        if (!editor) return;
+        editor.focus();
+        if (!savedImgRange) return;
+        try {
+            var sel = window.getSelection();
+            sel.removeAllRanges();
+            sel.addRange(savedImgRange);
+        } catch (e) {}
+    }
+    function shrinkDataUrl(src, mime, done) {
+        if (!src || src.length < 700000) { done(src); return; }
+        var img = new Image();
+        img.onload = function () {
+            var w = img.naturalWidth || img.width;
+            var h = img.naturalHeight || img.height;
+            if (!w || !h) { done(src); return; }
+            var maxEdge = 1600;
+            var scale = Math.min(1, maxEdge / Math.max(w, h));
+            var cw = Math.max(1, Math.round(w * scale));
+            var ch = Math.max(1, Math.round(h * scale));
+            var canvas = document.createElement('canvas');
+            canvas.width = cw;
+            canvas.height = ch;
+            var ctx = canvas.getContext('2d');
+            if (!ctx) { done(src); return; }
+            var keepPng = /png/i.test(mime || '') || /image\/png/i.test(src.slice(0, 30));
+            if (!keepPng) {
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, cw, ch);
+            }
+            ctx.drawImage(img, 0, 0, cw, ch);
+            try {
+                done(keepPng ? canvas.toDataURL('image/png') : canvas.toDataURL('image/jpeg', 0.82));
+            } catch (eC) { done(src); }
         };
-        reader.readAsDataURL(file);
+        img.onerror = function () { done(src); };
+        img.src = src;
+    }
+    window.abeneShrinkImageSrc = shrinkDataUrl;
+    function insertImageFile(file) {
+        if (!file || !/^image\//.test(file.type || '')) return Promise.resolve(false);
+        return new Promise(function (resolve) {
+            var reader = new FileReader();
+            reader.onload = function (e) {
+                shrinkDataUrl(e.target.result, file.type, function (src) {
+                    insertAtCaret(picHtml(src, file.name || 'imagem'));
+                    resolve(true);
+                });
+            };
+            reader.onerror = function () { resolve(false); };
+            reader.readAsDataURL(file);
+        });
     }
 
     window.insertTextBox = function () {
@@ -381,9 +434,81 @@
     window.handleImageUpload = function (event) {
         var files = event && event.target && event.target.files;
         if (!files || !files.length) return;
-        Array.prototype.forEach.call(files, insertImageFile);
-        event.target.value = '';
+        restoreImgCaret();
+        var list = Array.prototype.slice.call(files);
+        var seq = Promise.resolve();
+        var n = 0;
+        list.forEach(function (f) {
+            seq = seq.then(function () {
+                return insertImageFile(f).then(function (ok) { if (ok) n++; });
+            });
+        });
+        seq.then(function () {
+            try { event.target.value = ''; } catch (eV) {}
+            if (n) toast(tt('imgInsertedOk') || (n === 1 ? 'Imagem inserida.' : (n + ' imagens inseridas.')));
+            else toast(tt('imgBadFile') || 'Este ficheiro não é uma imagem suportada.');
+        });
     };
+    var origInsertImage = window.insertImage;
+    window.insertImage = function () {
+        saveImgCaret();
+        var inp = document.getElementById('imageInput');
+        if (inp) {
+            try { inp.multiple = true; } catch (eM) {}
+            inp.click();
+            return;
+        }
+        if (typeof origInsertImage === 'function') return origInsertImage.apply(this, arguments);
+    };
+    window.insertImage._abeneObjects = true;
+    window.insertImage._legacy = origInsertImage;
+
+    var origCapture = window.captureScreen;
+    window.captureScreen = function () {
+        saveImgCaret();
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+            toast(tt('aNoCapture') || 'Captura não disponível neste browser.');
+            if (typeof origCapture === 'function' && !origCapture._abeneObjects) {
+                return origCapture.apply(this, arguments);
+            }
+            return;
+        }
+        return navigator.mediaDevices.getDisplayMedia({ video: true, audio: false }).then(function (stream) {
+            var video = document.createElement('video');
+            video.muted = true;
+            video.setAttribute('playsinline', 'true');
+            video.srcObject = stream;
+            function grab() {
+                var w = video.videoWidth || 1280;
+                var h = video.videoHeight || 720;
+                var canvas = document.createElement('canvas');
+                canvas.width = w;
+                canvas.height = h;
+                var ctx = canvas.getContext('2d');
+                if (ctx) ctx.drawImage(video, 0, 0, w, h);
+                stream.getTracks().forEach(function (tr) { tr.stop(); });
+                try { video.srcObject = null; } catch (eS) {}
+                var raw = canvas.toDataURL('image/jpeg', 0.82);
+                shrinkDataUrl(raw, 'image/jpeg', function (src) {
+                    restoreImgCaret();
+                    insertAtCaret(picHtml(src, tt('capture') || 'Captura', 'max-width:100%;height:auto;'));
+                    toast(tt('imgInsertedOk') || 'Imagem inserida.');
+                });
+            }
+            return video.play().then(function () {
+                return new Promise(function (resolve) {
+                    if (video.videoWidth) { resolve(); return; }
+                    video.onloadeddata = function () { resolve(); };
+                    setTimeout(resolve, 250);
+                });
+            }).then(grab);
+        }).catch(function (err) {
+            if (err && err.name === 'NotAllowedError') return;
+            toast(tt('aCaptureFail') || 'Não foi possível capturar o ecrã.');
+        });
+    };
+    window.captureScreen._abeneObjects = true;
+    window.captureScreen._legacy = origCapture;
 
     var origOnline = window.insertOnlineImage;
     window.insertOnlineImage = function () {
@@ -540,6 +665,9 @@
                 if (im) { im.style.width = w + 'px'; im.style.height = 'auto'; im.style.maxWidth = 'none'; }
                 var ic = drag.el.querySelector('[data-icon]');
                 if (ic) applyIconSize(ic, w);
+                if (drag.el.classList && drag.el.classList.contains('abene-shape')) {
+                    drag.el.style.height = w + 'px';
+                }
                 if (typeof positionImageHandles === 'function') positionImageHandles();
                 return;
             }
@@ -986,4 +1114,467 @@
         wrapOne: wrapImg,
         stickCaption: stickCaptionToPic
     };
+
+    var origInsertWordArt = window.insertWordArt;
+    var WA_CSS = {
+        blue: 'font-size:28pt;font-weight:700;color:#2b579a;text-shadow:2px 2px 0 #dbe7f5;letter-spacing:.5px',
+        gold: 'font-size:28pt;font-weight:700;color:#c9a84c;text-shadow:1px 1px 0 #0b1223;letter-spacing:.5px',
+        outline: 'font-size:28pt;font-weight:700;-webkit-text-stroke:2px #2b579a;color:transparent;letter-spacing:1px',
+        fill: 'font-size:32pt;font-weight:800;background-image:linear-gradient(90deg,#2b579a,#5B9BD5);-webkit-background-clip:text;background-clip:text;color:transparent'
+    };
+    function waHtml(text, style) {
+        style = style || window._abeneWordArtStyle || 'blue';
+        var css = WA_CSS[style] || WA_CSS.blue;
+        return '<div class="abene-wordart" data-wordart="true" data-wa-style="' + esc(style) + '" data-wordart-text="' + esc(text) + '" contenteditable="false" style="display:inline-block;margin:12px 0;cursor:pointer;' + css + ';">' + esc(text) + '</div>';
+    }
+    function openWordArtDialog(target) {
+        if (typeof window.openGenericModal !== 'function') {
+            if (typeof origInsertWordArt === 'function') return origInsertWordArt.apply(this, arguments);
+            return;
+        }
+        var cur = '';
+        if (target) {
+            cur = target.getAttribute('data-wordart-text') || target.textContent || '';
+            var st = target.getAttribute('data-wa-style');
+            if (st) window._abeneWordArtStyle = st;
+        }
+        if (!cur) cur = tt('wordartDefault') || 'Genius Raros';
+        window._abeneWaTarget = target || null;
+        window.openGenericModal(tt('wordArt') || 'WordArt',
+            '<div class="form-group"><label>' + esc(tt('wordart') || tt('wordArt')) + '</label>' +
+            '<input id="abeneWaText" type="text" value="' + esc(cur) + '"></div>',
+            '<button type="button" class="btn-secondary" onclick="closeModal(\'genericModal\')">' + esc(tt('cancel')) + '</button>' +
+            '<button type="button" class="btn-primary" onclick="abeneWaInsert()">' + esc(tt('ok')) + '</button>'
+        );
+        setTimeout(function () {
+            var inp = document.getElementById('abeneWaText');
+            if (inp) { inp.focus(); inp.select(); }
+        }, 30);
+    }
+    window.abeneWaInsert = function () {
+        var inp = document.getElementById('abeneWaText');
+        var text = inp ? String(inp.value || '').trim() : '';
+        if (!text) return;
+        var target = window._abeneWaTarget;
+        window._abeneWaTarget = null;
+        var html = waHtml(text, window._abeneWordArtStyle || 'blue');
+        if (target && target.parentNode) {
+            var box = document.createElement('div');
+            box.innerHTML = html;
+            if (box.firstChild) target.parentNode.replaceChild(box.firstChild, target);
+        } else {
+            insertAtCaret(html);
+        }
+        save();
+        if (typeof window.closeModal === 'function') window.closeModal('genericModal');
+    };
+    window.insertWordArt = function () {
+        openWordArtDialog(null);
+    };
+    window.insertWordArt._abeneObjects = true;
+    window.insertWordArt._legacy = origInsertWordArt;
+
+    document.addEventListener('dblclick', function (ev) {
+        var el = ev.target && ev.target.closest && ev.target.closest('#editor [data-wordart]');
+        if (!el) return;
+        ev.preventDefault();
+        openWordArtDialog(el);
+    });
+
+    var origInsertSignature = window.insertSignature;
+    function signHtml(label) {
+        return '<div class="document-signature abene-signature" data-abene-sign="true" data-sign-label="' + esc(label) + '" contenteditable="false" style="display:inline-block;min-width:220px;margin:24px 12px 12px 0;text-align:center;cursor:pointer;vertical-align:top;">' +
+            '<div class="abene-sign-line" style="border-bottom:1px solid #333;height:36px;min-width:220px;"></div>' +
+            '<small>' + esc(label) + '</small></div>';
+    }
+    function openSignDialog(target) {
+        if (typeof window.openGenericModal !== 'function') {
+            if (typeof origInsertSignature === 'function') return origInsertSignature.apply(this, arguments);
+            return;
+        }
+        var cur = '';
+        if (target) {
+            cur = target.getAttribute('data-sign-label') || (target.querySelector('small') && target.querySelector('small').textContent) || '';
+        }
+        if (!cur) cur = tt('signatureDefault') || tt('pSignDef') || 'Assinatura';
+        window._abeneSignTarget = target || null;
+        window.openGenericModal(tt('signature') || 'Assinatura',
+            '<div class="form-group"><label>' + esc(tt('pSign') || tt('signature')) + '</label>' +
+            '<input id="abeneSignText" type="text" value="' + esc(cur) + '"></div>',
+            '<button type="button" class="btn-secondary" onclick="closeModal(\'genericModal\')">' + esc(tt('cancel')) + '</button>' +
+            '<button type="button" class="btn-primary" onclick="abeneSignInsert()">' + esc(tt('ok')) + '</button>'
+        );
+        setTimeout(function () {
+            var inp = document.getElementById('abeneSignText');
+            if (inp) { inp.focus(); inp.select(); }
+        }, 30);
+    }
+    window.abeneSignInsert = function () {
+        var inp = document.getElementById('abeneSignText');
+        var label = inp ? String(inp.value || '').trim() : '';
+        if (!label) return;
+        var target = window._abeneSignTarget;
+        window._abeneSignTarget = null;
+        var html = signHtml(label);
+        if (target && target.parentNode) {
+            var box = document.createElement('div');
+            box.innerHTML = html;
+            if (box.firstChild) target.parentNode.replaceChild(box.firstChild, target);
+        } else {
+            insertAtCaret(html);
+        }
+        save();
+        if (typeof window.closeModal === 'function') window.closeModal('genericModal');
+    };
+    window.insertSignature = function () {
+        openSignDialog(null);
+    };
+    window.insertSignature._abeneObjects = true;
+    window.insertSignature._legacy = origInsertSignature;
+
+    document.addEventListener('dblclick', function (ev) {
+        var el = ev.target && ev.target.closest && ev.target.closest('#editor .document-signature, #editor [data-abene-sign]');
+        if (!el) return;
+        ev.preventDefault();
+        openSignDialog(el.closest('.document-signature') || el);
+    });
+
+    var origShowDropCap = window.showDropCapMenu;
+    var origApplyDropCap = window.applyDropCap;
+    function restoreDropCaret() {
+        var editor = editorEl();
+        var r = window._abeneDropRange;
+        if (!editor || !r) return;
+        try {
+            if (editor.contains(r.startContainer)) {
+                editor.focus();
+                var sel = window.getSelection();
+                sel.removeAllRanges();
+                sel.addRange(r);
+            }
+        } catch (e) {}
+    }
+    function dropCapBlock() {
+        var editor = editorEl();
+        if (!editor) return null;
+        var sel = window.getSelection();
+        var n = sel && sel.anchorNode;
+        if (n && n.nodeType !== 1) n = n.parentElement;
+        var block = n && n.closest && n.closest('#editor p, #editor h1, #editor h2, #editor h3, #editor h4, #editor h5, #editor h6, #editor li, #editor blockquote');
+        if (block && editor.contains(block)) return block;
+        var r = window._abeneDropRange;
+        if (!r) return null;
+        n = r.startContainer;
+        if (n && n.nodeType !== 1) n = n.parentElement;
+        block = n && n.closest && n.closest('#editor p, #editor h1, #editor h2, #editor h3, #editor h4, #editor h5, #editor h6, #editor li, #editor blockquote');
+        return (block && editor.contains(block)) ? block : null;
+    }
+    function firstDropText(block) {
+        if (!block) return null;
+        var w = document.createTreeWalker(block, NodeFilter.SHOW_TEXT, {
+            acceptNode: function (node) {
+                if (node.parentElement && node.parentElement.closest('[data-dropcap]')) return NodeFilter.FILTER_REJECT;
+                var t = String(node.textContent || '').replace(/\u200b/g, '');
+                if (!t.trim()) return NodeFilter.FILTER_REJECT;
+                return NodeFilter.FILTER_ACCEPT;
+            }
+        });
+        return w.nextNode();
+    }
+    window.showDropCapMenu = function (ev) {
+        var editor = editorEl();
+        var sel = window.getSelection();
+        window._abeneDropRange = null;
+        if (sel && sel.rangeCount) {
+            try {
+                var r = sel.getRangeAt(0);
+                if (!editor || editor.contains(r.startContainer)) window._abeneDropRange = r.cloneRange();
+            } catch (e) {}
+        }
+        if (typeof origShowDropCap === 'function') return origShowDropCap.apply(this, arguments);
+    };
+    window.showDropCapMenu._legacy = origShowDropCap;
+    window.applyDropCap = function (mode) {
+        restoreDropCaret();
+        var editor = editorEl();
+        if (!editor) {
+            if (typeof origApplyDropCap === 'function') return origApplyDropCap.apply(this, arguments);
+            return;
+        }
+        if (typeof window.hideRibbonFlyout === 'function') window.hideRibbonFlyout();
+        var block = dropCapBlock();
+        if (!block) { toast(tt('selectParagraph')); return; }
+        var existing = block.querySelector('[data-dropcap]');
+        if (existing) {
+            block.insertBefore(document.createTextNode(existing.textContent), existing);
+            existing.remove();
+        }
+        if (mode === 'none') { save(); return; }
+        var first = firstDropText(block);
+        if (!first) { toast(tt('selectParagraph')); return; }
+        var raw = String(first.textContent || '').replace(/^\s+/, '');
+        var letter = raw.charAt(0);
+        if (!letter) { toast(tt('selectParagraph')); return; }
+        first.textContent = raw.slice(1);
+        var css = mode === 'margin'
+            ? 'float:left;font-size:36pt;line-height:.85;margin:0 12px 0 -8px;padding:0;font-weight:700;color:#2b579a;'
+            : 'float:left;font-size:42pt;line-height:.8;padding:4px 7px 0 0;font-weight:700;color:#2b579a;';
+        var span = document.createElement('span');
+        span.setAttribute('data-dropcap', mode);
+        span.style.cssText = css;
+        span.textContent = letter;
+        block.insertBefore(span, block.firstChild);
+        save();
+    };
+    window.applyDropCap._abeneObjects = true;
+    window.applyDropCap._legacy = origApplyDropCap;
+
+    var origColBreak = window.insertColumnBreak;
+    window.insertColumnBreak = function () {
+        var editor = editorEl();
+        try {
+            if (editor && !editor.classList.contains('abene-cols-2') && !editor.classList.contains('abene-cols-3')) {
+                if (typeof window.applyPageColumns === 'function') window.applyPageColumns('2');
+            }
+            var html = '<div class="abene-col-break" contenteditable="false" data-abene-col-break="true" aria-label="' +
+                esc(tt('colBreak')) + '" style="break-after:column;-webkit-column-break-after:always;column-break-after:always;display:block;height:14px;margin:6px 0;border-top:2px dotted #6ba3d6;"></div>';
+            insertAtCaret(html);
+            save();
+            if (typeof window.abeneSchedulePageFlow === 'function') window.abeneSchedulePageFlow(true);
+        } catch (err) {
+            if (typeof origColBreak === 'function') return origColBreak.apply(this, arguments);
+            throw err;
+        }
+    };
+    window.insertColumnBreak._abeneObjects = true;
+    window.insertColumnBreak._legacy = origColBreak;
+
+    var origBlankPage = window.insertBlankPage;
+    window.insertBlankPage = function () {
+        if (typeof window.hideRibbonFlyout === 'function') window.hideRibbonFlyout();
+        try {
+            var editor = editorEl();
+            if (!editor) {
+                if (typeof origBlankPage === 'function') return origBlankPage.apply(this, arguments);
+                return;
+            }
+            editor.focus();
+            var host = null;
+            try {
+                var sel = window.getSelection();
+                if (sel && sel.rangeCount) {
+                    var n = sel.anchorNode;
+                    if (n && n.nodeType === 3) n = n.parentNode;
+                    while (n && n !== editor && n.parentNode !== editor) n = n.parentNode;
+                    if (n && n.parentNode === editor) host = n;
+                }
+            } catch (eSel) {}
+            function makeBreak() {
+                var marker = document.createElement('div');
+                marker.className = 'page-break-marker';
+                marker.contentEditable = 'false';
+                marker.setAttribute('aria-hidden', 'true');
+                marker.setAttribute('data-abene-blank-break', 'true');
+                return marker;
+            }
+            function makePara(isBlankBody) {
+                var p = document.createElement('p');
+                p.className = 'abene-normal';
+                p.innerHTML = '<br>';
+                if (isBlankBody) {
+                    p.setAttribute('data-abene-blank-page', 'true');
+                    p.setAttribute('aria-label', tt('blankPage'));
+                }
+                return p;
+            }
+            var start = makeBreak();
+            var body = makePara(true);
+            var following = null;
+            if (host && host.parentNode === editor) {
+                following = host.nextSibling;
+                editor.insertBefore(start, following);
+                editor.insertBefore(body, start.nextSibling);
+            } else {
+                editor.appendChild(start);
+                editor.appendChild(body);
+            }
+            if (following && following.parentNode === editor) {
+                var end = makeBreak();
+                editor.insertBefore(end, following);
+            }
+            try {
+                var sel2 = window.getSelection();
+                var r = document.createRange();
+                r.selectNodeContents(body);
+                r.collapse(true);
+                sel2.removeAllRanges();
+                sel2.addRange(r);
+            } catch (eCaret) {}
+            save();
+            if (typeof window.abeneSchedulePageFlow === 'function') window.abeneSchedulePageFlow(true);
+            if (typeof window.abeneFitEditorSheets === 'function') window.abeneFitEditorSheets(editor);
+            if (typeof window.renderPageDecorations === 'function') window.renderPageDecorations();
+            try {
+                if (body && editor.contains(body)) {
+                    var sel3 = window.getSelection();
+                    var r3 = document.createRange();
+                    r3.selectNodeContents(body);
+                    r3.collapse(true);
+                    sel3.removeAllRanges();
+                    sel3.addRange(r3);
+                }
+            } catch (eAfter) {}
+        } catch (err) {
+            if (typeof origBlankPage === 'function') return origBlankPage.apply(this, arguments);
+            throw err;
+        }
+    };
+    window.insertBlankPage._abeneObjects = true;
+    window.insertBlankPage._legacy = origBlankPage;
+
+    var origAbeneInsertShape = window.abeneInsertShape;
+    function shapeSvg(kind, fill) {
+        if (kind === 'circle') {
+            return '<svg viewBox="0 0 100 100" width="100%" height="100%" preserveAspectRatio="none" aria-hidden="true"><circle cx="50" cy="50" r="46" fill="' + fill + '"/></svg>';
+        }
+        if (kind === 'triangle') {
+            return '<svg viewBox="0 0 100 100" width="100%" height="100%" preserveAspectRatio="none" aria-hidden="true"><polygon points="50,8 94,92 6,92" fill="' + fill + '"/></svg>';
+        }
+        if (kind === 'diamond') {
+            return '<svg viewBox="0 0 100 100" width="100%" height="100%" preserveAspectRatio="none" aria-hidden="true"><polygon points="50,6 94,50 50,94 6,50" fill="' + fill + '"/></svg>';
+        }
+        return '<svg viewBox="0 0 100 100" width="100%" height="100%" preserveAspectRatio="none" aria-hidden="true"><rect x="6" y="6" width="88" height="88" fill="' + fill + '"/></svg>';
+    }
+    window.abeneInsertShape = function (kind) {
+        try {
+            if (typeof window.hideRibbonFlyout === 'function') window.hideRibbonFlyout();
+            kind = String(kind || 'square');
+            if (['square', 'circle', 'triangle', 'diamond'].indexOf(kind) < 0) kind = 'square';
+            var fill = ({ square: '#2b579a', circle: '#e74c3c', triangle: '#27ae60', diamond: '#f39c12' })[kind];
+            var label = ({
+                square: tt('shapeSquareBtn') || tt('shapeSquare') || 'Quadrado',
+                circle: tt('shapeCircleBtn') || tt('shapeCircle') || 'Círculo',
+                triangle: tt('shapeTriangleBtn') || 'Triângulo',
+                diamond: tt('shapeDiamondBtn') || 'Losango'
+            })[kind];
+            var html = '<span class="abene-pic abene-shape abene-obj-inline" data-abene-obj="shape" data-shape="' + esc(kind) +
+                '" data-wrap="none" contenteditable="false" title="' + esc(label) +
+                '" style="width:100px;height:100px;display:inline-block;vertical-align:middle;line-height:0;position:relative;">' +
+                shapeSvg(kind, fill) +
+                '<span class="abene-obj-resize" data-resize="se"></span></span>';
+            var editor = editorEl();
+            if (!editor) {
+                if (typeof origAbeneInsertShape === 'function') return origAbeneInsertShape.apply(this, arguments);
+                return;
+            }
+            editor.focus();
+            var box = document.createElement('div');
+            box.innerHTML = html;
+            var node = box.firstChild;
+            var placed = false;
+            try {
+                var sel = window.getSelection();
+                if (sel && sel.rangeCount && editor.contains(sel.anchorNode)) {
+                    var range = sel.getRangeAt(0);
+                    range.deleteContents();
+                    range.insertNode(node);
+                    range.setStartAfter(node);
+                    range.collapse(true);
+                    sel.removeAllRanges();
+                    sel.addRange(range);
+                    placed = true;
+                }
+            } catch (eIns) { placed = false; }
+            if (!placed) {
+                var host = editor.querySelector('p.abene-normal') || editor.querySelector('p') || editor;
+                if (host !== editor) host.appendChild(node);
+                else editor.appendChild(node);
+            }
+            save();
+        } catch (err) {
+            if (typeof origAbeneInsertShape === 'function') return origAbeneInsertShape.apply(this, arguments);
+            throw err;
+        }
+    };
+    window.abeneInsertShape._abeneObjects = true;
+    window.abeneInsertShape._legacy = origAbeneInsertShape;
+
+    var DATE_FMTS = ['short', 'long', 'iso', 'datetime'];
+    function formatAbeneDate(fmt) {
+        var loc = document.documentElement.lang || 'pt-PT';
+        var now = new Date();
+        fmt = String(fmt || 'short');
+        if (fmt === 'long') {
+            return now.toLocaleDateString(loc, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+        }
+        if (fmt === 'iso') return now.toISOString().slice(0, 10);
+        if (fmt === 'datetime') return now.toLocaleString(loc);
+        return now.toLocaleDateString(loc);
+    }
+    function refreshDateFields() {
+        var editor = editorEl();
+        if (!editor) return;
+        editor.querySelectorAll('[data-field-type="date"], .field-date').forEach(function (field) {
+            var fmt = field.getAttribute('data-date-format') || 'short';
+            field.textContent = formatAbeneDate(fmt);
+        });
+    }
+    var origInsertDateValue = window.insertDateValue;
+    window.insertDateValue = function (i) {
+        try {
+            if (typeof window.hideRibbonFlyout === 'function') window.hideRibbonFlyout();
+            var idx = parseInt(i, 10);
+            if (!isFinite(idx) || idx < 0 || idx > 3) idx = 0;
+            var fmt = DATE_FMTS[idx];
+            var str = formatAbeneDate(fmt);
+            var editor = editorEl();
+            if (!editor) {
+                if (typeof origInsertDateValue === 'function') return origInsertDateValue.apply(this, arguments);
+                return;
+            }
+            editor.focus();
+            var html = '<span class="field-date" data-field-type="date" data-date-format="' + esc(fmt) + '" contenteditable="false">' + esc(str) + '</span>';
+            var box = document.createElement('div');
+            box.innerHTML = html;
+            var node = box.firstChild;
+            var placed = false;
+            try {
+                var sel = window.getSelection();
+                if (sel && sel.rangeCount && editor.contains(sel.anchorNode)) {
+                    var range = sel.getRangeAt(0);
+                    range.deleteContents();
+                    range.insertNode(node);
+                    range.setStartAfter(node);
+                    range.collapse(true);
+                    sel.removeAllRanges();
+                    sel.addRange(range);
+                    placed = true;
+                }
+            } catch (eIns) { placed = false; }
+            if (!placed) {
+                var host = editor.querySelector('p.abene-normal') || editor.querySelector('p') || editor;
+                if (host !== editor) host.appendChild(node);
+                else editor.appendChild(node);
+            }
+            save();
+        } catch (err) {
+            if (typeof origInsertDateValue === 'function') return origInsertDateValue.apply(this, arguments);
+            throw err;
+        }
+    };
+    window.insertDateValue._abeneObjects = true;
+    window.insertDateValue._legacy = origInsertDateValue;
+
+    var origUpdateAllFields = window.updateAllFields;
+    window.updateAllFields = function (opts) {
+        var result;
+        try {
+            if (typeof origUpdateAllFields === 'function') result = origUpdateAllFields.apply(this, arguments);
+        } finally {
+            try { refreshDateFields(); } catch (eD) {}
+        }
+        return result;
+    };
+    window.updateAllFields._abeneObjects = true;
+    window.updateAllFields._legacy = origUpdateAllFields;
 })();

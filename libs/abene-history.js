@@ -57,7 +57,8 @@
             s.headerDifferentFirst ? '1' : '0',
             s.columns || '',
             s.gutter || 0,
-            s.colRule ? '1' : '0'
+            s.colRule ? '1' : '0',
+            s.pageBorder || ''
         ].join('|');
     }
 
@@ -331,4 +332,174 @@
         bind();
         if (useEngine && stack.length === 0) record('open');
     });
+
+    /* Ficheiro → Propriedades : janela em vez de alert. Estatísticas permanece. */
+    (function wrapProperties() {
+        function tt(key, fb) {
+            if (typeof root.t === 'function') {
+                var v = root.t(key);
+                if (v && v !== key) return String(v);
+            }
+            return fb || key;
+        }
+        var origStats = root.openStatsModal;
+        if (typeof origStats === 'function' && !origStats._abenePropsTitle) {
+            root.openStatsModal = function () {
+                var r = origStats.apply(this, arguments);
+                var title = document.querySelector('#statsModal h3');
+                if (title) title.textContent = tt('statsTitle', 'Estatísticas');
+                return r;
+            };
+            root.openStatsModal._abenePropsTitle = true;
+        }
+        var origProps = root.showProperties;
+        root.showProperties = function () {
+            var editor = document.getElementById('editor');
+            if (typeof root.openStatsModal === 'function' && document.getElementById('statsModal') && editor) {
+                root.openStatsModal();
+                var title = document.querySelector('#statsModal h3');
+                if (title) title.textContent = tt('fileProps', 'Propriedades');
+                var body = document.getElementById('statsModalBody');
+                if (body && !body.querySelector('[data-abene-html-size]')) {
+                    var p = document.createElement('p');
+                    p.setAttribute('data-abene-html-size', '1');
+                    var lab = document.createElement('strong');
+                    lab.textContent = tt('statsHtml', 'HTML') + ' ';
+                    p.appendChild(lab);
+                    p.appendChild(document.createTextNode((editor.innerHTML.length / 1024).toFixed(1) + ' KB'));
+                    body.appendChild(p);
+                }
+                if (typeof root.closeAllDropdowns === 'function') root.closeAllDropdowns();
+                return;
+            }
+            if (typeof origProps === 'function') return origProps.apply(this, arguments);
+        };
+    })();
+
+    /* Ver → Atualizar campos: toast de resultado + referências cruzadas (o índice/data já vinham do toolbar). */
+    (function wrapUpdateFields() {
+        function tt(key, fb, vars) {
+            vars = vars || {};
+            if (typeof root.t === 'function') {
+                var v = root.t(key, vars);
+                if (v && v !== key) return String(v);
+            }
+            var out = fb || key;
+            Object.keys(vars).forEach(function (k) {
+                out = String(out).replace(new RegExp('\\{' + k + '\\}', 'g'), vars[k]);
+            });
+            return out;
+        }
+        function ed() { return document.getElementById('editor'); }
+        function xrefLabel(target) {
+            if (!target) return '';
+            if (target.tagName === 'IMG') {
+                return String(target.getAttribute('alt') || target.getAttribute('data-caption') || '').replace(/\s+/g, ' ').trim();
+            }
+            return String(target.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 80);
+        }
+        function refreshXrefs() {
+            var node = ed();
+            if (!node) return 0;
+            var n = 0;
+            node.querySelectorAll('a.abene-xref, a[data-abene-xref]').forEach(function (a) {
+                var id = String(a.getAttribute('href') || '').replace(/^#/, '');
+                if (!id) return;
+                var target = null;
+                try { target = node.querySelector('[id="' + id.replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"]'); } catch (eQ) {}
+                if (!target) target = document.getElementById(id);
+                var lab = xrefLabel(target);
+                if (!lab) return;
+                if (a.textContent !== lab) a.textContent = lab;
+                n++;
+            });
+            return n;
+        }
+        function countFields() {
+            var node = ed();
+            if (!node) return 0;
+            return node.querySelectorAll(
+                '[data-field-type], .field-toc, [data-abene-block="toc"], [data-index], [data-bibliography], ' +
+                '[data-figures-index], [data-illustrations-index], [data-tables-index], ' +
+                'a.abene-xref, a[data-abene-xref], .abene-caption, [data-caption-for]'
+            ).length;
+        }
+        var orig = root.updateAllFields;
+        if (typeof orig !== 'function' || orig._abeneFieldsWrap) return;
+        root.updateAllFields = function (opts) {
+            var silent = !!(opts && opts.silent);
+            var next = {};
+            if (opts) {
+                Object.keys(opts).forEach(function (k) { next[k] = opts[k]; });
+            }
+            next.silent = true;
+            orig.call(this, next);
+            refreshXrefs();
+            if (!silent && typeof root.refreshPagination === 'function') {
+                try { root.refreshPagination(); } catch (eP) {}
+            }
+            if (!silent && typeof root.showToast === 'function') {
+                var n = countFields();
+                root.showToast(n
+                    ? tt('fieldsUpdated', '{n} campo(s) atualizado(s).', { n: n })
+                    : tt('fieldsNone', 'Nenhum campo para atualizar.'));
+            }
+        };
+        root.updateAllFields._abeneFieldsWrap = true;
+        root.updateAllFields._legacy = orig;
+    })();
+
+    /* Ver → Estrutura: o modo já esconde o corpo; marcar o botão, toast, indentar títulos. */
+    (function wrapOutlineView() {
+        function tt(key, fb) {
+            if (typeof root.t === 'function') {
+                var v = root.t(key);
+                if (v && v !== key) return String(v);
+            }
+            return fb || key;
+        }
+        if (!document.getElementById('abene-outline-css')) {
+            var st = document.createElement('style');
+            st.id = 'abene-outline-css';
+            st.textContent = '.page.view-outline h1{margin-left:0;font-size:18pt;}' +
+                '.page.view-outline h2{margin-left:18px;font-size:15pt;}' +
+                '.page.view-outline h3{margin-left:36px;font-size:13pt;}' +
+                '.page.view-outline h4{margin-left:54px;font-size:12pt;}' +
+                '.page.view-outline .abene-page-flow,.page.view-outline .watermark,.page.view-outline .page-break-marker{display:none!important;}';
+            document.head.appendChild(st);
+        }
+        function mark(mode) {
+            document.querySelectorAll('#tab-view [onclick*="setViewMode("]').forEach(function (btn) {
+                var onclick = btn.getAttribute('onclick') || '';
+                btn.classList.toggle('active', onclick.indexOf("'" + mode + "'") >= 0);
+            });
+            var edit = document.getElementById('btnViewEdit');
+            var read = document.getElementById('btnViewRead');
+            var web = document.getElementById('btnViewWeb');
+            if (edit) edit.classList.toggle('active', mode === 'print');
+            if (read) read.classList.toggle('active', mode === 'read');
+            if (web) web.classList.toggle('active', mode === 'web');
+        }
+        var orig = root.setViewMode;
+        if (typeof orig !== 'function' || orig._abeneOutlineWrap) return;
+        root.setViewMode = function (mode) {
+            orig.apply(this, arguments);
+            var m = String(mode || 'print');
+            mark(m);
+            if (typeof root.showToast !== 'function') return;
+            if (m === 'outline') {
+                var ed = document.getElementById('editor');
+                var n = ed ? ed.querySelectorAll('h1,h2,h3,h4').length : 0;
+                root.showToast(n
+                    ? tt('viewOutline', 'Estrutura')
+                    : tt('navEmpty', 'Nenhum título encontrado. Utilize os estilos Título para criar a navegação.'));
+                return;
+            }
+            if (m === 'read') root.showToast(tt('viewRead', 'Leitura'));
+            else if (m === 'web') root.showToast(tt('viewWeb', 'Web'));
+            else root.showToast(tt('viewPrint', 'Impressão'));
+        };
+        root.setViewMode._abeneOutlineWrap = true;
+        root.setViewMode._legacy = orig;
+    })();
 })(window);

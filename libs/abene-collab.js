@@ -44,6 +44,25 @@
         var a = '';
         try { a = localStorage.getItem('abeneAuthor') || ''; } catch (e1) {}
         if (a) return a;
+        if (typeof root.abeneOpenCollabAuthor === 'function') {
+            root.abeneOpenCollabAuthor();
+            try { a = localStorage.getItem('abeneAuthor') || ''; } catch (e2) {}
+            return a || tt('aAuthor', 'Editor');
+        }
+        if (typeof root.openGenericModal === 'function') {
+            root.openGenericModal(
+                tt('groupCollab', 'Colaboração'),
+                '<div class="form-group"><label for="abeneDlg_author">' + esc(tt('collabAuthorPrompt', 'O seu nome (visível aos outros):')) + '</label>' +
+                '<input id="abeneDlg_author" type="text" maxlength="80"></div>',
+                '<button type="button" class="btn-secondary" onclick="closeModal(\'genericModal\')">' + esc(tt('cancel', 'Cancelar')) + '</button>' +
+                '<button type="button" class="btn-primary" onclick="abeneCollabSaveAuthorFromDlg()">' + esc(tt('ok', 'OK')) + '</button>'
+            );
+            setTimeout(function () {
+                var el = document.getElementById('abeneDlg_author');
+                if (el) el.focus();
+            }, 30);
+            return tt('aAuthor', 'Editor');
+        }
         a = (root.prompt && root.prompt(tt('collabAuthorPrompt', 'O seu nome (visível aos outros):'))) || '';
         a = String(a).trim().slice(0, 80) || tt('aAuthor', 'Editor');
         try { localStorage.setItem('abeneAuthor', a); } catch (e2) {}
@@ -213,6 +232,10 @@
                 '<button type="button" class="btn-secondary" onclick="closeModal(\'genericModal\')">' + esc(tt('close', 'Fechar')) + '</button>'
                 + '<button type="button" class="btn-primary" onclick="ABENE.Collab.shareSubmit()">' + esc(tt('collabShare', 'Partilhar')) + '</button>'
             );
+            setTimeout(function () {
+                var el = document.getElementById('collabShareEmail');
+                if (el) el.focus();
+            }, 30);
         } else {
             var email = root.prompt && root.prompt(tt('collabShareEmail', 'E-mail Google'));
             if (email) shareSubmit(email, 'editor');
@@ -224,13 +247,17 @@
         var role = roleArg || (document.getElementById('collabShareRole') && document.getElementById('collabShareRole').value) || 'editor';
         email = String(email || '').trim();
         if (!email || email.indexOf('@') < 0) {
-            toast(tt('collabShareEmail', 'E-mail Google'));
+            toast(tt('collabShareBad', 'Indique um e-mail Google válido.'));
+            var inp = document.getElementById('collabShareEmail');
+            if (inp) inp.focus();
             return;
         }
         call('COLLAB_SHARE', { email: email, role: role }).then(function () {
             toast(tt('collabShareOk', 'Convite enviado.'));
             if (typeof root.closeModal === 'function') root.closeModal('genericModal');
-        }).catch(function () {});
+        }).catch(function () {
+            toast(tt('collabShareFail', 'Não foi possível enviar o convite. Verifique a ligação Google e o URL /exec.'));
+        });
     }
     function saveCloudVersion() {
         if (!on || !useEngine || !cloudReady()) return;
@@ -358,6 +385,73 @@
     };
     root.toggleCollabMode = toggleMode;
     root.abeneCollabShare = shareDialog;
+    root.abeneCollabSaveAuthorFromDlg = function () {
+        var el = document.getElementById('abeneDlg_author');
+        var name = el ? String(el.value || '').trim().slice(0, 80) : '';
+        if (name) {
+            try { localStorage.setItem('abeneAuthor', name); } catch (e) {}
+            toast(tt('collabAuthorSaved', 'Nome visível guardado.'));
+        }
+        if (typeof root.closeModal === 'function') root.closeModal('genericModal');
+    };
+
+    /* Rever → Partilhar: nunca silencioso; e-mail inválido e falha de convite com toast. */
+    (function wrapShareUx() {
+        var origShare = shareDialog;
+        if (typeof origShare !== 'function' || origShare._abeneShareWrap) return;
+        function wrappedShare() {
+            if (!useEngine) {
+                toast(tt('collabDisabled', 'Colaboração desligada (abeneCollabEngine=0).'));
+                return;
+            }
+            var r = origShare.apply(this, arguments);
+            setTimeout(function () {
+                var modal = document.getElementById('genericModal');
+                var inp = document.getElementById('collabShareEmail');
+                if (inp && modal && modal.classList.contains('visible')) {
+                    try { inp.focus(); } catch (eF) {}
+                }
+            }, 40);
+            return r;
+        }
+        wrappedShare._abeneShareWrap = true;
+        wrappedShare._legacy = origShare;
+        shareDialog = wrappedShare;
+        root.abeneCollabShare = wrappedShare;
+        root.ABENE.Collab.shareDialog = wrappedShare;
+
+        var origSubmit = shareSubmit;
+        function wrappedSubmit(emailArg, roleArg) {
+            var email = emailArg || (document.getElementById('collabShareEmail') && document.getElementById('collabShareEmail').value);
+            var role = roleArg || (document.getElementById('collabShareRole') && document.getElementById('collabShareRole').value) || 'editor';
+            email = String(email || '').trim();
+            if (!email || email.indexOf('@') < 0) {
+                toast(tt('collabShareNeedEmail', 'Indique um e-mail Google válido.'));
+                var inp = document.getElementById('collabShareEmail');
+                if (inp) try { inp.focus(); } catch (eF) {}
+                return;
+            }
+            if (!cloudReady()) {
+                toast(tt('collabNeedExec', 'Configure o URL /exec nas Definições para colaborar na nuvem. Offline: versões e sugestões locais.'));
+                return;
+            }
+            return call('COLLAB_SHARE', { email: email, role: role }).then(function () {
+                toast(tt('collabShareOk', 'Convite enviado.'));
+                if (typeof root.closeModal === 'function') root.closeModal('genericModal');
+            }).catch(function (err) {
+                var msg = String((err && err.message) || err || '');
+                if (/Unknown action/i.test(msg)) {
+                    toast(tt('collabNeedUpdate', 'Atualize o script emaildrive no Google (versão 2.2) e implante uma nova aplicação web.'));
+                    return;
+                }
+                toast(tt('collabShareFail', 'Não foi possível enviar o convite.'));
+            });
+        }
+        wrappedSubmit._abeneShareWrap = true;
+        wrappedSubmit._legacy = origSubmit;
+        shareSubmit = wrappedSubmit;
+        root.ABENE.Collab.shareSubmit = wrappedSubmit;
+    })();
 
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
     else setTimeout(boot, 0);

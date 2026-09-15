@@ -258,6 +258,81 @@
     root.abeneCollectClients = collectClients;
     root.abeneCollectArticles = collectArticles;
 
+    /* Rever → Modo Docs: botão visível Ligado/Desligado; presença só com o modo; Esc no editor não desliga. */
+    (function wrapModoDocs() {
+        var orig = root.toggleCollabMode;
+        if (typeof orig !== 'function' || orig._abeneDocsWrap) return;
+        function ttLocal(key, fb) {
+            if (typeof root.t === 'function') {
+                var v = root.t(key);
+                if (v && v !== key) return String(v);
+            }
+            return fb || key;
+        }
+        function isOn() {
+            return !!(root.ABENE && root.ABENE.Collab && root.ABENE.Collab.on);
+        }
+        function hidePresenceIfOff() {
+            var box = document.getElementById('collabPresence');
+            if (!box || isOn()) return;
+            box.innerHTML = '';
+            box.title = '';
+        }
+        function refreshBtn() {
+            var btn = document.getElementById('btnCollabMode');
+            var on = isOn();
+            if (!btn) return;
+            btn.classList.toggle('active', on);
+            btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+            btn.title = on
+                ? ttLocal('collabOn', 'Modo Docs ligado. Presença e partilha na nuvem; o Word local não muda.')
+                : ttLocal('collabModeTitle', 'Colaboração (Google Drive) — o Word continua a funcionar offline');
+        }
+        function ensurePresence() {
+            var box = document.getElementById('collabPresence');
+            if (!box || !isOn()) return;
+            if (box.querySelector('.abene-peer')) return;
+            var name = ttLocal('aAuthor', 'Editor');
+            try { name = localStorage.getItem('abeneAuthor') || name; } catch (eN) {}
+            var p = String(name || 'E').trim().split(/\s+/);
+            var ini = ((p[0] && p[0].charAt(0)) || 'E').toUpperCase();
+            if (p.length > 1 && p[p.length - 1].charAt(0)) ini += p[p.length - 1].charAt(0).toUpperCase();
+            box.innerHTML = '<span class="abene-peer self" title="' + String(name).replace(/"/g, '') + '">' + ini + '</span>';
+            box.title = ttLocal('collabAlone', 'Só eu');
+        }
+        function syncUi() {
+            refreshBtn();
+            if (isOn()) ensurePresence();
+            else hidePresenceIfOff();
+        }
+        function wrapped() {
+            orig.apply(this, arguments);
+            syncUi();
+        }
+        wrapped._abeneDocsWrap = true;
+        wrapped._legacy = orig;
+        root.toggleCollabMode = wrapped;
+        if (root.ABENE && root.ABENE.Collab) root.ABENE.Collab.toggleMode = wrapped;
+        document.addEventListener('keydown', function (e) {
+            if (e.key !== 'Escape') return;
+            if (!isOn()) return;
+            if (document.body.classList.contains('focus-mode')) return;
+            var modal = document.getElementById('genericModal');
+            if (modal && modal.classList.contains('visible')) return;
+            var tgt = e.target;
+            if (tgt && tgt.closest && tgt.closest('#editor, [contenteditable="true"], input, textarea, select')) return;
+            var editor = document.getElementById('editor');
+            if (editor && (editor.classList.contains('view-read') || editor.classList.contains('view-web'))) return;
+            wrapped();
+        });
+        function boot() {
+            syncUi();
+        }
+        if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+        else setTimeout(boot, 0);
+        setTimeout(boot, 80);
+    })();
+
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', refreshDatalists);
     } else {

@@ -839,19 +839,52 @@
         var key = kind === 'footer' ? 'footerDistance' : 'headerDistance';
         var currentPx = props[key];
         var currentCm = currentPx != null && currentPx !== '' ? (Number(currentPx) * 2.54 / 96).toFixed(2) : '';
-        var s = root.prompt(tt('pHfDistance', 'Distância da extremidade (cm):'), currentCm);
-        if (s == null) return;
-        s = String(s).trim().replace(',', '.');
-        if (!s) props[key] = null;
-        else {
-            var cm = parseFloat(s);
-            if (!isFinite(cm) || cm < 0 || cm > 10) return;
-            props[key] = Math.round(cm * 96 / 2.54);
+        var label = tt('pHfDistance', 'Distância da extremidade (cm):');
+        function applyCm(s) {
+            if (s == null) return;
+            s = String(s).trim().replace(',', '.');
+            if (!s) props[key] = null;
+            else {
+                var cm = parseFloat(s);
+                if (!isFinite(cm) || cm < 0 || cm > 10) {
+                    var bad = tt('hfDistInvalid', 'Indique um valor entre 0 e 10 cm.');
+                    if (typeof showToast === 'function') showToast(bad);
+                    else if (root.alert) root.alert(bad);
+                    return;
+                }
+                props[key] = Math.round(cm * 96 / 2.54);
+            }
+            writeSection(cur, props);
+            hideFly();
+            refreshChrome();
+            if (typeof saveUndoState === 'function') saveUndoState();
         }
-        writeSection(cur, props);
-        hideFly();
-        refreshChrome();
-        if (typeof saveUndoState === 'function') saveUndoState();
+        function escHtml(s) {
+            return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        }
+        var open = root.openGenericModal || (typeof openGenericModal === 'function' ? openGenericModal : null);
+        if (typeof open === 'function') {
+            var title = kind === 'footer'
+                ? tt('hfDistFooter', 'Distância do rodapé…')
+                : tt('hfDistHeader', 'Distância do cabeçalho…');
+            root._abeneFormOnOk = function (data) { applyCm(data && data.cm); };
+            open(title,
+                '<div class="form-group"><label for="abeneDlg_cm">' + escHtml(label) + '</label>' +
+                '<input id="abeneDlg_cm" type="number" min="0" max="10" step="0.05" inputmode="decimal" value="' + escHtml(currentCm) + '"></div>',
+                '<button class="btn-secondary" onclick="closeModal(\'genericModal\')">' + escHtml(tt('cancel', 'Cancelar')) + '</button>' +
+                '<button class="btn-primary" onclick="abeneSubmitFormDialog()">' + escHtml(tt('ok', 'OK')) + '</button>');
+            setTimeout(function () {
+                var el = document.getElementById('abeneDlg_cm');
+                if (el) {
+                    el.focus();
+                    if (el.select) el.select();
+                }
+            }, 30);
+            return;
+        }
+        var asked = root.prompt ? root.prompt(label, currentCm) : currentCm;
+        if (asked == null) return;
+        applyCm(asked);
     }
 
     function sectionMenuButtons() {
@@ -918,4 +951,70 @@
         return '<div class="hf-sec-opts">' + sectionMenuButtons() + '</div>';
     };
     root.abeneHfSectionMenuButtons = sectionMenuButtons;
+
+    function wrapInsertSectionHeading() {
+        var orig = root.insertSection;
+        if (typeof orig === 'function' && orig._abeneSecPage) return;
+        function escHtml(s) {
+            return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        }
+        function restoreSecRange() {
+            var editor = ed();
+            var r = root._abeneSecRange;
+            if (!editor || !r) return;
+            try {
+                editor.focus();
+                var sel = window.getSelection();
+                sel.removeAllRanges();
+                sel.addRange(r);
+            } catch (eR) {}
+        }
+        function go(title) {
+            title = String(title || '').trim();
+            if (!title) return;
+            restoreSecRange();
+            insertBreak('nextPage');
+            var html = '<div data-section="true" class="abene-section-title" style="border-top:2px solid #2b579a;margin:8px 0 12px;padding-top:8px;"><h2>' + escHtml(title) + '</h2></div><p></p>';
+            if (root.EditorCommands && root.EditorCommands.useEngine && typeof root.EditorCommands.insertHTML === 'function') {
+                root.EditorCommands.insertHTML(html);
+            } else {
+                try { document.execCommand('insertHTML', false, html); } catch (eIns) {}
+            }
+            if (typeof saveUndoState === 'function') saveUndoState();
+            if (root.abeneSchedulePageFlow) root.abeneSchedulePageFlow(true);
+            if (typeof showToast === 'function') showToast(tt('secTitlePage', title));
+        }
+        var wrapped = function () {
+            var titleLabel = tt('sectionTitle', 'Título da secção:');
+            var def = tt('newSection', 'Nova secção');
+            try {
+                var sel = window.getSelection();
+                if (sel && sel.rangeCount) root._abeneSecRange = sel.getRangeAt(0).cloneRange();
+            } catch (eSel) {}
+            if (typeof root.openGenericModal === 'function' || typeof openGenericModal === 'function') {
+                var open = root.openGenericModal || openGenericModal;
+                root._abeneFormOnOk = function (data) { go(data && data.title); };
+                open(tt('section', 'Secção'),
+                    '<div class="form-group"><label for="abeneDlg_title">' + escHtml(titleLabel) + '</label>' +
+                    '<input id="abeneDlg_title" type="text" value="' + escHtml(def) + '"></div>',
+                    '<button class="btn-secondary" onclick="closeModal(\'genericModal\')">' + escHtml(tt('cancel', 'Cancelar')) + '</button>' +
+                    '<button class="btn-primary" onclick="abeneSubmitFormDialog()">' + escHtml(tt('ok', 'OK')) + '</button>');
+                setTimeout(function () {
+                    var el = document.getElementById('abeneDlg_title');
+                    if (el) el.focus();
+                }, 30);
+                return;
+            }
+            var asked = root.prompt ? root.prompt(titleLabel, def) : def;
+            if (asked) go(asked);
+        };
+        wrapped._abeneSecPage = true;
+        wrapped._legacy = orig;
+        root.insertSection = wrapped;
+    }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', wrapInsertSectionHeading);
+    } else {
+        setTimeout(wrapInsertSectionHeading, 0);
+    }
 })(window);

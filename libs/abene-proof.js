@@ -296,7 +296,14 @@
         nextIssue();
     };
 
-    function latexLite(s) {
+    var SUPER_MAP = { '0': '⁰', '1': '¹', '2': '²', '3': '³', '4': '⁴', '5': '⁵', '6': '⁶', '7': '⁷', '8': '⁸', '9': '⁹', '+': '⁺', '-': '⁻', '=': '⁼', '(': '⁽', ')': '⁾', 'n': 'ⁿ', 'i': 'ⁱ' };
+    var SUB_MAP = { '0': '₀', '1': '₁', '2': '₂', '3': '₃', '4': '₄', '5': '₅', '6': '₆', '7': '₇', '8': '₈', '9': '₉', '+': '₊', '-': '₋', '=': '₌', '(': '₍', ')': '₎', 'a': 'ₐ', 'e': 'ₑ', 'o': 'ₒ', 'x': 'ₓ' };
+    function mapScriptChars(str, table) {
+        return String(str || '').split('').map(function (ch) {
+            return table[ch] != null ? table[ch] : ch;
+        }).join('');
+    }
+    function latexLiteLegacy(s) {
         var t = String(s == null ? '' : s);
         var map = {
             '\\alpha': 'α', '\\beta': 'β', '\\gamma': 'γ', '\\delta': 'δ', '\\epsilon': 'ε', '\\pi': 'π',
@@ -310,6 +317,37 @@
         t = t.replace(/\{([^}]+)\}/g, '$1');
         return t;
     }
+    function latexLite(s) {
+        try {
+            var t = String(s == null ? '' : s);
+            t = t.replace(/\\frac\{([^{}]*)\}\{([^{}]*)\}/g, function (_, a, b) {
+                a = String(a || '').trim();
+                b = String(b || '').trim();
+                if (/^[A-Za-z0-9]+$/.test(a) && /^[A-Za-z0-9]+$/.test(b)) return a + '/' + b;
+                return '(' + a + ')/(' + b + ')';
+            });
+            t = t.replace(/\\sqrt\{([^{}]*)\}/g, function (_, x) {
+                x = String(x || '').trim();
+                return x.length <= 1 ? ('√' + x) : ('√(' + x + ')');
+            });
+            t = t.replace(/\^\{([^}]+)\}/g, function (_, x) { return mapScriptChars(x, SUPER_MAP); });
+            t = t.replace(/_\{([^}]+)\}/g, function (_, x) { return mapScriptChars(x, SUB_MAP); });
+            var map = {
+                '\\alpha': 'α', '\\beta': 'β', '\\gamma': 'γ', '\\delta': 'δ', '\\epsilon': 'ε', '\\pi': 'π',
+                '\\Sigma': 'Σ', '\\Omega': 'Ω', '\\sum': '∑', '\\int': '∫', '\\infty': '∞',
+                '\\times': '×', '\\cdot': '·', '\\pm': '±', '\\leq': '≤', '\\geq': '≥', '\\neq': '≠', '\\approx': '≈',
+                '\\sqrt': '√', '\\left': '', '\\right': '', '\\,': ' ', '\\ ': ' '
+            };
+            Object.keys(map).forEach(function (k) { t = t.split(k).join(map[k]); });
+            t = t.replace(/\^([0-9])/g, function (_, d) { return '⁰¹²³⁴⁵⁶⁷⁸⁹'.charAt(Number(d)); });
+            t = t.replace(/_([0-9])/g, function (_, d) { return '₀₁₂₃₄₅₆₇₈₉'.charAt(Number(d)); });
+            t = t.replace(/\{([^}]+)\}/g, '$1');
+            return t;
+        } catch (err) {
+            return latexLiteLegacy(s);
+        }
+    }
+    root.abeneLatexLite = latexLite;
     function eqHtml(src) {
         return '<span class="abene-equation" data-equation="true" data-equation-src="' + esc(src) +
             '" contenteditable="false">' + esc(latexLite(src)) + '</span>';
@@ -347,7 +385,13 @@
             document.querySelectorAll('.abene-eq-pal button').forEach(function (b) {
                 b.onclick = function () {
                     if (!inp) return;
-                    inp.value = (inp.value || '') + b.getAttribute('data-eq');
+                    var token = b.getAttribute('data-eq') || '';
+                    var start = inp.selectionStart != null ? inp.selectionStart : String(inp.value || '').length;
+                    var end = inp.selectionEnd != null ? inp.selectionEnd : start;
+                    var curVal = inp.value || '';
+                    inp.value = curVal.slice(0, start) + token + curVal.slice(end);
+                    var pos = start + token.length;
+                    try { inp.setSelectionRange(pos, pos); } catch (ePos) {}
                     sync();
                     inp.focus();
                 };
@@ -386,12 +430,41 @@
     function mergeChipHtml(id) {
         return '<span class="abene-merge-field" data-merge-field="' + esc(id) + '">{' + esc(id) + '}</span>';
     }
+    function refreshMergeUsed() {
+        var el = document.getElementById('abeneMergeUsed');
+        var editor = editorEl();
+        if (el && editor) el.textContent = String(editor.querySelectorAll('[data-merge-field]').length);
+    }
+    function placeMergeCaret() {
+        var editor = editorEl();
+        if (!editor) return;
+        restoreCaret();
+        var sel = root.getSelection && root.getSelection();
+        if (sel && sel.rangeCount && editor.contains(sel.anchorNode)) return;
+        editor.focus();
+        try {
+            var r = document.createRange();
+            var last = editor.lastChild;
+            if (last) {
+                r.selectNodeContents(last);
+                r.collapse(false);
+            } else {
+                r.selectNodeContents(editor);
+                r.collapse(false);
+            }
+            sel = root.getSelection();
+            sel.removeAllRanges();
+            sel.addRange(r);
+        } catch (e) {}
+    }
     function insertMergeField(id) {
         var field = String(id || '').replace(/[{}]/g, '').trim();
         if (!field) return;
-        restoreCaret();
+        placeMergeCaret();
         insertHtmlHelper(mergeChipHtml(field));
         saveCaret();
+        refreshMergeUsed();
+        toast(tt('mergeInserted', 'Campo inserido.'));
     }
     function valueFor(client, fieldId) {
         var spec = fieldKeys().filter(function (f) { return f.id.toLowerCase() === String(fieldId).toLowerCase(); })[0];
@@ -478,7 +551,7 @@
             }).join('') + '</div>' +
             '<div class="form-group"><label>' + esc(tt('mergeField')) + '</label>' +
             '<input id="abeneMergeCustom" type="text" value="' + esc(tt('mergeFieldDefault', 'NomeCliente')) + '"></div>' +
-            '<p>' + esc(tt('mergeInDoc', 'Campos no documento')) + ': <strong>' + used + '</strong></p>' +
+            '<p>' + esc(tt('mergeInDoc', 'Campos no documento')) + ': <strong id="abeneMergeUsed">' + used + '</strong></p>' +
             (clients.length
                 ? '<div class="form-group"><label>' + esc(tt('mergePickClient', 'Clientes da série')) + '</label>' +
                     '<label class="abene-merge-all"><input type="checkbox" id="abeneMergeAll"> ' +
@@ -512,13 +585,18 @@
     root.abeneMergeInsert = function () {
         var el = document.getElementById('abeneMergeCustom');
         insertMergeField(el ? el.value : '');
-        toast(tt('mergeInserted', 'Campo inserido.'));
     };
     root.abeneMergeApply = function () {
+        var editor = editorEl();
+        if (!editor || editor.querySelectorAll('[data-merge-field]').length < 1) {
+            toast(tt('mergeNeedFields', 'Insira pelo menos um campo {NomeCliente} no texto.'));
+            return;
+        }
         var clients = collectMergeClients();
+        if (!clients.length) { toast(tt('pickClientEmpty')); return; }
         var picked = selectedMergeClients(clients);
-        var c = picked[0] || clients[0];
-        if (!c) { toast(tt('pickClientEmpty')); return; }
+        var c = picked[0];
+        if (!c) { toast(tt('mergeNeedClients', 'Selecione pelo menos um cliente.')); return; }
         var n = applyClientToDoc(c);
         toast(tt('mergeDone', '{n} campo(s) preenchidos.').replace('{n}', String(n)));
         if (typeof root.closeModal === 'function') root.closeModal('genericModal');
@@ -671,10 +749,89 @@
     root.insertMailMergeField._abeneProof = true;
     root.insertMailMergeField._legacy = origMerge;
 
+    var SMART_COLORS = ['#2b579a', '#3b82a0', '#4f8f72', '#d28b36', '#a84d65'];
+    var smartTarget = null;
+    function buildSmartArtHtml(items) {
+        var html = '<div data-smartart="true" data-smartart-steps="' + esc(items.join(', ')) +
+            '" contenteditable="false" title="' + esc(tt('smartArt', 'SmartArt')) +
+            '" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:16px 0;padding:12px;background:#f4f7fb;border:1px solid #c8d4e5;border-radius:6px;cursor:pointer;">';
+        items.forEach(function (item, index) {
+            html += '<div style="display:flex;align-items:center;gap:6px;"><div style="background:' +
+                SMART_COLORS[index % SMART_COLORS.length] +
+                ';color:#fff;padding:12px 16px;border-radius:4px;min-width:110px;text-align:center;font-weight:600;">' +
+                esc(item) + '</div>' +
+                (index < items.length - 1 ? '<span style="font-size:20px;color:#6b7280;">→</span>' : '') +
+                '</div>';
+        });
+        html += '</div>';
+        return html;
+    }
+    function openSmartArtDialog(target) {
+        if (typeof root.openGenericModal !== 'function') {
+            if (typeof origSmartArt === 'function') return origSmartArt.apply(root, arguments);
+            return;
+        }
+        saveCaret();
+        smartTarget = target || null;
+        var cur = '';
+        if (target) cur = target.getAttribute('data-smartart-steps') || '';
+        if (!cur) cur = tt('pSmartDef', 'Ideia, Planeamento, Realização, Resultado');
+        root.openGenericModal(
+            tt('smartArt', 'SmartArt'),
+            '<div class="form-group"><label for="abeneSmartSteps">' + esc(tt('pSmart', 'Passos do SmartArt, separados por vírgulas:')) + '</label>' +
+            '<input id="abeneSmartSteps" type="text" value="' + esc(cur) + '"></div>',
+            '<button type="button" class="btn-secondary" onclick="closeModal(\'genericModal\')">' + esc(tt('cancel', 'Cancelar')) + '</button>' +
+            '<button type="button" class="btn-primary" onclick="abeneSmartArtApply()">' + esc(tt('ok', 'OK')) + '</button>'
+        );
+        setTimeout(function () {
+            var inp = document.getElementById('abeneSmartSteps');
+            if (inp) { inp.focus(); inp.select(); }
+        }, 30);
+    }
+    root.abeneSmartArtApply = function () {
+        var inp = document.getElementById('abeneSmartSteps');
+        var items = String(inp && inp.value || '').split(',').map(function (s) { return s.trim(); }).filter(Boolean);
+        if (!items.length) return;
+        var html = buildSmartArtHtml(items);
+        var target = smartTarget;
+        smartTarget = null;
+        if (typeof root.closeModal === 'function') root.closeModal('genericModal');
+        if (target && target.parentNode) {
+            var box = document.createElement('div');
+            box.innerHTML = html;
+            if (box.firstChild) target.parentNode.replaceChild(box.firstChild, target);
+            save();
+            return;
+        }
+        insertHtmlHelper(html);
+    };
+    var origSmartArt = root.insertSmartArt;
+    root.insertSmartArt = function () {
+        try {
+            if (typeof root.openGenericModal !== 'function') {
+                if (typeof origSmartArt === 'function') return origSmartArt.apply(this, arguments);
+                return;
+            }
+            openSmartArtDialog(null);
+        } catch (err) {
+            if (typeof origSmartArt === 'function') return origSmartArt.apply(this, arguments);
+            throw err;
+        }
+    };
+    root.insertSmartArt._abeneProof = true;
+    root.insertSmartArt._legacy = origSmartArt;
+
     document.addEventListener('dblclick', function (ev) {
         var eq = ev.target && ev.target.closest && ev.target.closest('#editor [data-equation]');
-        if (!eq) return;
-        ev.preventDefault();
-        openEquation(eq.getAttribute('data-equation-src') || eq.textContent || '', eq);
+        if (eq) {
+            ev.preventDefault();
+            openEquation(eq.getAttribute('data-equation-src') || eq.textContent || '', eq);
+            return;
+        }
+        var smart = ev.target && ev.target.closest && ev.target.closest('#editor [data-smartart]');
+        if (smart) {
+            ev.preventDefault();
+            openSmartArtDialog(smart);
+        }
     });
 })(window);

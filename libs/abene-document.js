@@ -320,4 +320,436 @@
         if (!useEngine) return;
         try { if (!current) capture(); } catch (e) {}
     });
+
+    /* Citação: o menu APA/MLA/Chicago existe ; envelopper pour marquer le style actif
+       et permettre de modifier une citação (duplo-clique). Ne pas toucher au picker. */
+    (function wrapCitations() {
+        function tt(key, fb) {
+            if (typeof root.t === 'function') {
+                var v = root.t(key);
+                if (v && v !== key) return v;
+            }
+            return fb || key;
+        }
+        function esc(s) {
+            return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+                return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+            });
+        }
+        var origStyle = root.setCitationStyle;
+        root.setCitationStyle = function (ev) {
+            if (typeof origStyle === 'function') origStyle.apply(this, arguments);
+            var fly = document.getElementById('ribbonFlyout');
+            if (!fly || !fly.classList.contains('visible')) return;
+            var cur = 'APA';
+            try { cur = localStorage.getItem('abeneCitationStyle') || 'APA'; } catch (eC) {}
+            Array.prototype.forEach.call(fly.querySelectorAll('button'), function (b) {
+                if (String(b.textContent || '').trim() === cur) b.classList.add('active');
+                else b.classList.remove('active');
+            });
+        };
+
+        root.abeneEditCitation = function (span) {
+            if (!span || typeof openGenericModal !== 'function') return;
+            window._abeneCiteEl = span;
+            openGenericModal(tt('citation', 'Citação'),
+                '<div class="form-group"><label>' + esc(tt('pAuthor', 'Autor')) + '</label>' +
+                    '<input id="abeneCiteAuthor" value="' + esc(span.getAttribute('data-cite-author') || '') + '"></div>' +
+                '<div class="form-group"><label>' + esc(tt('pSourceTitle', 'Título')) + '</label>' +
+                    '<input id="abeneCiteTitle" value="' + esc(span.getAttribute('data-cite-title') || '') + '"></div>' +
+                '<div class="form-group"><label>' + esc(tt('pYear', 'Ano')) + '</label>' +
+                    '<input id="abeneCiteYear" value="' + esc(span.getAttribute('data-cite-year') || String(new Date().getFullYear())) + '"></div>',
+                '<button type="button" class="btn-secondary" onclick="closeModal(\'genericModal\')">' + esc(tt('cancel', 'Cancelar')) + '</button>' +
+                '<button type="button" class="btn-primary" onclick="abeneApplyCiteEdit()">' + esc(tt('ok', 'OK')) + '</button>'
+            );
+        };
+        root.abeneApplyCiteEdit = function () {
+            var span = window._abeneCiteEl;
+            var aEl = document.getElementById('abeneCiteAuthor');
+            var tEl = document.getElementById('abeneCiteTitle');
+            var yEl = document.getElementById('abeneCiteYear');
+            var a = aEl ? String(aEl.value || '').trim() : '';
+            var ti = tEl ? String(tEl.value || '').trim() : '';
+            var y = yEl ? String(yEl.value || '').trim() : '';
+            if (typeof closeModal === 'function') closeModal('genericModal');
+            if (!span || !span.setAttribute || !a || !ti) return;
+            span.setAttribute('data-cite-author', a);
+            span.setAttribute('data-cite-title', ti);
+            span.setAttribute('data-cite-year', y);
+            var cur = 'APA';
+            try { cur = localStorage.getItem('abeneCitationStyle') || 'APA'; } catch (eS) {}
+            if (typeof root.abeneApplyCiteStyle === 'function') root.abeneApplyCiteStyle(cur);
+            else {
+                span.textContent = '(' + a + ', ' + y + ')';
+                if (typeof root.saveUndoState === 'function') root.saveUndoState();
+            }
+        };
+
+        function bindCite() {
+            var editor = ed();
+            if (!editor || editor._abeneCiteEdit) return;
+            editor._abeneCiteEdit = true;
+            editor.addEventListener('dblclick', function (ev) {
+                var span = ev.target && ev.target.closest && ev.target.closest('[data-citation]');
+                if (!span || !editor.contains(span)) return;
+                ev.preventDefault();
+                root.abeneEditCitation(span);
+            });
+        }
+        bindCite();
+        if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bindCite);
+        root.addEventListener('load', bindCite);
+    })();
+
+    /* Ver → Proteger : janela em vez de prompt/alert. Sessão + contenteditable inalterados. */
+    (function wrapProtect() {
+        function tt(key, fb) {
+            if (typeof root.t === 'function') {
+                var v = root.t(key);
+                if (v && v !== key) return String(v);
+            }
+            return fb || key;
+        }
+        function esc(s) {
+            return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+                return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+            });
+        }
+        function ds() {
+            return (root.abene && root.abene.documentState) || root.documentState || null;
+        }
+        function editorEl() {
+            return document.getElementById('editor');
+        }
+        function refreshBtn() {
+            var btn = document.querySelector('button[onclick="toggleProtection()"]');
+            if (!btn) return;
+            var lab = btn.querySelector('[data-i18n="protect"]') || btn.querySelector('span:not(.icon)');
+            var st = ds();
+            if (lab && st) {
+                lab.textContent = st.protected ? tt('unprotect', 'Desproteger') : tt('protect', 'Proteger');
+            }
+            btn.classList.toggle('active', !!(st && st.protected));
+        }
+        function toast(msg) {
+            if (typeof root.showToast === 'function') root.showToast(msg);
+        }
+        root.abeneProtectConfirm = function () {
+            var inp = document.getElementById('abeneProtPwd');
+            var err = document.getElementById('abeneProtErr');
+            var pwd = inp ? String(inp.value || '') : '';
+            var st = ds();
+            var ed = editorEl();
+            if (!st || !ed) return;
+            if (st.protected) {
+                var expected = '';
+                try { expected = sessionStorage.getItem('abenePassword') || ''; } catch (eG) {}
+                if (pwd !== expected) {
+                    if (err) err.textContent = tt('aPwdBad', 'Palavra-passe incorreta.');
+                    return;
+                }
+                if (typeof closeModal === 'function') closeModal('genericModal');
+                st.protected = false;
+                ed.contentEditable = 'true';
+                refreshBtn();
+                toast(tt('aUnlocked', 'Documento desbloqueado.'));
+                return;
+            }
+            if (!pwd) {
+                if (err) err.textContent = tt('aSetPwd', 'Definir uma palavra-passe de proteção:');
+                return;
+            }
+            if (typeof closeModal === 'function') closeModal('genericModal');
+            try { sessionStorage.setItem('abenePassword', pwd); } catch (eS) {}
+            st.protected = true;
+            ed.contentEditable = 'false';
+            refreshBtn();
+            toast(tt('aProtected', 'Documento protegido só de leitura nesta sessão.'));
+        };
+        var orig = root.toggleProtection;
+        root.toggleProtection = function () {
+            if (typeof openGenericModal !== 'function') {
+                if (typeof orig === 'function') return orig.apply(this, arguments);
+                return;
+            }
+            var st = ds();
+            var locked = !!(st && st.protected);
+            var title = locked ? tt('unprotect', 'Desproteger') : tt('protect', 'Proteger');
+            var label = locked ? tt('aPwd', 'Palavra-passe:') : tt('aSetPwd', 'Definir uma palavra-passe de proteção:');
+            var okLab = locked ? tt('unprotect', 'Desproteger') : tt('protect', 'Proteger');
+            var hint = locked ? '' : '<p style="margin:8px 0 0;font-size:12px;color:#666;">' + esc(tt('aProtected', 'Documento protegido só de leitura nesta sessão.')) + '</p>';
+            openGenericModal(title,
+                '<div class="form-group"><label for="abeneProtPwd">' + esc(label) + '</label>' +
+                    '<input id="abeneProtPwd" type="password" autocomplete="new-password"></div>' +
+                '<p id="abeneProtErr" style="color:#c00;min-height:1.2em;margin:0;"></p>' + hint,
+                '<button type="button" class="btn-secondary" onclick="closeModal(\'genericModal\')">' + esc(tt('cancel', 'Cancelar')) + '</button>' +
+                '<button type="button" class="btn-primary" onclick="abeneProtectConfirm()">' + esc(okLab) + '</button>'
+            );
+            if (typeof root.closeAllDropdowns === 'function') root.closeAllDropdowns();
+            setTimeout(function () {
+                var first = document.getElementById('abeneProtPwd');
+                if (!first) return;
+                first.focus();
+                first.addEventListener('keydown', function (ev) {
+                    if (ev.key === 'Enter') {
+                        ev.preventDefault();
+                        root.abeneProtectConfirm();
+                    }
+                });
+            }, 30);
+        };
+        if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', refreshBtn);
+        else refreshBtn();
+        root.addEventListener('load', refreshBtn);
+    })();
+
+    /* Aceitar / Recusar: janela de confirmação + toast (index fazia tudo em silêncio). */
+    (function wrapTrackAll() {
+        function tt(key, fb, vars) {
+            vars = vars || {};
+            if (typeof root.t === 'function') {
+                var v = root.t(key, vars);
+                if (v && v !== key) return String(v);
+            }
+            var out = fb || key;
+            Object.keys(vars).forEach(function (k) {
+                out = String(out).replace(new RegExp('\\{' + k + '\\}', 'g'), vars[k]);
+            });
+            return out;
+        }
+        function esc(s) {
+            return String(s == null ? '' : s)
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        }
+        function ed() { return document.getElementById('editor'); }
+        function countChanges() {
+            var node = ed();
+            if (!node) return 0;
+            return node.querySelectorAll('ins.abene-change, del.abene-change, span.abene-change').length;
+        }
+        function toast(msg) {
+            if (typeof root.showToast === 'function') root.showToast(msg);
+        }
+        function changeAtCaret() {
+            var rootEd = ed();
+            var sel = window.getSelection();
+            var node = null;
+            if (sel && sel.rangeCount) {
+                node = sel.anchorNode;
+                if (node && node.nodeType === 3) node = node.parentElement;
+            }
+            if (!node || !node.closest) return null;
+            var mark = node.closest('ins.abene-change, del.abene-change, span.abene-change');
+            if (mark && rootEd && rootEd.contains(mark)) return mark;
+            return null;
+        }
+        function applyOne(kind, node) {
+            if (!node || !node.parentNode) return false;
+            var tag = String(node.tagName || '').toUpperCase();
+            var kids = Array.prototype.slice.call(node.childNodes);
+            if (kind === 'reject') {
+                if (tag === 'DEL') node.replaceWith.apply(node, kids);
+                else node.remove();
+            } else if (tag === 'DEL') {
+                node.remove();
+            } else {
+                node.replaceWith.apply(node, kids);
+            }
+            if (typeof root.saveUndoState === 'function') root.saveUndoState();
+            if (typeof root.updateStats === 'function') root.updateStats();
+            return true;
+        }
+        var origAccept = root.acceptAllChanges;
+        var origReject = root.rejectAllChanges;
+        function confirmAll(kind) {
+            var n = countChanges();
+            if (!n) {
+                toast(tt('aNoChanges', 'Nenhuma alteração registada.'));
+                return;
+            }
+            if (typeof openGenericModal !== 'function') {
+                if (kind === 'reject' && typeof origReject === 'function') origReject.apply(root, []);
+                else if (typeof origAccept === 'function') origAccept.apply(root, []);
+                return;
+            }
+            var title = kind === 'reject'
+                ? tt('reject', 'Rejeitar')
+                : tt('accept', 'Aceitar');
+            var msg = kind === 'reject'
+                ? tt('rejectAllConfirm', 'Recusar todas as {n} alteração(ões)?', { n: n })
+                : tt('acceptAllConfirm', 'Aceitar todas as {n} alteração(ões)?', { n: n });
+            root._abeneTrackKind = kind;
+            openGenericModal(title,
+                '<p id="abeneTrackConfirmMsg">' + esc(msg) + '</p>',
+                '<button type="button" class="btn-secondary" onclick="closeModal(\'genericModal\')">' +
+                    esc(tt('cancel', 'Cancelar')) + '</button>' +
+                '<button type="button" class="btn-primary" id="abeneTrackOk" onclick="abeneTrackApplyAll()">' +
+                    esc(tt('ok', 'OK')) + '</button>'
+            );
+            if (typeof root.closeAllDropdowns === 'function') root.closeAllDropdowns();
+        }
+        root.abeneTrackApplyAll = function () {
+            var kind = root._abeneTrackKind;
+            if (typeof closeModal === 'function') closeModal('genericModal');
+            if (kind === 'reject' && typeof origReject === 'function') origReject.apply(root, []);
+            else if (typeof origAccept === 'function') origAccept.apply(root, []);
+            toast(kind === 'reject'
+                ? tt('rejectAllDone', 'Alterações recusadas.')
+                : tt('acceptAllDone', 'Alterações aceites.'));
+        };
+        function onRibbon(kind) {
+            var one = changeAtCaret();
+            if (one) {
+                applyOne(kind, one);
+                toast(kind === 'reject'
+                    ? tt('rejectOneDone', 'Alteração recusada.')
+                    : tt('acceptOneDone', 'Alteração aceite.'));
+                return;
+            }
+            confirmAll(kind);
+        }
+        root.acceptAllChanges = function () { onRibbon('accept'); };
+        root.rejectAllChanges = function () { onRibbon('reject'); };
+        root._abeneTrackAll = true;
+        root._abeneTrackOne = true;
+    })();
+
+    /* Ver → Modo de foco: o friso desaparece; fica um botão visível para sair (além de Esc). */
+    (function wrapFocusMode() {
+        function tt(key, fb) {
+            if (typeof root.t === 'function') {
+                var v = root.t(key);
+                if (v && v !== key) return String(v);
+            }
+            return fb || key;
+        }
+        function isOn() { return document.body.classList.contains('focus-mode'); }
+        function ribbonBtn() {
+            return document.querySelector('#tab-view button[onclick="toggleFocusMode()"]') ||
+                document.querySelector('button[onclick="toggleFocusMode()"]');
+        }
+        function refreshBtn() {
+            var btn = ribbonBtn();
+            if (btn) btn.classList.toggle('active', isOn());
+        }
+        function ensureBar() {
+            var bar = document.getElementById('abeneFocusExit');
+            if (!bar) {
+                bar = document.createElement('button');
+                bar.id = 'abeneFocusExit';
+                bar.type = 'button';
+                bar.setAttribute('aria-label', tt('focusExit', 'Sair do modo de foco (Esc)'));
+                bar.style.cssText = 'position:fixed;top:10px;right:14px;z-index:12000;display:none;border:0;border-radius:4px;padding:8px 14px;font:13px "Segoe UI",sans-serif;cursor:pointer;background:#2b579a;color:#fff;box-shadow:0 2px 10px rgba(0,0,0,.25);';
+                bar.addEventListener('click', function (ev) {
+                    if (ev && ev.preventDefault) ev.preventDefault();
+                    if (isOn() && typeof root.toggleFocusMode === 'function') root.toggleFocusMode();
+                });
+                document.body.appendChild(bar);
+            }
+            bar.textContent = tt('focusExit', 'Sair do modo de foco (Esc)');
+            bar.style.display = isOn() ? 'block' : 'none';
+        }
+        var orig = root.toggleFocusMode;
+        if (typeof orig !== 'function' || orig._abeneFocusWrap) return;
+        root.toggleFocusMode = function () {
+            orig.apply(this, arguments);
+            refreshBtn();
+            ensureBar();
+        };
+        root.toggleFocusMode._abeneFocusWrap = true;
+        root.toggleFocusMode._legacy = orig;
+        function boot() {
+            refreshBtn();
+            ensureBar();
+        }
+        if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+        else boot();
+        root.addEventListener('load', boot);
+    })();
+
+    /* Ver → Versões: confirmar restaurar/copiar; botão para gravar uma versão agora. */
+    (function wrapVersions() {
+        function tt(key, fb) {
+            if (typeof root.t === 'function') {
+                var v = root.t(key);
+                if (v && v !== key) return String(v);
+            }
+            return fb || key;
+        }
+        function esc(s) {
+            return String(s == null ? '' : s)
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        }
+        function addSnapButton() {
+            var title = document.getElementById('genericModalTitle');
+            var foot = document.getElementById('genericModalFooter');
+            var overlay = document.getElementById('genericModal');
+            if (!foot || !overlay || !overlay.classList.contains('visible')) return;
+            if (foot.querySelector('#abeneVerSnap')) return;
+            var label = (title && title.textContent) || '';
+            if (label.indexOf('Histórico') < 0 && label.toLowerCase().indexOf('vers') < 0 &&
+                label.toLowerCase().indexOf('version') < 0) return;
+            var btn = document.createElement('button');
+            btn.type = 'button';
+            btn.id = 'abeneVerSnap';
+            btn.className = 'btn-secondary';
+            btn.textContent = tt('versionsSaveNow', 'Guardar versão agora');
+            btn.addEventListener('click', function () {
+                if (typeof root.saveDocument === 'function') root.saveDocument({ silent: true });
+                if (typeof root.showToast === 'function') root.showToast(tt('toastSaved', 'Guardado'));
+                if (typeof root.showVersions === 'function') root.showVersions();
+            });
+            if (foot.firstChild) foot.insertBefore(btn, foot.firstChild);
+            else foot.appendChild(btn);
+        }
+        var origShow = root.showVersions;
+        if (typeof origShow === 'function' && !origShow._abeneVerSnap) {
+            root.showVersions = function () {
+                var r = origShow.apply(this, arguments);
+                setTimeout(addSnapButton, 0);
+                return r;
+            };
+            root.showVersions._abeneVerSnap = true;
+            root.showVersions._legacy = origShow;
+        }
+        function confirmThen(kind, index, orig) {
+            if (typeof orig !== 'function') return;
+            if (typeof root.openGenericModal !== 'function') {
+                orig.call(root, index);
+                return;
+            }
+            root._abeneVerIdx = index;
+            root._abeneVerKind = kind;
+            var ask = kind === 'copy'
+                ? tt('versionsCopyAsk', 'Abrir uma cópia desta versão como documento novo?')
+                : tt('versionsRestoreAsk', 'Substituir o documento atual por esta versão?');
+            var okLab = kind === 'copy' ? tt('versionsCopy', 'Copiar como novo') : tt('versionsRestore', 'Restaurar');
+            root.openGenericModal(okLab, '<p>' + esc(ask) + '</p>',
+                '<button type="button" class="btn-secondary" onclick="showVersions()">' + esc(tt('cancel', 'Cancelar')) + '</button>' +
+                '<button type="button" class="btn-primary" onclick="abeneVersionsConfirmGo()">' + esc(okLab) + '</button>'
+            );
+        }
+        root.abeneVersionsConfirmGo = function () {
+            var kind = root._abeneVerKind;
+            var idx = root._abeneVerIdx;
+            if (typeof root.closeModal === 'function') root.closeModal('genericModal');
+            if (kind === 'copy' && typeof root.copyVersionAsNew === 'function' && root.copyVersionAsNew._abeneVerOrig) {
+                root.copyVersionAsNew._abeneVerOrig.call(root, idx);
+            } else if (kind !== 'copy' && typeof root.restoreVersion === 'function' && root.restoreVersion._abeneVerOrig) {
+                root.restoreVersion._abeneVerOrig.call(root, idx);
+            }
+        };
+        var origRestore = root.restoreVersion;
+        if (typeof origRestore === 'function' && !origRestore._abeneVerWrap) {
+            root.restoreVersion = function (index) { confirmThen('restore', index, origRestore); };
+            root.restoreVersion._abeneVerWrap = true;
+            root.restoreVersion._abeneVerOrig = origRestore;
+        }
+        var origCopy = root.copyVersionAsNew;
+        if (typeof origCopy === 'function' && !origCopy._abeneVerWrap) {
+            root.copyVersionAsNew = function (index) { confirmThen('copy', index, origCopy); };
+            root.copyVersionAsNew._abeneVerWrap = true;
+            root.copyVersionAsNew._abeneVerOrig = origCopy;
+        }
+    })();
 })(window);

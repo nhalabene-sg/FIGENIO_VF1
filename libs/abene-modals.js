@@ -159,7 +159,9 @@
             '<div class="form-group"><button type="button" class="btn-secondary" onclick="document.getElementById(\'abeneImgFile\').click()">' +
                 esc(tt('imgChooseFile')) + '</button>' +
                 '<input id="abeneImgFile" type="file" accept="image/*" style="display:none" onchange="abenePreviewImageFile(this)">' +
-                '<div id="abeneImgFileName" style="font-size:11px;color:#666;margin-top:6px;"></div></div>' +
+                '<div id="abeneImgFileName" style="font-size:11px;color:#666;margin-top:6px;"></div>' +
+                '<img id="abeneImgPreview" alt="" style="display:none;max-width:100%;max-height:140px;margin-top:8px;border:1px solid #d8dee9;border-radius:4px;">' +
+                '</div>' +
             field('abeneImgUrl', tt('pImageUrl'), '<input id="abeneImgUrl" type="url" value="https://">') +
             '<div class="form-row">' +
                 field('abeneImgW', tt('imgWidth'), '<input id="abeneImgW" type="number" min="0" max="2000" value="400">') +
@@ -172,7 +174,11 @@
                     '<option value="left">' + esc(tt('objLeft')) + '</option>' +
                     '<option value="right">' + esc(tt('objRight')) + '</option>' +
                     '<option value="center">' + esc(tt('objCenter')) + '</option>' +
+                    '<option value="above">' + esc(tt('objAbove')) + '</option>' +
+                    '<option value="below">' + esc(tt('objBelow')) + '</option>' +
                     '<option value="free">' + esc(tt('objFree')) + '</option>' +
+                    '<option value="behind">' + esc(tt('objBehind')) + '</option>' +
+                    '<option value="front">' + esc(tt('objFront')) + '</option>' +
                 '</select>'),
             '<button class="btn-secondary" onclick="closeModal(\'genericModal\')">' + esc(tt('cancel')) + '</button>' +
             '<button class="btn-primary" onclick="abeneApplyInsertImage()">' + esc(tt('ok')) + '</button>'
@@ -181,11 +187,27 @@
     window.abenePreviewImageFile = function (inp) {
         var file = inp && inp.files && inp.files[0];
         if (!file) return;
+        if (!/^image\//.test(file.type || '')) {
+            if (typeof showToast === 'function') showToast(tt('imgBadFile') || 'Este ficheiro não é uma imagem suportada.');
+            return;
+        }
         window._abeneImgFileName = file.name || '';
         var nameEl = document.getElementById('abeneImgFileName');
+        var prev = document.getElementById('abeneImgPreview');
         if (nameEl) nameEl.textContent = file.name;
         var reader = new FileReader();
-        reader.onload = function (e) { window._abeneImgFileData = e.target.result; };
+        reader.onload = function (e) {
+            function show(src) {
+                window._abeneImgFileData = src;
+                if (prev) {
+                    prev.src = src;
+                    prev.style.display = 'block';
+                }
+            }
+            if (typeof window.abeneShrinkImageSrc === 'function') {
+                window.abeneShrinkImageSrc(e.target.result, file.type, show);
+            } else show(e.target.result);
+        };
         reader.readAsDataURL(file);
     };
     window.abeneApplyInsertImage = function () {
@@ -194,16 +216,18 @@
         var width = Number(val('abeneImgW')) || 0;
         var unit = val('abeneImgUnit') || 'px';
         var wrap = val('abeneImgWrap') || 'none';
-        if (typeof closeModal === 'function') closeModal('genericModal');
-        restoreCaret();
         var src = data;
         if (!src) {
             if (/^https?:\/\//i.test(url) || /^data:image\//i.test(url)) src = url;
         }
         if (!src) {
-            if (typeof showToast === 'function') showToast(tt('aBadUrl'));
+            if (window._abeneImgFileName && typeof showToast === 'function') {
+                showToast(tt('imgWaitPreview') || 'Aguarde a pré-visualização da imagem.');
+            } else if (typeof showToast === 'function') showToast(tt('aBadUrl'));
             return;
         }
+        if (typeof closeModal === 'function') closeModal('genericModal');
+        restoreCaret();
         if (typeof window.abeneInsertPicture === 'function') {
             window.abeneInsertPicture(src, { width: width, unit: unit, wrap: wrap, alt: window._abeneImgFileName || '' });
         } else {
@@ -218,28 +242,72 @@
     window.insertLink = function () {
         closeFly();
         if (typeof openGenericModal !== 'function') return;
+        var editor = editorEl();
         var sel = window.getSelection();
         var selected = sel && sel.toString() ? sel.toString() : '';
+        var existing = null;
+        var n = sel && sel.rangeCount ? sel.anchorNode : null;
+        if (n && n.nodeType === 3) n = n.parentNode;
+        while (n && n !== editor) {
+            if (n.tagName === 'A') { existing = n; break; }
+            n = n.parentNode;
+        }
+        window._abeneLinkEl = existing || null;
         saveCaret();
-        openGenericModal(tt('link'),
-            field('abeneLinkUrl', tt('linkUrl'), '<input id="abeneLinkUrl" type="url" value="https://">') +
-            field('abeneLinkText', tt('linkText'), '<input id="abeneLinkText" type="text" value="' + esc(selected) + '">') +
+        var href = existing ? (existing.getAttribute('href') || '') : 'https://';
+        var text = existing ? String(existing.textContent || '') : selected;
+        var tgt = existing && existing.getAttribute('target') === '_self' ? '_self' : '_blank';
+        var title = existing ? (tt('linkEdit') || 'Editar hiperligação') : tt('link');
+        openGenericModal(title,
+            field('abeneLinkUrl', tt('linkUrl'), '<input id="abeneLinkUrl" type="text" inputmode="url" autocomplete="off" value="' + esc(href) + '">') +
+            '<p class="abene-proof-hint">' + esc(tt('linkHint') || 'Site, e-mail ou #secção. Ctrl+clique abre o destino.') + '</p>' +
+            field('abeneLinkText', tt('linkText'), '<input id="abeneLinkText" type="text" value="' + esc(text) + '">') +
             field('abeneLinkTarget', tt('linkTarget'),
                 '<select id="abeneLinkTarget">' +
-                    '<option value="_blank">' + esc(tt('linkNewTab')) + '</option>' +
-                    '<option value="_self">' + esc(tt('linkSameTab')) + '</option>' +
+                    '<option value="_blank"' + (tgt !== '_self' ? ' selected' : '') + '>' + esc(tt('linkNewTab')) + '</option>' +
+                    '<option value="_self"' + (tgt === '_self' ? ' selected' : '') + '>' + esc(tt('linkSameTab')) + '</option>' +
                 '</select>'),
+            (existing
+                ? '<button type="button" class="btn-secondary" onclick="abeneRemoveLink()">' + esc(tt('linkRemove') || 'Remover ligação') + '</button>'
+                : '') +
             '<button class="btn-secondary" onclick="closeModal(\'genericModal\')">' + esc(tt('cancel')) + '</button>' +
             '<button class="btn-primary" onclick="abeneApplyInsertLink()">' + esc(tt('ok')) + '</button>'
         );
     };
+    function normalizeLinkUrl(url) {
+        url = String(url || '').trim();
+        if (!url) return '';
+        if (/^(https?:\/\/|mailto:|tel:|#|\/)/i.test(url)) return url;
+        if (/^[\w.+-]+@[\w.-]+\.[a-z]{2,}$/i.test(url)) return 'mailto:' + url;
+        if (/^www\./i.test(url) || /^[\w.-]+\.[a-z]{2,}([\/:?#]|$)/i.test(url)) return 'https://' + url;
+        return url;
+    }
+    function isOkLink(url) {
+        return /^(https?:\/\/|mailto:|tel:|#|\/)/i.test(url);
+    }
     window.abeneApplyInsertLink = function () {
-        var url = (val('abeneLinkUrl') || '').trim();
+        var url = normalizeLinkUrl(val('abeneLinkUrl'));
         var text = (val('abeneLinkText') || '').trim();
         var target = val('abeneLinkTarget') === '_self' ? '_self' : '_blank';
-        if (typeof closeModal === 'function') closeModal('genericModal');
-        if (!/^https?:\/\//i.test(url) && !/^mailto:/i.test(url) && !/^#/.test(url)) {
+        if (!isOkLink(url)) {
             if (typeof showToast === 'function') showToast(tt('aBadUrl'));
+            return;
+        }
+        if (typeof closeModal === 'function') closeModal('genericModal');
+        var existing = window._abeneLinkEl;
+        window._abeneLinkEl = null;
+        if (existing && existing.parentNode) {
+            existing.setAttribute('href', url);
+            if (target === '_blank') {
+                existing.setAttribute('target', '_blank');
+                existing.setAttribute('rel', 'noopener noreferrer');
+            } else {
+                existing.setAttribute('target', '_self');
+                existing.removeAttribute('rel');
+            }
+            if (!existing.getAttribute('style') || existing.style.color === '') existing.style.color = '#2b579a';
+            if (text) existing.textContent = text;
+            if (typeof saveUndoState === 'function') saveUndoState();
             return;
         }
         restoreCaret();
@@ -249,6 +317,276 @@
             '<a href="' + esc(url) + '"' + extra + ' style="color:#2b579a;">' + esc(display) + '</a>');
         if (typeof saveUndoState === 'function') saveUndoState();
     };
+    window.abeneRemoveLink = function () {
+        var existing = window._abeneLinkEl;
+        window._abeneLinkEl = null;
+        if (typeof closeModal === 'function') closeModal('genericModal');
+        if (!existing || !existing.parentNode) return;
+        var parent = existing.parentNode;
+        while (existing.firstChild) parent.insertBefore(existing.firstChild, existing);
+        parent.removeChild(existing);
+        if (typeof saveUndoState === 'function') saveUndoState();
+    };
+
+    document.addEventListener('click', function (ev) {
+        var a = ev.target && ev.target.closest && ev.target.closest('#editor a[href]');
+        if (!a) return;
+        if (a.closest && a.closest('.page-header-zone, .page-footer-zone')) return;
+        var href = a.getAttribute('href') || '';
+        if (href.charAt(0) === '#') {
+            ev.preventDefault();
+            if (typeof window.abeneJumpToAnchor === 'function') window.abeneJumpToAnchor(href.slice(1));
+            return;
+        }
+        ev.preventDefault();
+        if (ev.ctrlKey || ev.metaKey) {
+            if (href) {
+                try { window.open(href, '_blank', 'noopener,noreferrer'); } catch (eO) {}
+            }
+        }
+    }, true);
+
+    function commentAuthor() {
+        try { return localStorage.getItem('abeneAuthor') || tt('aAuthor') || 'Autor'; } catch (e) { return 'Autor'; }
+    }
+    function commentWhen() {
+        var loc = 'pt-PT';
+        try { loc = localStorage.getItem('abeneLanguage') || loc; } catch (eL) {}
+        return new Date().toLocaleString(loc);
+    }
+    function closestComment() {
+        var editor = editorEl();
+        var sel = window.getSelection();
+        var n = sel && sel.rangeCount ? sel.anchorNode : null;
+        if (n && n.nodeType === 3) n = n.parentNode;
+        while (n && n !== editor) {
+            if (n.nodeType === 1 && ((n.getAttribute && n.getAttribute('data-comment') != null) || (n.classList && n.classList.contains('comment-anchor')))) {
+                return n;
+            }
+            n = n.parentNode;
+        }
+        return null;
+    }
+    function markComment(el, text, author, date) {
+        el.classList.add('comment-anchor');
+        el.setAttribute('data-comment', text);
+        el.setAttribute('data-comment-author', author || '');
+        el.setAttribute('data-comment-date', date || '');
+        el.style.background = '#fff3cd';
+        el.style.borderBottom = '2px solid #ffc107';
+        var tip = (tt('commentPrefix') || 'Comentário: ') + text;
+        if (author) tip += ' — ' + author;
+        if (date) tip += ' (' + date + ')';
+        el.title = tip;
+    }
+    function unwrapComment(el) {
+        if (!el || !el.parentNode) return;
+        var parent = el.parentNode;
+        while (el.firstChild) parent.insertBefore(el.firstChild, el);
+        parent.removeChild(el);
+    }
+    var origInsertComment = window.insertComment;
+    window.insertComment = function () {
+        closeFly();
+        if (typeof openGenericModal !== 'function') {
+            if (typeof origInsertComment === 'function') return origInsertComment.apply(this, arguments);
+            return;
+        }
+        var existing = closestComment();
+        var sel = window.getSelection();
+        if (!existing && (!sel || !sel.rangeCount || sel.isCollapsed)) {
+            if (typeof showToast === 'function') showToast(tt('commentNeedSel'));
+            return;
+        }
+        window._abeneCommentEl = existing || null;
+        saveCaret();
+        var meta = '';
+        if (existing) {
+            var who = existing.getAttribute('data-comment-author') || '';
+            var when = existing.getAttribute('data-comment-date') || '';
+            if (who || when) meta = '<p class="abene-proof-hint">' + esc(who) + (when ? ' · ' + esc(when) : '') + '</p>';
+        }
+        openGenericModal(existing ? (tt('commentEdit') || 'Editar comentário') : tt('comment'),
+            field('abeneCommentText', tt('pComment'),
+                '<textarea id="abeneCommentText" rows="4">' + esc(existing ? (existing.getAttribute('data-comment') || '') : '') + '</textarea>') + meta,
+            (existing
+                ? '<button type="button" class="btn-secondary" onclick="abeneRemoveComment()">' + esc(tt('commentRemove') || 'Remover comentário') + '</button>'
+                : '') +
+            '<button class="btn-secondary" onclick="closeModal(\'genericModal\')">' + esc(tt('cancel')) + '</button>' +
+            '<button class="btn-primary" onclick="abeneApplyComment()">' + esc(tt('ok')) + '</button>'
+        );
+    };
+    window.insertComment._abeneModals = true;
+    window.insertComment._legacy = origInsertComment;
+    window.abeneApplyComment = function () {
+        var text = (val('abeneCommentText') || '').trim();
+        if (!text) {
+            if (typeof showToast === 'function') showToast(tt('commentNeedText') || 'Escreva o comentário.');
+            return;
+        }
+        var existing = window._abeneCommentEl;
+        window._abeneCommentEl = null;
+        if (typeof closeModal === 'function') closeModal('genericModal');
+        if (existing && existing.parentNode) {
+            markComment(existing, text, existing.getAttribute('data-comment-author') || commentAuthor(),
+                existing.getAttribute('data-comment-date') || commentWhen());
+            if (typeof saveUndoState === 'function') saveUndoState();
+            if (typeof window.refreshCommentsPane === 'function') window.refreshCommentsPane();
+            return;
+        }
+        restoreCaret();
+        var sel = window.getSelection();
+        if (!sel || !sel.rangeCount || sel.isCollapsed) {
+            if (typeof showToast === 'function') showToast(tt('commentNeedSel'));
+            return;
+        }
+        var range = sel.getRangeAt(0);
+        var span = document.createElement('span');
+        markComment(span, text, commentAuthor(), commentWhen());
+        try { range.surroundContents(span); } catch (eW) {
+            span.appendChild(range.extractContents());
+            range.insertNode(span);
+        }
+        if (typeof saveUndoState === 'function') saveUndoState();
+        if (typeof window.toggleCommentsPane === 'function') window.toggleCommentsPane(true);
+        else if (typeof window.refreshCommentsPane === 'function') window.refreshCommentsPane();
+    };
+    window.abeneRemoveComment = function () {
+        var el = window._abeneCommentEl;
+        window._abeneCommentEl = null;
+        if (typeof closeModal === 'function') closeModal('genericModal');
+        unwrapComment(el);
+        if (typeof saveUndoState === 'function') saveUndoState();
+        if (typeof window.refreshCommentsPane === 'function') window.refreshCommentsPane();
+    };
+    window.abeneEditCommentAt = function (index) {
+        var editor = editorEl();
+        if (!editor) return;
+        var comments = editor.querySelectorAll('[data-comment], .comment-anchor');
+        var el = comments[index];
+        if (!el) return;
+        window._abeneCommentI = index;
+        try {
+            var range = document.createRange();
+            range.selectNodeContents(el);
+            var sel = window.getSelection();
+            sel.removeAllRanges();
+            sel.addRange(range);
+        } catch (eS) {}
+        window.insertComment();
+    };
+    var origRefreshComments = window.refreshCommentsPane;
+    var origNavigateComment = window.navigateComment;
+    window.refreshCommentsPane = function () {
+        var body = document.getElementById('commentsPaneBody');
+        var editor = editorEl();
+        if (!body || !editor) {
+            if (typeof origRefreshComments === 'function') return origRefreshComments.apply(this, arguments);
+            return;
+        }
+        var comments = editor.querySelectorAll('[data-comment], .comment-anchor');
+        if (!comments.length) {
+            body.innerHTML = '<p class="abene-proof-hint">' + esc(tt('commentEmpty') || 'Nenhum comentário.') + '</p>';
+            return;
+        }
+        var i0 = window._abeneCommentI || 0;
+        if (i0 >= comments.length) i0 = comments.length - 1;
+        if (i0 < 0) i0 = 0;
+        window._abeneCommentI = i0;
+        body.innerHTML = '';
+        var nav = document.createElement('div');
+        nav.style.cssText = 'display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;';
+        function navBtn(step, label) {
+            var b = document.createElement('button');
+            b.type = 'button';
+            b.className = 'btn-secondary';
+            b.textContent = label;
+            b.addEventListener('click', function () { window.navigateComment(step); });
+            nav.appendChild(b);
+        }
+        navBtn(-1, tt('commentPrev') || 'Anterior');
+        navBtn(1, tt('commentNext') || 'Seguinte');
+        body.appendChild(nav);
+        Array.prototype.forEach.call(comments, function (node, i) {
+            var text = node.getAttribute('data-comment') || node.title || String(node.textContent || '').slice(0, 80);
+            var author = node.getAttribute('data-comment-author') || '';
+            var date = node.getAttribute('data-comment-date') || '';
+            var row = document.createElement('div');
+            row.className = 'comment-row';
+            if (i === i0) row.style.borderLeft = '3px solid #2563eb';
+            var head = document.createElement('strong');
+            head.textContent = '#' + (i + 1);
+            row.appendChild(head);
+            if (author || date) {
+                var meta = document.createElement('div');
+                meta.className = 'abene-proof-hint';
+                meta.textContent = author + (date ? (author ? ' · ' : '') + date : '');
+                row.appendChild(meta);
+            }
+            var p = document.createElement('p');
+            p.textContent = text;
+            row.appendChild(p);
+            var edit = document.createElement('button');
+            edit.type = 'button';
+            edit.className = 'btn-secondary';
+            edit.textContent = tt('commentEditBtn') || 'Editar';
+            edit.addEventListener('click', function (ev) {
+                ev.stopPropagation();
+                window.abeneEditCommentAt(i);
+            });
+            var resolve = document.createElement('button');
+            resolve.type = 'button';
+            resolve.className = 'btn-secondary';
+            resolve.textContent = tt('commentResolve') || 'Resolver';
+            resolve.addEventListener('click', function (ev) {
+                ev.stopPropagation();
+                if (typeof window.resolveComment === 'function') window.resolveComment(i);
+                else {
+                    unwrapComment(node);
+                    if (typeof saveUndoState === 'function') saveUndoState();
+                    window.refreshCommentsPane();
+                }
+            });
+            row.appendChild(edit);
+            row.appendChild(resolve);
+            row.addEventListener('click', function (ev) {
+                if (ev.target && ev.target.closest && ev.target.closest('button')) return;
+                window._abeneCommentI = i;
+                try { node.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (eV) {}
+                window.refreshCommentsPane();
+            });
+            body.appendChild(row);
+        });
+    };
+    window.refreshCommentsPane._legacy = origRefreshComments;
+    window.navigateComment = function (step) {
+        var editor = editorEl();
+        if (!editor) {
+            if (typeof origNavigateComment === 'function') return origNavigateComment.apply(this, arguments);
+            return;
+        }
+        var comments = editor.querySelectorAll('[data-comment], .comment-anchor');
+        if (!comments.length) return;
+        var i = ((window._abeneCommentI || 0) + step + comments.length) % comments.length;
+        window._abeneCommentI = i;
+        try { comments[i].scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (eN) {}
+        window.refreshCommentsPane();
+    };
+    window.navigateComment._legacy = origNavigateComment;
+
+    document.addEventListener('dblclick', function (ev) {
+        var el = ev.target && ev.target.closest && ev.target.closest('#editor [data-comment], #editor .comment-anchor');
+        if (!el) return;
+        ev.preventDefault();
+        try {
+            var range = document.createRange();
+            range.selectNodeContents(el);
+            var sel = window.getSelection();
+            sel.removeAllRanges();
+            sel.addRange(range);
+        } catch (eD) {}
+        window.insertComment();
+    });
 
     window.openTypographyModal = function () {
         closeFly();
@@ -492,4 +830,219 @@
         if (typeof prevI18n === 'function') prevI18n(lang);
         document.querySelectorAll('[data-abene-drag="1"]').forEach(function (h) { h.title = winHint(); });
     };
+
+    var origAddWatermark = window.addWatermark;
+    window.addWatermark = function () {
+        closeFly();
+        if (typeof openGenericModal !== 'function') {
+            if (typeof origAddWatermark === 'function') return origAddWatermark.apply(this, arguments);
+            return;
+        }
+        var cur = typeof window.abeneReadWatermarkSpec === 'function' ? window.abeneReadWatermarkSpec() : null;
+        var text = (cur && cur.text) || tt('pWatermarkDef') || 'CONFIDENCIAL';
+        var hex = (cur && cur.hex) || '#c8c8c8';
+        var size = (cur && cur.size) || 56;
+        openGenericModal(tt('watermark'),
+            '<p class="abene-proof-hint">' + esc(tt('wmHint') || '') + '</p>' +
+            field('abeneWmText', tt('pWatermark'),
+                '<input id="abeneWmText" type="text" value="' + esc(text) + '">') +
+            field('abeneWmColor', tt('wmColor') || 'Cor',
+                '<input id="abeneWmColor" type="color" value="' + esc(hex) + '">') +
+            field('abeneWmSize', tt('wmSize') || 'Tamanho (pt)',
+                '<input id="abeneWmSize" type="number" min="24" max="120" value="' + esc(String(size)) + '">'),
+            (cur
+                ? '<button type="button" class="btn-secondary" onclick="abeneClearWatermark()">' + esc(tt('wmRemove')) + '</button>'
+                : '') +
+            '<button class="btn-secondary" onclick="closeModal(\'genericModal\')">' + esc(tt('cancel')) + '</button>' +
+            '<button class="btn-primary" onclick="abeneSubmitWatermark()">' + esc(tt('ok')) + '</button>'
+        );
+        setTimeout(function () {
+            var inp = document.getElementById('abeneWmText');
+            if (inp) { inp.focus(); inp.select(); }
+        }, 30);
+    };
+    window.addWatermark._abeneModals = true;
+    window.addWatermark._legacy = origAddWatermark;
+    window.abeneSubmitWatermark = function () {
+        var text = (val('abeneWmText') || '').trim();
+        var color = val('abeneWmColor') || '#c8c8c8';
+        var size = parseFloat(val('abeneWmSize')) || 56;
+        if (typeof closeModal === 'function') closeModal('genericModal');
+        if (typeof window.abeneApplyWatermarkSpec === 'function') {
+            window.abeneApplyWatermarkSpec({ text: text, color: color, size: size }, { toast: true });
+            return;
+        }
+        if (typeof origAddWatermark === 'function') origAddWatermark();
+    };
+    window.abeneClearWatermark = function () {
+        if (typeof closeModal === 'function') closeModal('genericModal');
+        if (typeof window.abeneApplyWatermarkSpec === 'function') {
+            window.abeneApplyWatermarkSpec({ text: '' }, { toast: true });
+        } else if (typeof window.applyWatermarkPreset === 'function') {
+            window.applyWatermarkPreset('');
+        }
+    };
+
+    /* Inserir → Captura : recorte de zona após o ecrã (sem apagar o getDisplayMedia). */
+    (function wrapCaptureCrop() {
+        var crop = { x0: 0, y0: 0, x1: 0, y1: 0, drag: false, src: '' };
+        function toast(msg) {
+            if (typeof showToast === 'function') showToast(msg);
+        }
+        function insertSrc(src) {
+            restoreCaret();
+            if (typeof window.abeneInsertPicture === 'function') {
+                window.abeneInsertPicture(src, { alt: tt('capture') || 'Captura' });
+            } else {
+                insertViaCommands('<img data-illustration="true" src="' + esc(src) + '" style="max-width:100%;height:auto;" alt="Captura">');
+            }
+            toast(tt('imgInsertedOk') || 'Imagem inserida.');
+            if (typeof saveUndoState === 'function') saveUndoState();
+        }
+        function bindCrop() {
+            var img = document.getElementById('abeneCropImg');
+            var sel = document.getElementById('abeneCropSel');
+            var box = document.getElementById('abeneCropBox');
+            if (!img || !sel || !box || box._abeneCrop) return;
+            box._abeneCrop = true;
+            function pos(ev) {
+                var r = img.getBoundingClientRect();
+                return {
+                    x: Math.max(0, Math.min(r.width, ev.clientX - r.left)),
+                    y: Math.max(0, Math.min(r.height, ev.clientY - r.top))
+                };
+            }
+            function paint() {
+                var x = Math.min(crop.x0, crop.x1);
+                var y = Math.min(crop.y0, crop.y1);
+                var w = Math.abs(crop.x1 - crop.x0);
+                var h = Math.abs(crop.y1 - crop.y0);
+                if (w < 4 || h < 4) { sel.style.display = 'none'; return; }
+                sel.style.display = 'block';
+                sel.style.left = x + 'px';
+                sel.style.top = y + 'px';
+                sel.style.width = w + 'px';
+                sel.style.height = h + 'px';
+            }
+            function onMove(ev) {
+                if (!crop.drag) return;
+                var p = pos(ev);
+                crop.x1 = p.x;
+                crop.y1 = p.y;
+                paint();
+            }
+            function onUp() {
+                crop.drag = false;
+                document.removeEventListener('mousemove', onMove);
+                document.removeEventListener('mouseup', onUp);
+            }
+            box.addEventListener('mousedown', function (ev) {
+                if (ev.button !== 0) return;
+                ev.preventDefault();
+                var p = pos(ev);
+                crop.drag = true;
+                crop.x0 = crop.x1 = p.x;
+                crop.y0 = crop.y1 = p.y;
+                paint();
+                document.addEventListener('mousemove', onMove);
+                document.addEventListener('mouseup', onUp);
+            });
+        }
+        window.abeneShowCaptureCrop = function (src) {
+            crop.src = src;
+            crop.x0 = crop.y0 = crop.x1 = crop.y1 = 0;
+            crop.drag = false;
+            if (typeof openGenericModal !== 'function') {
+                insertSrc(src);
+                return;
+            }
+            openGenericModal(tt('capture') || tt('imgCapture') || 'Captura',
+                '<p style="font-size:12px;margin:0 0 8px;">' + esc(tt('captureCrop')) + '</p>' +
+                '<div id="abeneCropBox" style="position:relative;display:inline-block;max-width:100%;cursor:crosshair;">' +
+                    '<img id="abeneCropImg" alt="" src="' + esc(src) + '" style="max-width:100%;max-height:280px;display:block;">' +
+                    '<div id="abeneCropSel" style="position:absolute;display:none;border:1px dashed #2b579a;background:rgba(43,87,154,.18);pointer-events:none;box-sizing:border-box;"></div>' +
+                '</div>',
+                '<button type="button" class="btn-secondary" onclick="abeneCancelCaptureCrop()">' + esc(tt('cancel')) + '</button>' +
+                '<button type="button" class="btn-secondary" onclick="abeneApplyCaptureCrop(true)">' + esc(tt('captureFull')) + '</button>' +
+                '<button type="button" class="btn-primary" onclick="abeneApplyCaptureCrop(false)">' + esc(tt('ok')) + '</button>'
+            );
+            setTimeout(bindCrop, 40);
+        };
+        window.abeneCancelCaptureCrop = function () {
+            crop.src = '';
+            if (typeof closeModal === 'function') closeModal('genericModal');
+        };
+        window.abeneApplyCaptureCrop = function (full) {
+            var src = crop.src;
+            var imgEl = document.getElementById('abeneCropImg');
+            var wDisp = imgEl ? imgEl.clientWidth : 0;
+            var hDisp = imgEl ? imgEl.clientHeight : 0;
+            var nw = imgEl ? imgEl.naturalWidth : 0;
+            var nh = imgEl ? imgEl.naturalHeight : 0;
+            var x = Math.min(crop.x0, crop.x1);
+            var y = Math.min(crop.y0, crop.y1);
+            var w = Math.abs(crop.x1 - crop.x0);
+            var h = Math.abs(crop.y1 - crop.y0);
+            if (typeof closeModal === 'function') closeModal('genericModal');
+            crop.src = '';
+            if (!src) return;
+            if (full || w < 8 || h < 8 || !nw || !wDisp) {
+                insertSrc(src);
+                return;
+            }
+            var sx = x * nw / wDisp;
+            var sy = y * nh / hDisp;
+            var sw = w * nw / wDisp;
+            var sh = h * nh / hDisp;
+            var c = document.createElement('canvas');
+            c.width = Math.max(1, Math.round(sw));
+            c.height = Math.max(1, Math.round(sh));
+            var im = new Image();
+            im.onload = function () {
+                var ctx = c.getContext('2d');
+                if (ctx) ctx.drawImage(im, sx, sy, sw, sh, 0, 0, c.width, c.height);
+                insertSrc(c.toDataURL('image/jpeg', 0.86));
+            };
+            im.src = src;
+        };
+        var orig = window.captureScreen;
+        window.captureScreen = function () {
+            saveCaret();
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+                if (typeof orig === 'function') return orig.apply(this, arguments);
+                toast(tt('aNoCapture'));
+                return;
+            }
+            return navigator.mediaDevices.getDisplayMedia({ video: true, audio: false }).then(function (stream) {
+                var video = document.createElement('video');
+                video.muted = true;
+                video.setAttribute('playsinline', 'true');
+                video.srcObject = stream;
+                function grab() {
+                    var vw = video.videoWidth || 1280;
+                    var vh = video.videoHeight || 720;
+                    var canvas = document.createElement('canvas');
+                    canvas.width = vw;
+                    canvas.height = vh;
+                    var ctx = canvas.getContext('2d');
+                    if (ctx) ctx.drawImage(video, 0, 0, vw, vh);
+                    stream.getTracks().forEach(function (tr) { tr.stop(); });
+                    try { video.srcObject = null; } catch (eS) {}
+                    window.abeneShowCaptureCrop(canvas.toDataURL('image/jpeg', 0.82));
+                }
+                return video.play().then(function () {
+                    return new Promise(function (resolve) {
+                        if (video.videoWidth) { resolve(); return; }
+                        video.onloadeddata = function () { resolve(); };
+                        setTimeout(resolve, 250);
+                    });
+                }).then(grab);
+            }).catch(function (err) {
+                if (err && err.name === 'NotAllowedError') return;
+                toast(tt('aCaptureFail'));
+            });
+        };
+        window.captureScreen._abeneCaptureCrop = true;
+        window.captureScreen._legacy = orig;
+    })();
 })();

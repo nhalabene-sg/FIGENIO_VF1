@@ -1131,4 +1131,51 @@
 
     wrapImageRun();
     wrapPushBlock();
+
+    /* Ver → Leitura / Web: segundo clique (ou Esc) volta à impressão. O wrap Estrutura (Awinda) continua a marcar o botão e o toast. */
+    (function wrapReadViewToggle() {
+        var orig = root.setViewMode;
+        if (typeof orig !== 'function') return;
+        if (!orig._abeneReadToggle) {
+            root.setViewMode = function (mode) {
+                var m = String(mode || 'print');
+                var editor = ed();
+                if (m === 'read' && editor && editor.classList.contains('view-read')) {
+                    return orig.call(this, 'print');
+                }
+                if (m === 'web' && editor && editor.classList.contains('view-web')) {
+                    return orig.call(this, 'print');
+                }
+                return orig.apply(this, arguments);
+            };
+            root.setViewMode._abeneReadToggle = true;
+            root.setViewMode._abeneWebToggle = true;
+            root.setViewMode._legacy = orig;
+        } else if (!root.setViewMode._abeneWebToggle) {
+            var prev = root.setViewMode;
+            root.setViewMode = function (mode) {
+                var m = String(mode || 'print');
+                var editor = ed();
+                if (m === 'web' && editor && editor.classList.contains('view-web')) {
+                    return prev.call(this, 'print');
+                }
+                return prev.apply(this, arguments);
+            };
+            root.setViewMode._abeneReadToggle = true;
+            root.setViewMode._abeneWebToggle = true;
+            root.setViewMode._legacy = prev._legacy || prev;
+        }
+        if (!root._abeneReadEsc) {
+            root._abeneReadEsc = true;
+            document.addEventListener('keydown', function (e) {
+                if (e.key !== 'Escape') return;
+                if (document.body.classList.contains('focus-mode')) return;
+                var editor = ed();
+                if (!editor) return;
+                if (editor.classList.contains('view-read') || editor.classList.contains('view-web')) {
+                    if (typeof root.setViewMode === 'function') root.setViewMode('print');
+                }
+            });
+        }
+    })();
 })(window);

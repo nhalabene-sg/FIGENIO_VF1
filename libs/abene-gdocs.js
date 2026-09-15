@@ -262,6 +262,22 @@
         }
     }
 
+    /* Rever → Atualizar Docs: o botão do friso permanece visível mesmo sem ligação. */
+    (function wrapPullRibbonVisible() {
+        var orig = updateStatusUi;
+        if (orig._abenePullWrap) return;
+        updateStatusUi = function () {
+            orig.apply(this, arguments);
+            var ribbon = document.getElementById('btnGdocsPull');
+            if (!ribbon) return;
+            ribbon.style.display = '';
+            var linked = !!(getLink() && getLink().id);
+            ribbon.classList.toggle('active', linked);
+        };
+        updateStatusUi._abenePullWrap = true;
+        updateStatusUi._legacy = orig;
+    })();
+
     root.abeneOpenInGoogleDocs = openInGoogleDocs;
     root.openInGoogleDocs = openInGoogleDocs;
     root.abenePullFromGoogleDocs = pullFromGoogleDocs;
@@ -270,6 +286,115 @@
     root.abeneGdocsClearLink = clearLink;
     root.abeneGdocsForkOnCopy = forkLinkOnCopy;
     root.abeneGdocsUpdateStatus = updateStatusUi;
+
+    /* Rever → Google Docs: botão ativo se ligado; segundo clique não fica mudo; popup bloqueado com toast. */
+    (function wrapOpenGdocsUx() {
+        function openRibbonBtn() {
+            var nodes = document.querySelectorAll('button.ribbon-btn');
+            var i, oc;
+            for (i = 0; i < nodes.length; i++) {
+                oc = nodes[i].getAttribute('onclick') || '';
+                if (oc.indexOf('abeneOpenInGoogleDocs') >= 0) return nodes[i];
+            }
+            return null;
+        }
+        var origStatus = updateStatusUi;
+        if (!origStatus._abeneGdocsOpenWrap) {
+            updateStatusUi = function () {
+                origStatus.apply(this, arguments);
+                var btn = openRibbonBtn();
+                var linked = !!(getLink() && getLink().id);
+                if (btn) {
+                    btn.classList.toggle('active', linked);
+                    btn.setAttribute('aria-pressed', linked ? 'true' : 'false');
+                }
+            };
+            updateStatusUi._abeneGdocsOpenWrap = true;
+            updateStatusUi._abenePullWrap = !!origStatus._abenePullWrap;
+            updateStatusUi._legacy = origStatus;
+            root.abeneGdocsUpdateStatus = updateStatusUi;
+        }
+        var origOpen = openInGoogleDocs;
+        if (typeof origOpen === 'function' && !origOpen._abeneGdocsOpenWrap) {
+            openInGoogleDocs = function () {
+                if (busy) {
+                    toast(tt('gdocsBusy', 'Aguarde: a enviar para o Google Docs…'));
+                    return;
+                }
+                var nativeOpen = root.open;
+                root.open = function (url, target, feat) {
+                    var w = nativeOpen.call(root, url, target, feat);
+                    if (url && !w) {
+                        toast(tt('gdocsPopup', 'O browser bloqueou o novo separador. Use «Google Docs ligado» na barra de estado.'));
+                    }
+                    root.open = nativeOpen;
+                    return w;
+                };
+                try {
+                    return origOpen.apply(this, arguments);
+                } finally {
+                    setTimeout(function () {
+                        if (root.open !== nativeOpen && !busy) root.open = nativeOpen;
+                    }, 8000);
+                }
+            };
+            openInGoogleDocs._abeneGdocsOpenWrap = true;
+            openInGoogleDocs._legacy = origOpen;
+            root.abeneOpenInGoogleDocs = openInGoogleDocs;
+            root.openInGoogleDocs = openInGoogleDocs;
+        }
+    })();
+
+    /* Rever → Google Docs: reabrir o mesmo documento (mapa por nome); Atualizar Docs nunca mudo se ocupado. */
+    (function wrapGdocsLinkRestore() {
+        var origGet = getLink;
+        if (typeof origGet !== 'function' || origGet._abeneLinkWrap) return;
+        getLink = function () {
+            var hit = origGet.apply(this, arguments);
+            if (hit && hit.id) return hit;
+            var rec = (readLinkStore()[docName()] || {});
+            var id = String(rec.id || '').replace(/[^a-zA-Z0-9_-]/g, '');
+            if (!id) return null;
+            return {
+                id: id,
+                url: rec.url || ('https://docs.google.com/document/d/' + id + '/edit')
+            };
+        };
+        getLink._abeneLinkWrap = true;
+        getLink._legacy = origGet;
+        root.abeneGdocsGetLink = getLink;
+
+        var origPull = pullFromGoogleDocs;
+        if (typeof origPull === 'function' && !origPull._abenePullBusy) {
+            pullFromGoogleDocs = function () {
+                if (busy) {
+                    toast(tt('gdocsBusy', 'Aguarde: a enviar para o Google Docs…'));
+                    return;
+                }
+                return origPull.apply(this, arguments);
+            };
+            pullFromGoogleDocs._abenePullBusy = true;
+            pullFromGoogleDocs._legacy = origPull;
+            root.abenePullFromGoogleDocs = pullFromGoogleDocs;
+        }
+
+        var origRestore = restoreFromStorage;
+        if (typeof origRestore === 'function' && !origRestore._abeneLinkWrap) {
+            restoreFromStorage = function () {
+                var st = docState();
+                if (!(st && st.gdocsFileId)) {
+                    var rec = (readLinkStore()[docName()] || {});
+                    if (rec.id) {
+                        setLink(rec.id, rec.url);
+                        return;
+                    }
+                }
+                return origRestore.apply(this, arguments);
+            };
+            restoreFromStorage._abeneLinkWrap = true;
+            restoreFromStorage._legacy = origRestore;
+        }
+    })();
 
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', restoreFromStorage);

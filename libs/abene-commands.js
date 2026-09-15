@@ -305,4 +305,348 @@
             return exec('selectAll');
         };
     }
+
+    /* Estilos → Novo a partir da seleção : janela em vez de prompt. O painel Estilos permanece. */
+    (function wrapNewStyleFromSel() {
+        function tt(key, fb) {
+            if (typeof root.t === 'function') {
+                var v = root.t(key);
+                if (v && v !== key) return String(v);
+            }
+            return fb || key;
+        }
+        function esc(s) {
+            return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+                return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+            });
+        }
+        var orig = root.abeneStyleFromSelection;
+        if (typeof orig !== 'function' || orig._abeneNewStyleModal) return;
+        root.abeneStyleFromSelection = function () {
+            if (typeof openGenericModal !== 'function') return orig.apply(this, arguments);
+            var range = null;
+            try {
+                var sel = root.getSelection();
+                if (sel && sel.rangeCount) range = sel.getRangeAt(0).cloneRange();
+            } catch (eR) {}
+            root._abeneNewStyleRange = range;
+            var def = tt('styleCustom', 'Estilo personalizado');
+            openGenericModal(tt('styleNewFromSel', 'Novo a partir da seleção'),
+                '<div class="form-group"><label for="abeneStyleNewName">' + esc(tt('styleNewName', 'Nome do novo estilo:')) + '</label>' +
+                    '<input id="abeneStyleNewName" type="text" value="' + esc(def) + '"></div>' +
+                '<p id="abeneStyleNewErr" style="color:#c00;min-height:1.2em;margin:0;"></p>',
+                '<button type="button" class="btn-secondary" onclick="abeneCancelNewStyle()">' + esc(tt('cancel', 'Cancelar')) + '</button>' +
+                '<button type="button" class="btn-primary" onclick="abeneApplyNewStyle()">' + esc(tt('ok', 'OK')) + '</button>'
+            );
+            setTimeout(function () {
+                var inp = document.getElementById('abeneStyleNewName');
+                if (!inp) return;
+                inp.focus();
+                inp.select();
+                inp.addEventListener('keydown', function (ev) {
+                    if (ev.key === 'Enter') {
+                        ev.preventDefault();
+                        root.abeneApplyNewStyle();
+                    }
+                });
+            }, 30);
+        };
+        root.abeneStyleFromSelection._abeneNewStyleModal = true;
+        root.abeneCancelNewStyle = function () {
+            if (typeof closeModal === 'function') closeModal('genericModal');
+            if (typeof root.manageStyles === 'function') root.manageStyles();
+        };
+        root.abeneApplyNewStyle = function () {
+            var inp = document.getElementById('abeneStyleNewName');
+            var err = document.getElementById('abeneStyleNewErr');
+            var name = inp ? String(inp.value || '').trim() : '';
+            if (!name) {
+                if (err) err.textContent = tt('styleNewName', 'Nome do novo estilo:');
+                return;
+            }
+            if (typeof closeModal === 'function') closeModal('genericModal');
+            var editor = document.getElementById('editor');
+            if (editor) editor.focus();
+            var range = root._abeneNewStyleRange;
+            if (range) {
+                try {
+                    var sel = root.getSelection();
+                    sel.removeAllRanges();
+                    sel.addRange(range);
+                } catch (eS) {}
+            }
+            var prompt0 = root.prompt;
+            root.prompt = function () { return name; };
+            try { orig.apply(root, []); }
+            finally {
+                root.prompt = prompt0;
+                root._abeneNewStyleRange = null;
+            }
+        };
+    })();
+
+    /* Ver → Paginação: toast + botão ativo (index ligava/desligava em silêncio). */
+    (function wrapPaginationToggle() {
+        function tt(key, fb) {
+            if (typeof root.t === 'function') {
+                var v = root.t(key);
+                if (v && v !== key) return String(v);
+            }
+            return fb || key;
+        }
+        function ds() {
+            return (root.abene && root.abene.documentState) || root.documentState || null;
+        }
+        function isOn() {
+            var st = ds();
+            if (st && typeof st.pagination === 'boolean') return st.pagination;
+            var ed = document.getElementById('editor');
+            return !!(ed && ed.classList.contains('pagination-active'));
+        }
+        function refreshBtn() {
+            var btn = document.querySelector('button[onclick="togglePagination()"]');
+            if (btn) btn.classList.toggle('active', isOn());
+        }
+        var orig = root.togglePagination;
+        if (typeof orig !== 'function' || orig._abenePagWrap) return;
+        root.togglePagination = function () {
+            orig.apply(this, arguments);
+            refreshBtn();
+            var on = isOn();
+            if (typeof root.showToast === 'function') {
+                root.showToast(on
+                    ? tt('paginationOn', 'Paginação ativada.')
+                    : tt('paginationOff', 'Paginação desativada. Vista contínua.'));
+            }
+        };
+        root.togglePagination._abenePagWrap = true;
+        if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', refreshBtn);
+        else refreshBtn();
+        root.addEventListener('load', refreshBtn);
+    })();
+
+    /* Ver → Grelha: toast + botão ativo (index só mudava o fundo, sem feedback). */
+    (function wrapGridlines() {
+        function tt(key, fb) {
+            if (typeof root.t === 'function') {
+                var v = root.t(key);
+                if (v && v !== key) return String(v);
+            }
+            return fb || key;
+        }
+        var GRID_LT = 'linear-gradient(rgba(0,0,0,0.08) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,0.08) 1px, transparent 1px)';
+        var GRID_DK = 'linear-gradient(rgba(255,255,255,0.12) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.12) 1px, transparent 1px)';
+        function ed() { return document.getElementById('editor'); }
+        function wanted() {
+            try { return localStorage.getItem('abeneGrid') === '1'; } catch (eW) { return false; }
+        }
+        function isOn() {
+            var el = ed();
+            return !!(el && el.style.backgroundImage);
+        }
+        function paint(on) {
+            var el = ed();
+            if (!el) return;
+            if (on) {
+                el.style.backgroundImage = document.body.classList.contains('dark-mode') ? GRID_DK : GRID_LT;
+                el.style.backgroundSize = '20px 20px';
+            } else {
+                el.style.backgroundImage = '';
+                el.style.backgroundSize = '';
+            }
+        }
+        function refreshBtn() {
+            var btn = document.querySelector('#tab-view button[onclick="toggleGridlines()"]') ||
+                document.querySelector('button[onclick="toggleGridlines()"]');
+            if (btn) btn.classList.toggle('active', isOn());
+        }
+        var orig = root.toggleGridlines;
+        if (typeof orig !== 'function' || orig._abeneGridWrap) return;
+        root.toggleGridlines = function () {
+            var next = !isOn();
+            paint(next);
+            try { localStorage.setItem('abeneGrid', next ? '1' : '0'); } catch (eS) {}
+            refreshBtn();
+            if (typeof root.showToast === 'function') {
+                root.showToast(next ? tt('gridOn', 'Grelha visível.') : tt('gridOff', 'Grelha oculta.'));
+            }
+        };
+        root.toggleGridlines._abeneGridWrap = true;
+        root.toggleGridlines._legacy = orig;
+        var origPag = root.refreshPagination;
+        if (typeof origPag === 'function' && !origPag._abeneGridHook) {
+            root.refreshPagination = function () {
+                var r = origPag.apply(this, arguments);
+                if (wanted()) paint(true);
+                refreshBtn();
+                return r;
+            };
+            root.refreshPagination._abeneGridHook = true;
+        }
+        var origAppear = root.setAppearance;
+        if (typeof origAppear === 'function') {
+            root.setAppearance = function () {
+                origAppear.apply(this, arguments);
+                if (wanted()) paint(true);
+                refreshBtn();
+            };
+        }
+        function boot() {
+            paint(wanted());
+            refreshBtn();
+        }
+        if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+        else boot();
+        root.addEventListener('load', boot);
+    })();
+
+    /* Ver → Janela: ecrã inteiro com toast; se o browser recusar, maximiza a janela da app. */
+    (function wrapFullscreen() {
+        function tt(key, fb) {
+            if (typeof root.t === 'function') {
+                var v = root.t(key);
+                if (v && v !== key) return String(v);
+            }
+            return fb || key;
+        }
+        function fsEl() {
+            return document.fullscreenElement || document.webkitFullscreenElement || null;
+        }
+        function isOn() {
+            return !!(fsEl() || document.body.classList.contains('app-maximized'));
+        }
+        function refreshBtn() {
+            var btn = document.querySelector('#tab-view button[onclick="toggleFullscreen()"]') ||
+                document.querySelector('button[onclick="toggleFullscreen()"]');
+            if (btn) btn.classList.toggle('active', isOn());
+        }
+        function toast(on, kind) {
+            if (typeof root.showToast !== 'function') return;
+            if (kind === 'app') {
+                root.showToast(on ? tt('fullAppOn', 'Janela maximizada.') : tt('fullAppOff', 'Janela restaurada.'));
+            } else {
+                root.showToast(on ? tt('fullOn', 'Ecrã inteiro. Esc para sair.') : tt('fullOff', 'Ecrã inteiro desativado.'));
+            }
+        }
+        var orig = root.toggleFullscreen;
+        if (typeof orig !== 'function' || orig._abeneFullWrap) return;
+        root.toggleFullscreen = function () {
+            var onFs = !!fsEl();
+            var exit = document.exitFullscreen || document.webkitExitFullscreen;
+            var req = document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullscreen;
+            if (onFs && exit) {
+                Promise.resolve(exit.call(document)).then(function () { refreshBtn(); toast(false, 'fs'); }).catch(function () { refreshBtn(); });
+                return;
+            }
+            if (document.body.classList.contains('app-maximized') && !onFs) {
+                document.body.classList.remove('app-maximized');
+                refreshBtn();
+                toast(false, 'app');
+                return;
+            }
+            if (req) {
+                Promise.resolve(req.call(document.documentElement)).then(function () {
+                    refreshBtn();
+                    toast(true, 'fs');
+                }).catch(function () {
+                    document.body.classList.add('app-maximized');
+                    refreshBtn();
+                    toast(true, 'app');
+                });
+                return;
+            }
+            if (typeof orig === 'function') orig.apply(this, arguments);
+            else document.body.classList.toggle('app-maximized');
+            refreshBtn();
+            toast(isOn(), document.body.classList.contains('app-maximized') ? 'app' : 'fs');
+        };
+        root.toggleFullscreen._abeneFullWrap = true;
+        root.toggleFullscreen._legacy = orig;
+        document.addEventListener('fullscreenchange', refreshBtn);
+        document.addEventListener('webkitfullscreenchange', refreshBtn);
+        function boot() { refreshBtn(); }
+        if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+        else boot();
+        root.addEventListener('load', boot);
+    })();
+
+    /* Base → Efeitos de texto: exige texto selecionado; restaura a seleção após o menu. */
+    (function wrapTextFx() {
+        var savedRange = null;
+        function ttLocal(key, fb) {
+            if (typeof root.t === 'function') {
+                var v = root.t(key);
+                if (v && v !== key) return String(v);
+            }
+            return fb || key;
+        }
+        function toast(msg) {
+            if (typeof root.showToast === 'function') root.showToast(msg);
+        }
+        function editor() {
+            return (root.abene && root.abene.editor) || document.getElementById('editor');
+        }
+        function nodeInEditor(n) {
+            var ed = editor();
+            if (!ed || !n) return false;
+            if (n.nodeType !== 1) n = n.parentElement;
+            return !!(n && (n === ed || ed.contains(n)));
+        }
+        function captureSel() {
+            var sel = root.getSelection();
+            if (!sel || !sel.rangeCount) return null;
+            var r = sel.getRangeAt(0);
+            if (!nodeInEditor(r.commonAncestorContainer)) return null;
+            try { return r.cloneRange(); } catch (e) { return null; }
+        }
+        function restoreSel(r) {
+            if (!r) return;
+            var sel = root.getSelection();
+            if (!sel) return;
+            try {
+                sel.removeAllRanges();
+                sel.addRange(r);
+            } catch (e2) {}
+        }
+        function hasVisibleSel() {
+            var r = savedRange;
+            if (!r && root.getSelection && root.getSelection().rangeCount) {
+                r = root.getSelection().getRangeAt(0);
+            }
+            if (!r || r.collapsed) return false;
+            return !!String(r.toString() || '').replace(/\u200b/g, '').replace(/\s+/g, '');
+        }
+        function boot() {
+            var origFx = root.applyTextFx;
+            if (typeof origFx === 'function' && !origFx._abeneFxWrap) {
+                root.applyTextFx = function (kind) {
+                    restoreSel(savedRange);
+                    if (!hasVisibleSel()) {
+                        toast(ttLocal('aSelectText', 'Selecione o texto a converter.'));
+                        return;
+                    }
+                    var out = origFx.apply(this, arguments);
+                    if (typeof root.saveUndoState === 'function') root.saveUndoState();
+                    savedRange = null;
+                    return out;
+                };
+                root.applyTextFx._abeneFxWrap = true;
+                root.applyTextFx._legacy = origFx;
+            }
+            var orig = root.applyTextEffect;
+            if (typeof orig !== 'function' || orig._abeneFxWrap) return;
+            root.applyTextEffect = function (ev) {
+                savedRange = captureSel();
+                if (!hasVisibleSel()) {
+                    toast(ttLocal('aSelectText', 'Selecione o texto a converter.'));
+                }
+                return orig.apply(this, arguments);
+            };
+            root.applyTextEffect._abeneFxWrap = true;
+            root.applyTextEffect._legacy = orig;
+        }
+        if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+        else setTimeout(boot, 0);
+        root.addEventListener('load', boot);
+    })();
 })(window);

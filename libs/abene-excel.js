@@ -89,10 +89,30 @@
     }
     function listSep() { return /^en/i.test(locale()) ? ',' : ';'; }
     function decSep() { return /^en/i.test(locale()) ? '.' : ','; }
+    function isFx(raw) {
+        var s = String(raw == null ? '' : raw).replace(/^\s+/, '');
+        if (!s) return false;
+        if (s.charAt(0) === '=') return true;
+        if (s.charAt(0) === '+' && /[\dA-Za-z.(]/.test(s.charAt(1) || '')) return true;
+        if (s.charAt(0) === '-' && /[+\-*/^]/.test(s.slice(1)) && /^-\s*[\d(A-Za-z$]/.test(s)) return true;
+        if (/^\d{4}-\d{2}-\d{2}/.test(s) || /^\d{1,2}[./]\d{1,2}[./]/.test(s)) return false;
+        if (/^[\d.,\s()+\-*/^%]+$/.test(s) && /[+\-*/^]/.test(s) && /\d/.test(s)) return true;
+        if (/^\$?[A-Za-z]{1,3}\$?\d+\s*[+\-*/^]/.test(s)) return true;
+        return false;
+    }
+    function toFx(raw) {
+        var s = String(raw == null ? '' : raw).replace(/^\s+|\s+$/g, '');
+        if (!s) return s;
+        if (s.charAt(0) === '=') return s;
+        if (s.charAt(0) === '+') return '=' + s.slice(1);
+        return '=' + s;
+    }
     function formulaDisplay(raw) {
         if (!raw) return '';
-        if (String(raw).charAt(0) !== '=') return String(raw);
-        return (E().localizeFormula ? E().localizeFormula(raw, locale()) : raw);
+        if (!isFx(raw)) return String(raw);
+        var fx = toFx(raw);
+        var eng = E();
+        return (eng && eng.localizeFormula ? eng.localizeFormula(fx, locale()) : fx);
     }
     function locFn(canon) {
         if (E().fnLocalName) return E().fnLocalName(canon, locale());
@@ -664,7 +684,7 @@
     function cellValue(sh, c, r, visiting) {
         var ce = cell(sh, c, r);
         if (!ce) return '';
-        if (ce.raw && String(ce.raw).charAt(0) === '=') {
+        if (ce.raw && isFx(ce.raw)) {
             if (ce._calc === visiting) return ce.value;
             return evalCell(sh, c, r, visiting);
         }
@@ -672,15 +692,19 @@
     }
     function evalCell(sh, c, r, visiting) {
         var ce = cell(sh, c, r);
-        if (!ce || !ce.raw || String(ce.raw).charAt(0) !== '=') return ce ? ce.value : '';
+        if (!ce || !ce.raw || !isFx(ce.raw)) return ce ? ce.value : '';
         var id = sh.name + '!' + key(c, r);
         visiting = visiting || {};
         if (visiting[id]) { ce.value = '#CIRC!'; ce.error = '#CIRC!'; return ce.error; }
         visiting[id] = true;
         try {
-            if (E().dangerous(ce.raw)) throw E().err('#N/A');
+            var eng = E();
+            if (!eng) throw { excel: '#N/A' };
+            if (eng.dangerous && eng.dangerous(ce.raw)) throw eng.err ? eng.err('#N/A') : { excel: '#N/A' };
+            var src = toFx(ce.raw);
+            if (eng.toInvariantFormula) src = eng.toInvariantFormula(src);
             var ctx = {
-                listSep: ',',
+                listSep: (eng.detectListSep ? eng.detectListSep(src) : ',') || ',',
                 origin: { c: c, r: r },
                 refs: [],
                 ref: function (rf) {
@@ -722,7 +746,7 @@
                     return ctx.range(pref + E().a1(c0, 0), pref + E().a1(c1, ssh.rows - 1));
                 }
             };
-            var v = E().evaluate(E().toInvariantFormula ? E().toInvariantFormula(ce.raw) : ce.raw, ctx);
+            var v = eng.evaluate(src, ctx);
             ce.value = v;
             ce.error = '';
             ce.deps = ctx.refs;
@@ -740,8 +764,10 @@
             for (k in sh.cells) {
                 if (!Object.prototype.hasOwnProperty.call(sh.cells, k)) continue;
                 ce = sh.cells[k];
-                if (ce.raw && String(ce.raw).charAt(0) === '=') evalCell(sh, E().parseA1(k).c, E().parseA1(k).r, {});
-                else {
+                if (ce.raw && isFx(ce.raw)) {
+                    if (String(ce.raw).charAt(0) !== '=') ce.raw = toFx(ce.raw);
+                    evalCell(sh, E().parseA1(k).c, E().parseA1(k).r, {});
+                } else {
                     var p = parseRaw(ce.raw);
                     ce.value = p.value;
                     ce.error = '';
@@ -773,7 +799,10 @@
         if (r >= sh.rows) sh.rows = r + 1;
         var ce = ensure(sh, c, r);
         var stored = raw == null ? '' : String(raw);
-        if (stored.charAt(0) === '=' && E().toInvariantFormula) stored = E().toInvariantFormula(stored);
+        if (isFx(stored)) {
+            stored = toFx(stored);
+            if (E() && E().toInvariantFormula) stored = E().toInvariantFormula(stored);
+        }
         ce.raw = stored;
         if (!ce.raw) delete sh.cells[key(c, r)];
         recalc(); persist(); render();
@@ -3331,6 +3360,7 @@
         }
         var ws = document.getElementById('excelWorkspace');
         if (ws) ws.style.display = 'flex';
+        try { recalc(); persist(); } catch (eRecalc) {}
         requestAnimationFrame(function () {
             requestAnimationFrame(function () {
                 render();
@@ -3566,6 +3596,7 @@
             if (saved) wb = JSON.parse(saved);
         } catch (e) {}
         if (!wb) wb = newWorkbook();
+        try { recalc(); } catch (eBootCalc) {}
         applyExcelVisibility();
         applyExcelLanguage();
         var prevXlI18n = window.abeneAfterI18n;

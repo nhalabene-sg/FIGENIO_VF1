@@ -36,6 +36,7 @@
             el = kids[i];
             if (!el || !el.classList) continue;
             if (el.classList.contains('abene-page-flow')) continue;
+            if (el.classList.contains('watermark') || el.classList.contains('abene-wm')) continue;
             if (el.classList.contains('abene-obj-free') || el.classList.contains('abene-obj-behind') || el.classList.contains('abene-obj-front')) continue;
             if (el.classList.contains('abene-footnotes')) continue;
             parts.push(el.tagName + ':' + (el.offsetHeight || 0) + 'x' + (el.offsetWidth || 0));
@@ -56,7 +57,10 @@
         if (root._abenePointerDown || root._abeneRulerDrag) return false;
         if (editor.classList.contains('editing-header-footer')) return false;
         if (A().documentState && A().documentState.pagination === false) return false;
+        if (root._abeneFlowForce) return false;
         if (editor.querySelector('.page-break-marker') && !editor.querySelector('.abene-page-flow')) return false;
+        var contentH = editor.scrollHeight || 0;
+        if (contentH > pageHeight() * 1.15 && !editor.querySelector('.abene-page-flow')) return false;
         if (geoKey() !== lastGeo) return false;
         var ph = pageHeight();
         var a = A();
@@ -67,6 +71,7 @@
         for (i = 0; i < kids.length; i++) {
             child = kids[i];
             if (!child || !child.classList || child.classList.contains('abene-page-flow')) continue;
+            if (child.classList.contains('watermark') || child.classList.contains('abene-wm')) continue;
             if (child.offsetHeight > writableHeight + 4) return false;
         }
         return heightsKey(editor) === lastHeights;
