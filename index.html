@@ -7647,7 +7647,7 @@
                 localStorage.setItem('abeneExcelCompleteOn', '1');
             } catch (e) {}
         }
-        if (typeof API_URL === 'string' && API_URL && companyData.appsScriptUrl !== API_URL) {
+        if (!companyData.appsScriptUrl && typeof API_URL === 'string' && API_URL) {
             companyData.appsScriptUrl = API_URL;
             if (companyData.databaseEnabled !== false) companyData.databaseEnabled = true;
             try { localStorage.setItem('abeneCompanyData', JSON.stringify(companyData)); } catch (eFill) {}
@@ -12475,7 +12475,7 @@ table { border-collapse: collapse; }
                 <p style="font-size:12px;color:#666;line-height:1.45;white-space:pre-line;">${t('sheetsHint')}</p>
                 ${(() => {
                     var coded = (typeof API_URL === 'string' && API_URL.trim()) ? API_URL.trim() : '';
-                    var shown = coded || (companyData.appsScriptUrl || '');
+                    var shown = (companyData.appsScriptUrl || '') || coded;
                     var ok = /script.google.com\/macros\/s\//.test(shown);
                     return field('appsScriptUrl', t('appsUrl'), shown, 'url') +
                         '<p style="font-size:12px;line-height:1.45;margin:8px 0;color:' + (ok ? '#1e6b3a' : '#a33') + ';">' +
