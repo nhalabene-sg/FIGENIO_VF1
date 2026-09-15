@@ -77,9 +77,11 @@
     -->
     <script>
       // ▼▼▼ COLAR O URL AQUI — APENAS NESTA LINHA ▼▼▼
-      var API_URL = '';
+      var API_URL = 'https://script.google.com/macros/s/AKfycbwc-Wu5u-Rvwq8VX1-y87kJ_87bS86RmJHLpfhGs-WUaXiB8TiuBYDCU17vdsn-dByGkw/exec';
+      var ACCOUNT_EMAIL = 'nhalabene@gmail.com';
       // ▲▲▲ NÃO ALTERAR MAIS NADA ▲▲▲
       window.API_URL = API_URL;
+      window.ABENE_ACCOUNT_EMAIL = ACCOUNT_EMAIL;
     </script>
     <link rel="icon" href="branding/favicon.svg" type="image/svg+xml">
     <link rel="apple-touch-icon" href="branding/icon_96.svg">
@@ -7606,7 +7608,7 @@
             cae: '',
             address: '',
             phone: '',
-            email: '',
+            email: (typeof ACCOUNT_EMAIL === 'string' && ACCOUNT_EMAIL) ? ACCOUNT_EMAIL : '',
             website: '',
             iban: '',
             bic: '',
@@ -7625,7 +7627,7 @@
             sheetsLastSync: '',
             driveFolderUrl: '',
             driveFolderId: '',
-            installerEmail: '',
+            installerEmail: (typeof ACCOUNT_EMAIL === 'string' && ACCOUNT_EMAIL) ? ACCOUNT_EMAIL : '',
             googleOwnerEmail: '',
             databaseEnabled: true,
             excelEnabled: true,
@@ -7645,10 +7647,18 @@
                 localStorage.setItem('abeneExcelCompleteOn', '1');
             } catch (e) {}
         }
-        if (!companyData.appsScriptUrl && typeof API_URL === 'string' && API_URL) {
+        if (typeof API_URL === 'string' && API_URL && companyData.appsScriptUrl !== API_URL) {
             companyData.appsScriptUrl = API_URL;
             if (companyData.databaseEnabled !== false) companyData.databaseEnabled = true;
             try { localStorage.setItem('abeneCompanyData', JSON.stringify(companyData)); } catch (eFill) {}
+        }
+        if (typeof ACCOUNT_EMAIL === 'string' && ACCOUNT_EMAIL) {
+            var accountChanged = false;
+            if (!companyData.email) { companyData.email = ACCOUNT_EMAIL; accountChanged = true; }
+            if (!companyData.installerEmail) { companyData.installerEmail = ACCOUNT_EMAIL; accountChanged = true; }
+            if (accountChanged) {
+                try { localStorage.setItem('abeneCompanyData', JSON.stringify(companyData)); } catch (eEmail) {}
+            }
         }
         if (!localStorage.getItem('abeneSheetsV2')) {
             if (companyData.appsScriptUrl) companyData.databaseEnabled = true;
