@@ -71,8 +71,12 @@
     var savedRange = null;
     function saveCaret() {
         var sel = window.getSelection();
-        if (sel && sel.rangeCount) savedRange = sel.getRangeAt(0).cloneRange();
+        var editor = editorEl();
+        if (sel && sel.rangeCount && editor && editor.contains(sel.anchorNode) && editor.contains(sel.focusNode)) {
+            savedRange = sel.getRangeAt(0).cloneRange();
+        }
     }
+    document.addEventListener('selectionchange', saveCaret);
     function restoreCaret() {
         var editor = editorEl();
         if (!editor) return;
@@ -859,6 +863,12 @@
     function buildTablesHtml() {
         return buildListIndexHtml('table', 'totTitle', 'aNoTablesCap');
     }
+    var generatedIndexContinuation = '[data-abene-cont="block"].field-toc, [data-abene-cont="block"][data-field-type="toc"], [data-abene-cont="block"][data-abene-origin-block="toc"], [data-abene-cont="block"][data-index], [data-abene-cont="block"][data-figures-index], [data-abene-cont="block"][data-tables-index], [data-abene-cont="block"][data-illustrations-index]';
+    function removeGeneratedIndexContinuations(editor, selector) {
+        editor.querySelectorAll(generatedIndexContinuation).forEach(function (part) {
+            if (!selector || part.matches(selector) || (selector.indexOf('toc') >= 0 && part.getAttribute('data-abene-origin-block') === 'toc')) part.remove();
+        });
+    }
     function refreshCaptionIndexes() {
         var editor = editorEl();
         if (!editor) return;
@@ -869,15 +879,55 @@
     }
     function replaceOrInsert(selector, html, atStart) {
         var editor = editorEl();
-        var existing = editor.querySelector(selector);
-        if (existing) {
-            existing.outerHTML = html;
-        } else if (atStart) {
-            editor.insertAdjacentHTML('afterbegin', html);
-        } else {
-            insertHTML(html);
+        if (!editor) return false;
+        saveCaret();
+        if (!savedRange || !editor.contains(savedRange.startContainer)) {
+            toast('Coloque o cursor na página onde pretende inserir o índice.');
+            return false;
         }
+        var range = savedRange.cloneRange();
+        range.collapse(true);
+        var parent = range.startContainer.nodeType === 1 ? range.startContainer : range.startContainer.parentElement;
+        if (parent.closest('table, [contenteditable="false"], .page-chrome')) {
+            toast('Coloque o cursor num parágrafo do documento, fora de tabelas e cabeçalhos.');
+            return false;
+        }
+        var holder = document.createElement('div');
+        holder.innerHTML = html;
+        var inserted = holder.firstElementChild;
+        var existing = editor.querySelector(selector);
+        if (existing && (existing.contains(range.startContainer) || parent.closest(generatedIndexContinuation))) {
+            existing.replaceWith(inserted);
+        } else {
+            if (existing) {
+                // Only retire the generated model break, never a user's manual break.
+                var after = existing.nextElementSibling;
+                while (after && after.classList.contains('abene-page-flow')) after = after.nextElementSibling;
+                if (existing.matches('[data-abene-block="toc"]') && after && after.matches('[data-abene-break="model"]')) after.remove();
+                existing.remove();
+            }
+            var paragraph = parent.closest('p, h1, h2, h3, h4, h5, h6');
+            if (paragraph && editor.contains(paragraph)) {
+                var tail = range.cloneRange();
+                tail.setEnd(paragraph, paragraph.childNodes.length);
+                var next = paragraph.cloneNode(false);
+                next.removeAttribute('id');
+                next.appendChild(tail.extractContents());
+                paragraph.after(inserted, next);
+                if (!paragraph.textContent && !paragraph.querySelector('img,video,canvas,svg')) paragraph.remove();
+                if (!next.hasChildNodes()) next.innerHTML = '<br>';
+            } else {
+                range.insertNode(inserted);
+            }
+        }
+        removeGeneratedIndexContinuations(editor, selector);
+        var selection = window.getSelection();
+        range = document.createRange(); range.setStartAfter(inserted); range.collapse(true);
+        selection.removeAllRanges(); selection.addRange(range); savedRange = range.cloneRange();
         if (typeof saveUndoState === 'function') saveUndoState();
+        if (typeof window.abeneSchedulePageFlow === 'function') window.abeneSchedulePageFlow(true);
+        inserted.scrollIntoView({ block: 'nearest' });
+        return true;
     }
     window.insertIllustrationsIndex = function () {
         var editor = editorEl();
@@ -885,7 +935,7 @@
         var hasCap = collectCaptions('figure').length;
         var hasImg = !!editor.querySelector('img');
         if (!hasCap && !hasImg) { toast(tt('aNoIllustDoc')); return; }
-        replaceOrInsert('[data-figures-index], [data-illustrations-index]', buildFiguresHtml(), true);
+        if (!replaceOrInsert('[data-figures-index], [data-illustrations-index]', buildFiguresHtml(), true)) return;
         toast(tt('illIndexTitle') || tt('illIndex'));
     };
     window.insertTableOfFigures = window.insertIllustrationsIndex;
@@ -898,7 +948,7 @@
             toast(tt('aNoTablesDoc') || tt('aNoTablesCap'));
             return;
         }
-        replaceOrInsert('[data-tables-index]', buildTablesHtml(), true);
+        if (!replaceOrInsert('[data-tables-index]', buildTablesHtml(), true)) return;
         toast(tt('totTitle') || tt('tocTables'));
     };
 
@@ -1145,6 +1195,9 @@
     function refreshAllTocs() {
         var editor = editorEl();
         if (!editor) return;
+        // Pagination clones retain the field attributes. Rebuilding every clone
+        // would reproduce the entire index once per page and grow it on each F9.
+        removeGeneratedIndexContinuations(editor);
         editor.querySelectorAll('[data-abene-block="toc"]').forEach(function (block) {
             window.abeneFillModeloToc(block);
         });
@@ -1158,18 +1211,9 @@
         try {
             if (!headingTargets().length) { toast(tt('aNoToc')); return; }
             var editor = editorEl();
-            var modelo = editor && editor.querySelector('[data-abene-block="toc"]');
-            if (modelo) {
-                window.abeneFillModeloToc(modelo);
-                if (typeof saveUndoState === 'function') saveUndoState();
-                return;
-            }
-            replaceOrInsert('[data-field-type="toc"], .field-toc', buildTocHtml(), true);
+            replaceOrInsert('[data-abene-block="toc"], [data-field-type="toc"], .field-toc', buildTocHtml(), true);
         } catch (err) {
-            if (typeof legacyInsertTOC === 'function' && legacyInsertTOC !== window.insertTOC) {
-                return legacyInsertTOC.apply(this, arguments);
-            }
-            throw err;
+            toast('Não foi possível inserir o índice: ' + String(err.message || err));
         }
     };
     window.abeneUpdateToc = function () {
@@ -1287,12 +1331,10 @@
             }
             var groups = collectIndexGroups();
             if (!groups.length) { toast(tt('idxSelectFirst')); return; }
-            replaceOrInsert('[data-index="true"]', buildIndexHtml(), true);
+            if (!replaceOrInsert('[data-index="true"]', buildIndexHtml(), true)) return;
             toast(tt('idxBuilt') || tt('idxTitle'));
         } catch (errIdx) {
-            if (typeof legacyInsertIndex === 'function' && legacyInsertIndex !== window.insertIndex) {
-                return legacyInsertIndex.apply(this, arguments);
-            }
+            toast('Não foi possível inserir o índice: ' + String(errIdx.message || errIdx));
         }
     };
 
@@ -1305,6 +1347,7 @@
         fieldsBusy = true;
         try {
             if (typeof refreshPagination === 'function' && !silent) refreshPagination();
+            removeGeneratedIndexContinuations(editor);
             renumberCaptions();
             if (editor.querySelector('[data-field-type="toc"], .field-toc, [data-abene-block="toc"]')) {
                 refreshAllTocs();
@@ -1313,6 +1356,13 @@
             refreshIndex();
             refreshInTextCitations();
             rebuildBibliography(false);
+            if (typeof window.abeneSchedulePageFlow === 'function') window.abeneSchedulePageFlow(true);
+            editor.querySelectorAll('.abene-toc-row').forEach(function (row) {
+                var link = row.querySelector('a[href^="#"]');
+                var page = row.querySelector('.abene-toc-page');
+                var target = link && document.getElementById(link.getAttribute('href').slice(1));
+                if (page && target) page.textContent = pageOfEl(target);
+            });
             var ph = (window.PageGeometry && window.PageGeometry.height) || 1123;
             var totalPages = window.abeneCountUsedPages ? window.abeneCountUsedPages(editor) : Math.max(1, Math.ceil(editor.scrollHeight / ph));
             editor.querySelectorAll('[data-field-type="page"]').forEach(function (field) {

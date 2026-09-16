@@ -1727,6 +1727,17 @@
             font-size: 12px;
         }
 
+        #devisConditionChoices input[type="radio"],
+        #devisConditionChoices input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            padding: 0;
+            margin-right: 7px;
+            vertical-align: middle;
+        }
+        #devisConditionChoices label { min-height: 32px; cursor: pointer; }
+        #devisConditionChoices fieldset { border: 1px solid #b8c4d4; border-radius: 4px; }
+        #devisNotes { min-height: 120px; }
         .form-group textarea {
             resize: vertical;
             min-height: 60px;
@@ -7178,6 +7189,7 @@
 
                 <div class="form-group">
                     <label data-i18n="conditions">Condições / Notas</label>
+                    <div id="devisConditionChoices" style="display:grid;gap:8px;margin:8px 0;"></div>
                     <textarea id="devisNotes">Pagamento por transferência bancária. Este orçamento é válido até à data indicada. Não constitui fatura.</textarea>
                 </div>
             </div>
@@ -12908,7 +12920,7 @@ table { border-collapse: collapse; }
     <script src="libs/abene-word-home.js?v=20260915-save-2"></script>
     <script src="libs/abene-pagination-engine.js?v=20260915-layout-1"></script>
     <script src="libs/abene-sections.js?v=20260915-hfdist-1"></script>
-    <script src="libs/abene-toolbar.js?v=20260915-webimg-1"></script>
+    <script src="libs/abene-toolbar.js?v=20260916-index-1"></script>
     <script src="libs/abene-commands.js?v=20260915-fx-1"></script>
     <script src="libs/abene-notes.js?v=20260915-dark-1"></script>
     <script src="libs/abene-objects.js?v=20260915-date-1"></script>
@@ -12918,7 +12930,7 @@ table { border-collapse: collapse; }
     <script src="libs/abene-history.js?v=20260915-outline-1"></script>
     <script src="libs/abene-export.js?v=20260915-web-1"></script>
     <script src="libs/abene-modelo.js?v=20260914-meta-1"></script>
-    <script src="libs/abene-comercial.js?v=20260914-essential-1"></script>
+    <script src="libs/abene-comercial.js?v=20260916-conditions-1"></script>
     <script src="libs/abene-contabilidade.js?v=20260915-email-2"></script>
     <script src="libs/abene-arquivo.js?v=20260915-mobile-2"></script>
     <script src="libs/abene-phone.js?v=20260914-essential-1"></script>

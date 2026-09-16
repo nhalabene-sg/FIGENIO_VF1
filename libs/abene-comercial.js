@@ -815,6 +815,57 @@
         finishInsert();
     }
 
+    // Commercial proposals, not mandatory legal rates. Only selected text is added.
+    var quotePaymentOptions = [
+        { id: 'advance20', label: '20% na aceitação + 80% na conclusão', text: 'Pagamento: 20% do valor total do orçamento após a aceitação por escrito; os restantes 80% na conclusão dos trabalhos, contra apresentação da respetiva fatura.' },
+        { id: 'advance50', label: '50% na aceitação + 50% na conclusão', text: 'Pagamento: 50% do valor total do orçamento após a aceitação por escrito; os restantes 50% na conclusão dos trabalhos, contra apresentação da respetiva fatura.' },
+        { id: 'stages', label: '30% na aceitação + 40% por etapa + 30% no final', text: 'Pagamento faseado: 30% do valor total após a aceitação por escrito, 40% após a conclusão de uma etapa definida por escrito entre as partes e 30% na conclusão dos trabalhos, mediante a respetiva faturação.' },
+        { id: 'completion', label: '100% na conclusão dos trabalhos', text: 'Pagamento: 100% do valor total na conclusão dos trabalhos, contra apresentação da respetiva fatura.' },
+        { id: 'invoice15', label: 'Pagamento a 15 dias da fatura', text: 'Pagamento: no prazo de 15 dias após a emissão da fatura correspondente aos trabalhos realizados.' }
+    ];
+    var quoteClauseOptions = [
+        { id: 'written', label: 'Aceitação por escrito', text: 'A adjudicação depende da aceitação por escrito deste orçamento e das condições acordadas.' },
+        { id: 'extras', label: 'Trabalhos adicionais só após aprovação', text: 'Trabalhos ou materiais não incluídos neste orçamento serão objeto de proposta adicional e só serão executados após aprovação por escrito do cliente.' },
+        { id: 'schedule', label: 'Datas e acesso ao local a combinar', text: 'A data de início, o prazo de execução e as condições de acesso ao local serão acordados por escrito antes do início dos trabalhos.' },
+        { id: 'transfer', label: 'Transferência bancária com referência', text: 'O pagamento será efetuado por transferência bancária para o IBAN indicado, identificando o número do orçamento.' }
+    ];
+    function setupQuoteConditions() {
+        var host = document.getElementById('devisConditionChoices');
+        var notes = document.getElementById('devisNotes');
+        if (!host || !notes) return;
+        var text = notes.value || '';
+        host.innerHTML = '<fieldset style="min-width:0;padding:8px"><legend>Plano de pagamento (escolha uma opção)</legend>' +
+            '<label style="display:block"><input type="radio" name="devisPaymentChoice" value="custom"' + (!quotePaymentOptions.some(function (p) { return text.indexOf(p.text) >= 0; }) ? ' checked' : '') + '> Só texto livre / personalizado</label>' +
+            quotePaymentOptions.map(function (p) {
+                return '<label style="display:block;margin:6px 0"><input type="radio" name="devisPaymentChoice" value="' + p.id + '"' + (text.indexOf(p.text) >= 0 ? ' checked' : '') + '> ' + esc(p.label) + '</label>';
+            }).join('') + '</fieldset><fieldset style="min-width:0;padding:8px"><legend>Cláusulas opcionais</legend>' +
+            quoteClauseOptions.map(function (p) {
+                return '<label style="display:block;margin:6px 0"><input type="checkbox" data-quote-clause="' + p.id + '"' + (text.indexOf(p.text) >= 0 ? ' checked' : '') + '> ' + esc(p.label) + '</label>';
+            }).join('') + '</fieldset><small>Propostas a acordar com o cliente. Pode completar ou alterar livremente o texto abaixo.</small>';
+        host.onchange = function (event) {
+            var input = event.target;
+            var value = notes.value;
+            if (input.name === 'devisPaymentChoice') {
+                quotePaymentOptions.forEach(function (p) { value = value.split(p.text).join(''); });
+                var selected = quotePaymentOptions.filter(function (p) { return p.id === input.value; })[0];
+                if (selected) {
+                    value = value.trim() + '\n\n' + selected.text;
+                    setField('devisPayTerms', selected.label);
+                } else {
+                    var terms = document.getElementById('devisPayTerms');
+                    if (terms && quotePaymentOptions.some(function (p) { return terms.value === p.label; })) terms.value = '';
+                }
+            } else {
+                var clause = quoteClauseOptions.filter(function (p) { return p.id === input.getAttribute('data-quote-clause'); })[0];
+                if (!clause) return;
+                value = value.split(clause.text).join('');
+                if (input.checked) value = value.trim() + '\n\n' + clause.text;
+            }
+            notes.value = value.replace(/\n{3,}/g, '\n\n').trim();
+            notes.dispatchEvent(new Event('input', { bubbles: true }));
+        };
+    }
+
     window.openDevisModal = function () {
         if (typeof applyCompanyDefaults === 'function') applyCompanyDefaults();
         var finalDevis = ed() && ed().querySelector('[data-abene-block="devis"][data-abene-status="final"]');
@@ -836,6 +887,7 @@
         ensurePaperLetterhead();
         prefillFromDocument('devis');
         hydrateFromEditor('devis');
+        setupQuoteConditions();
         var dateEl = document.getElementById('devisDate');
         if (dateEl && !dateEl.value) dateEl.value = todayIso();
         if (window.abeneContabilidade && window.abeneContabilidade.fillDevisFromTables) {
