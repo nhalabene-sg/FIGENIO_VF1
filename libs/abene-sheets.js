@@ -117,7 +117,10 @@
     }
     function parseApiJson(txt) {
         try { return JSON.parse(txt); }
-        catch (e) { throw new Error(String(txt || '').slice(0, 180) || 'bad-json'); }
+        catch (e) {
+            if (/^\s*(?:<!doctype\s+html|<html|<)/i.test(String(txt || ''))) throw new Error('google-html-response');
+            throw new Error('invalid-api-response');
+        }
     }
     function acceptApiJson(json) {
         if (!json || json.ok === false) throw new Error((json && json.error) || 'fail');
@@ -138,6 +141,7 @@
             headers: { 'Content-Type': 'text/plain;charset=utf-8' },
             body: JSON.stringify(body)
         }).then(function (res) {
+            if (!res.ok) throw new Error('api-http-' + res.status);
             return res.text().then(parseApiJson);
         }).then(acceptApiJson);
     }

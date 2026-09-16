@@ -67,6 +67,10 @@
         try {
             localStorage.setItem('abeneGdocsFileId', id);
             localStorage.setItem('abeneGdocsUrl', url);
+            var settings = JSON.parse(localStorage.getItem('abeneProjectSettings') || '{}');
+            settings.gdocsFileId = id;
+            settings.gdocsUrl = url;
+            localStorage.setItem('abeneProjectSettings', JSON.stringify(settings));
         } catch (e2) {}
         updateStatusUi();
     }
@@ -86,6 +90,10 @@
         try {
             localStorage.removeItem('abeneGdocsFileId');
             localStorage.removeItem('abeneGdocsUrl');
+            var settings = JSON.parse(localStorage.getItem('abeneProjectSettings') || '{}');
+            settings.gdocsFileId = '';
+            settings.gdocsUrl = '';
+            localStorage.setItem('abeneProjectSettings', JSON.stringify(settings));
         } catch (e3) {}
         updateStatusUi();
     }
@@ -141,10 +149,15 @@
     function applyHtmlToEditor(html) {
         var ed = (root.abene && root.abene.editor) || document.getElementById('editor');
         if (!ed) return false;
-        try {
-            if (typeof root.saveDocument === 'function') root.saveDocument({ silent: true });
-        } catch (eSave) {}
+        // Refuse replacement if a recovery copy cannot be stored.
+        localStorage.setItem('abeneBeforeGoogleDocsPull', JSON.stringify({
+            html: typeof root.persistableEditorHtml === 'function' ? root.persistableEditorHtml() : ed.innerHTML,
+            settings: typeof root.projectSettings === 'function' ? root.projectSettings() : '',
+            at: new Date().toISOString()
+        }));
         ed.innerHTML = sanitizeImportedHtml(html);
+        localStorage.setItem('docContent', ed.innerHTML);
+        localStorage.setItem('abeneAutosave', ed.innerHTML);
         var st = docState();
         if (st) st.dirty = true;
         if (typeof root.saveUndoState === 'function') root.saveUndoState();
@@ -172,9 +185,16 @@
             if (pullBtn) pullBtn.style.display = (link && link.id) ? '' : 'none';
         });
     }
-    function openInGoogleDocs() {
+    function openInGoogleDocs(options) {
         if (busy) return;
         if (typeof root.closeAllDropdowns === 'function') root.closeAllDropdowns();
+        var existing = getLink();
+        if (existing && !(options && options.send)) {
+            root.open('https://docs.google.com/document/d/' + existing.id + '/edit', '_blank', 'noopener,noreferrer');
+            updateStatusUi();
+            return;
+        }
+        if (existing && !root.confirm('Enviar o conteúdo atual de ABENE para o mesmo Google Docs? Isto substitui o conteúdo no Google Docs. Se trabalhou lá, use primeiro «Atualizar Docs».')) return;
         if (!cloudReady()) {
             openSettingsHint();
             return;
@@ -184,11 +204,12 @@
             return;
         }
         busy = true;
-        var existing = getLink();
+        var pendingTab = root.open('about:blank', '_blank');
+        if (pendingTab) pendingTab.opener = null;
         toast(existing
             ? tt('gdocsUpdating', 'A atualizar o Google Docs ligado…')
             : tt('gdocsSending', 'A enviar para o Google Docs…'));
-        root.buildDocxBlob().then(function (blob) {
+        root.abeneSheetsCall('PING').then(function () { return root.buildDocxBlob(); }).then(function (blob) {
             if (!blob) throw new Error('no-blob');
             if (blob.size > MAX_BYTES) throw new Error('too-large');
             return blobToBase64(blob).then(function (b64) {
@@ -205,12 +226,10 @@
             toast(json.updated
                 ? tt('gdocsUpdatedOpen', 'Mesmo documento atualizado — a abrir o Google Docs.')
                 : tt('gdocsOpened', 'Documento aberto no Google Docs.'));
-            try {
-                root.open(url, '_blank', 'noopener,noreferrer');
-            } catch (eOpen) {
-                root.location.href = url;
-            }
+            if (pendingTab && !pendingTab.closed) pendingTab.location.href = 'https://docs.google.com/document/d/' + id + '/edit';
+            else toast('Documento ligado. Clique em «Google Docs ligado» para abrir.');
         }).catch(function (err) {
+            if (pendingTab && !pendingTab.closed) pendingTab.close();
             handleErr(err);
         }).then(function () { busy = false; }, function () { busy = false; });
     }
@@ -226,6 +245,7 @@
             openSettingsHint();
             return;
         }
+        if (!root.confirm('Carregar as alterações do Google Docs neste documento ABENE? A versão local atual será conservada como cópia de segurança.')) return;
         busy = true;
         toast(tt('gdocsPulling', 'A atualizar a partir do Google Docs…'));
         root.abeneSheetsCall('PULL_GDOCS', { fileId: link.id }).then(function (json) {
@@ -239,7 +259,9 @@
     }
     function handleErr(err) {
         var msg = String((err && err.message) || err || '');
-        if (/no-url|no-cloud/i.test(msg) || msg === 'no-url') openSettingsHint();
+        if (msg === 'token') toast('Ligação Google recusada: a chave de acesso nas Definições não corresponde à chave do Apps Script. O documento local foi conservado.');
+        else if (/google-html-response|api-http-(401|403|404|405)|<!doctype|<html/i.test(msg)) toast('O Google devolveu uma página de acesso ou de erro, não a resposta da API. Verifique o URL /exec, o deployment e a autorização do Apps Script. O documento local foi conservado.');
+        else if (/no-url|no-cloud/i.test(msg) || msg === 'no-url') openSettingsHint();
         else if (/too-large/i.test(msg)) toast(tt('gdocsTooLarge', 'Documento demasiado grande (máx. ~4,5 MB). Reduza imagens e tente de novo.'));
         else if (/Unknown action/i.test(msg)) toast(tt('gdocsNeedUpdate', 'Atualize o script emaildrive no Google (versão 2.5) e implante uma nova aplicação web.'));
         else if (/no-blob|aNoDocx/i.test(msg)) toast(tt('aNoDocx', 'A biblioteca DOCX não está carregada.'));
@@ -252,14 +274,8 @@
             updateStatusUi();
             return;
         }
-        try {
-            var id = localStorage.getItem('abeneGdocsFileId') || '';
-            var url = localStorage.getItem('abeneGdocsUrl') || '';
-            if (id) setLink(id, url);
-            else updateStatusUi();
-        } catch (e) {
-            updateStatusUi();
-        }
+        // A global last-used ID can belong to a different document.
+        updateStatusUi();
     }
 
     /* Rever → Atualizar Docs: o botão do friso permanece visível mesmo sem ligação. */
@@ -280,6 +296,7 @@
 
     root.abeneOpenInGoogleDocs = openInGoogleDocs;
     root.openInGoogleDocs = openInGoogleDocs;
+    root.abeneSendToGoogleDocs = function () { return openInGoogleDocs({ send: true }); };
     root.abenePullFromGoogleDocs = pullFromGoogleDocs;
     root.abeneGdocsGetLink = getLink;
     root.abeneGdocsSetLink = setLink;
@@ -321,22 +338,7 @@
                     toast(tt('gdocsBusy', 'Aguarde: a enviar para o Google Docs…'));
                     return;
                 }
-                var nativeOpen = root.open;
-                root.open = function (url, target, feat) {
-                    var w = nativeOpen.call(root, url, target, feat);
-                    if (url && !w) {
-                        toast(tt('gdocsPopup', 'O browser bloqueou o novo separador. Use «Google Docs ligado» na barra de estado.'));
-                    }
-                    root.open = nativeOpen;
-                    return w;
-                };
-                try {
-                    return origOpen.apply(this, arguments);
-                } finally {
-                    setTimeout(function () {
-                        if (root.open !== nativeOpen && !busy) root.open = nativeOpen;
-                    }, 8000);
-                }
+                return origOpen.apply(this, arguments);
             };
             openInGoogleDocs._abeneGdocsOpenWrap = true;
             openInGoogleDocs._legacy = origOpen;
@@ -352,13 +354,8 @@
         getLink = function () {
             var hit = origGet.apply(this, arguments);
             if (hit && hit.id) return hit;
-            var rec = (readLinkStore()[docName()] || {});
-            var id = String(rec.id || '').replace(/[^a-zA-Z0-9_-]/g, '');
-            if (!id) return null;
-            return {
-                id: id,
-                url: rec.url || ('https://docs.google.com/document/d/' + id + '/edit')
-            };
+            // Titles are not identities: two reports may share the same name.
+            return null;
         };
         getLink._abeneLinkWrap = true;
         getLink._legacy = origGet;
@@ -381,14 +378,6 @@
         var origRestore = restoreFromStorage;
         if (typeof origRestore === 'function' && !origRestore._abeneLinkWrap) {
             restoreFromStorage = function () {
-                var st = docState();
-                if (!(st && st.gdocsFileId)) {
-                    var rec = (readLinkStore()[docName()] || {});
-                    if (rec.id) {
-                        setLink(rec.id, rec.url);
-                        return;
-                    }
-                }
                 return origRestore.apply(this, arguments);
             };
             restoreFromStorage._abeneLinkWrap = true;
