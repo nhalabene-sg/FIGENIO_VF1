@@ -2083,15 +2083,21 @@
     function lastUsedChild(editor) {
         var n = editor.lastElementChild;
         while (n && (n.classList.contains('abene-page-flow') || n.classList.contains('abene-footnotes') ||
-            n.classList.contains('watermark') || n.classList.contains('abene-wm'))) n = n.previousElementSibling;
-        while (n && isTrailingBlank(n)) {
-            var prev = n.previousElementSibling;
-            while (prev && prev.classList.contains('abene-page-flow')) prev = prev.previousElementSibling;
-            if (prev && prev.classList.contains('page-break-marker')) {
-                n = prev;
-                break;
+            n.classList.contains('watermark') || n.classList.contains('abene-wm') ||
+            n.getAttribute('data-abene-notes') === 'footnotes')) n = n.previousElementSibling;
+        // Skip trailing blanks AND terminal page-breaks (breaks that only leave blank landing pads).
+        while (n) {
+            if (isTrailingBlank(n)) {
+                n = n.previousElementSibling;
+                while (n && n.classList.contains('abene-page-flow')) n = n.previousElementSibling;
+                continue;
             }
-            n = prev;
+            if (n.classList.contains('page-break-marker')) {
+                n = n.previousElementSibling;
+                while (n && n.classList.contains('abene-page-flow')) n = n.previousElementSibling;
+                continue;
+            }
+            break;
         }
         return n;
     }
@@ -2099,25 +2105,34 @@
     window.abeneCountUsedPages = function (editor) {
         editor = editor || ed();
         var h = pageH();
-        if (!editor) return 1;
-        var n = lastUsedChild(editor);
-        if (!n) return 1;
-        var brPrev = n.previousElementSibling;
-        while (brPrev && brPrev.classList.contains('abene-page-flow')) brPrev = brPrev.previousElementSibling;
-        if (n && isTrailingBlank(n) && brPrev && brPrev.classList.contains('page-break-marker')) {
-            return Math.max(1, Math.floor((yInEditor(brPrev, editor) + 1) / h) + 2);
+        if (!editor || !h) return 1;
+        // Peel trailing blanks/flow; each terminal page-break adds exactly one sheet.
+        // Avoid marker.y+2 which created phantom pages when the marker already sat on a boundary.
+        var n = editor.lastElementChild;
+        var trailingBreakPages = 0;
+        while (n) {
+            if (n.classList.contains('abene-page-flow') || n.classList.contains('abene-footnotes') ||
+                n.classList.contains('watermark') || n.classList.contains('abene-wm') ||
+                n.getAttribute('data-abene-notes') === 'footnotes') {
+                n = n.previousElementSibling;
+                continue;
+            }
+            if (isTrailingBlank(n)) {
+                n = n.previousElementSibling;
+                continue;
+            }
+            if (n.classList.contains('page-break-marker')) {
+                trailingBreakPages++;
+                n = n.previousElementSibling;
+                continue;
+            }
+            break;
         }
+        if (!n) return Math.max(1, trailingBreakPages || 1);
         var top = yInEditor(n, editor);
-        var bottom = top + n.offsetHeight;
-        if (n.classList.contains('page-break-marker')) {
-            return Math.max(1, Math.floor((top + 1) / h) + 2);
-        }
-        var after = n.nextElementSibling;
-        while (after && after.classList.contains('abene-page-flow')) after = after.nextElementSibling;
-        if (after && after.classList.contains('page-break-marker') && isTrailingBlank(after.nextElementSibling)) {
-            return Math.max(1, Math.floor((yInEditor(after, editor) + 1) / h) + 2);
-        }
-        return Math.max(1, Math.ceil((bottom - 4) / h));
+        var bottom = top + (n.offsetHeight || 0);
+        var pages = Math.max(1, Math.ceil((bottom - 4) / h));
+        return pages + trailingBreakPages;
     };
 
     window.abeneFitEditorSheets = function (editor) {
@@ -2801,6 +2816,103 @@
         window._abeneFlowT = setTimeout(run, 70);
     };
 
+    /* Fix #3: after Ctrl+Enter / Quebra de pagina, caret + #editorArea follow
+       the new page once layout (abeneSchedulePageFlow / bookmarks) finishes. */
+    function abeneRevealPageBreakTarget(target) {
+        function resolve() {
+            if (target && target.isConnected) return target;
+            var root = ed();
+            return root ? root.querySelector('[data-abene-break-caret="1"]') : null;
+        }
+        function placeCaret(el) {
+            var editor = ed();
+            if (!editor || !el || !el.isConnected) return;
+            try { editor.focus({ preventScroll: true }); } catch (eFocus) {
+                try { editor.focus(); } catch (eFocus2) {}
+            }
+            try {
+                var sel = window.getSelection();
+                var r = document.createRange();
+                r.selectNodeContents(el);
+                r.collapse(true);
+                sel.removeAllRanges();
+                sel.addRange(r);
+            } catch (errCaret) {}
+        }
+        function scrollReveal(el) {
+            if (!el || !el.isConnected) return;
+            var area = document.getElementById('editorArea');
+            if (area) {
+                try {
+                    var a = area.getBoundingClientRect();
+                    var b = el.getBoundingClientRect();
+                    var mid = b.top + (b.height ? b.height / 2 : 0);
+                    /* Phone: keep target in the visible viewport above the virtual keyboard */
+                    var viewH = area.clientHeight;
+                    try {
+                        if (document.body.classList.contains('abene-phone') && window.visualViewport) {
+                            var vv = window.visualViewport;
+                            viewH = Math.max(80, Math.min(viewH, (vv.offsetTop + vv.height) - a.top - 8));
+                        }
+                    } catch (eVvPhone) {}
+                    var viewMid = a.top + viewH / 2;
+                    var delta = mid - viewMid;
+                    if (Math.abs(delta) > 4) {
+                        area.scrollTop = Math.max(0, area.scrollTop + delta);
+                    }
+                    var ph = pageH();
+                    var z = 1;
+                    try { z = ((window.abene && window.abene.currentZoom) || 100) / 100; } catch (eZ) { z = 1; }
+                    if (!isFinite(z) || z <= 0) z = 1;
+                    var cur = document.getElementById('pageNum');
+                    if (cur) {
+                        var page = Math.max(1, Math.floor(area.scrollTop / Math.max(1, ph * z)) + 1);
+                        var totEl = document.getElementById('totalPages');
+                        var pages = totEl ? (parseInt(totEl.textContent, 10) || page) : page;
+                        cur.textContent = String(Math.min(pages, page));
+                    }
+                    return;
+                } catch (errScroll) {}
+            }
+            try {
+                if (el.scrollIntoView) el.scrollIntoView({ block: 'center', inline: 'nearest' });
+            } catch (errView) {}
+        }
+        function run() {
+            if (window._abeneLayingOut) return false;
+            var el = resolve();
+            if (!el) return false;
+            placeCaret(el);
+            scrollReveal(el);
+            return true;
+        }
+        function clearMark() {
+            var el = resolve();
+            if (el) {
+                try { el.removeAttribute('data-abene-break-caret'); } catch (eClear) {}
+            }
+        }
+        var tries = 0;
+        function attempt() {
+            tries += 1;
+            if (window._abeneLayingOut && tries < 25) {
+                setTimeout(attempt, 40);
+                return;
+            }
+            var ok = run();
+            if (!ok && tries < 25) {
+                setTimeout(attempt, 40);
+                return;
+            }
+            clearMark();
+        }
+        requestAnimationFrame(function () {
+            requestAnimationFrame(function () {
+                attempt();
+            });
+        });
+    }
+
     window.abeneInsertPageBreak = function () {
         if (window._abeneBreakLock) return;
         window._abeneBreakLock = true;
@@ -2858,15 +2970,12 @@
             sel.removeAllRanges();
             sel.addRange(r);
         } catch (err) {}
+        try { nextP.setAttribute('data-abene-break-caret', '1'); } catch (eMark) {}
         if (typeof saveUndoState === 'function') saveUndoState();
         window.abeneSchedulePageFlow(true);
         if (typeof window.abeneFitEditorSheets === 'function') window.abeneFitEditorSheets(editor);
         if (typeof window.renderPageDecorations === 'function') window.renderPageDecorations();
-        requestAnimationFrame(function () {
-            requestAnimationFrame(function () {
-                if (nextP.isConnected) nextP.scrollIntoView({ block: 'center', inline: 'nearest' });
-            });
-        });
+        abeneRevealPageBreakTarget(nextP);
     };
     window.insertPageBreak = window.abeneInsertPageBreak;
 
@@ -4304,6 +4413,8 @@
         var map = SHORTCUTS[lang] || SHORTCUTS['pt-PT'];
         var k = e.key.toLowerCase();
         if (e.key === 'Enter') {
+            // Ctrl+Enter / Cmd+Enter only — never hijack plain Enter.
+            if (!(e.ctrlKey || e.metaKey) || e.altKey) return false;
             var edEl = ed();
             if (edEl && edEl.classList.contains('editing-header-footer')) return false;
             e.preventDefault();

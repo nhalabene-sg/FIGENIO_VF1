@@ -57,7 +57,7 @@
         }
     }
     function showFly(ev, html) {
-        saveCaret();
+        captureInsertPoint();
         var f = document.getElementById('ribbonFlyout');
         if (!f || !ev) return;
         f.classList.remove('hf-gallery-fly');
@@ -69,6 +69,7 @@
         if (ev.stopPropagation) ev.stopPropagation();
     }
     var savedRange = null;
+    var insertPointRange = null;
     function saveCaret() {
         var sel = window.getSelection();
         var editor = editorEl();
@@ -76,7 +77,21 @@
             savedRange = sel.getRangeAt(0).cloneRange();
         }
     }
+    function captureInsertPoint() {
+        saveCaret();
+        if (savedRange) {
+            try { insertPointRange = savedRange.cloneRange(); } catch (eCap) {}
+        }
+    }
     document.addEventListener('selectionchange', saveCaret);
+    // Ribbon / flyout mousedown steals focus; capture caret while selection is still in the editor.
+    document.addEventListener('mousedown', function (ev) {
+        var t = ev.target;
+        if (!t || !t.closest) return;
+        if (t.closest('#ribbonFlyout, .ribbon, .ribbon-tabs, .ribbon-btn, .ribbon-panel, .abene-swatch')) {
+            captureInsertPoint();
+        }
+    }, true);
     function restoreCaret() {
         var editor = editorEl();
         if (!editor) return;
@@ -865,9 +880,15 @@
     }
     var generatedIndexContinuation = '[data-abene-cont="block"].field-toc, [data-abene-cont="block"][data-field-type="toc"], [data-abene-cont="block"][data-abene-origin-block="toc"], [data-abene-cont="block"][data-index], [data-abene-cont="block"][data-figures-index], [data-abene-cont="block"][data-tables-index], [data-abene-cont="block"][data-illustrations-index]';
     function removeGeneratedIndexContinuations(editor, selector) {
+        if (!editor) return;
         editor.querySelectorAll(generatedIndexContinuation).forEach(function (part) {
             if (!selector || part.matches(selector) || (selector.indexOf('toc') >= 0 && part.getAttribute('data-abene-origin-block') === 'toc')) part.remove();
         });
+        if (selector) {
+            editor.querySelectorAll(selector).forEach(function (part) {
+                if (part.getAttribute && part.getAttribute('data-abene-cont')) part.remove();
+            });
+        }
     }
     function refreshCaptionIndexes() {
         var editor = editorEl();
@@ -877,17 +898,53 @@
         var tot = editor.querySelector('[data-tables-index]');
         if (tot) tot.outerHTML = buildTablesHtml();
     }
+    function resolveInsertRange(editor) {
+        var candidates = [insertPointRange, savedRange];
+        var i;
+        for (i = 0; i < candidates.length; i++) {
+            var r = candidates[i];
+            if (!r) continue;
+            try {
+                if (editor.contains(r.startContainer)) return r.cloneRange();
+            } catch (eRes) {}
+        }
+        var sel = window.getSelection();
+        if (sel && sel.rangeCount && editor.contains(sel.anchorNode)) {
+            try { return sel.getRangeAt(0).cloneRange(); } catch (eSel) {}
+        }
+        return null;
+    }
+    function removeIndexBlocks(editor, selector) {
+        removeGeneratedIndexContinuations(editor, selector);
+        Array.prototype.slice.call(editor.querySelectorAll(selector)).forEach(function (existing) {
+            if (!existing || !existing.parentNode) return;
+            if (existing.getAttribute && existing.getAttribute('data-abene-cont')) {
+                existing.remove();
+                return;
+            }
+            // Only retire the generated model break, never a user's manual break.
+            var after = existing.nextElementSibling;
+            while (after && after.classList && after.classList.contains('abene-page-flow')) after = after.nextElementSibling;
+            if (existing.matches && existing.matches('[data-abene-block="toc"]') && after && after.matches && after.matches('[data-abene-break="model"]')) after.remove();
+            existing.remove();
+        });
+        removeGeneratedIndexContinuations(editor, selector);
+    }
     function replaceOrInsert(selector, html, atStart) {
+        // atStart is intentionally ignored: indexes insert at the caret / selected page.
         var editor = editorEl();
         if (!editor) return false;
-        saveCaret();
-        if (!savedRange || !editor.contains(savedRange.startContainer)) {
+        var range = resolveInsertRange(editor);
+        if (!range) {
             toast('Coloque o cursor na página onde pretende inserir o índice.');
             return false;
         }
-        var range = savedRange.cloneRange();
         range.collapse(true);
         var parent = range.startContainer.nodeType === 1 ? range.startContainer : range.startContainer.parentElement;
+        if (!parent || !editor.contains(parent)) {
+            toast('Coloque o cursor na página onde pretende inserir o índice.');
+            return false;
+        }
         if (parent.closest('table, [contenteditable="false"], .page-chrome')) {
             toast('Coloque o cursor num parágrafo do documento, fora de tabelas e cabeçalhos.');
             return false;
@@ -895,38 +952,81 @@
         var holder = document.createElement('div');
         holder.innerHTML = html;
         var inserted = holder.firstElementChild;
-        var existing = editor.querySelector(selector);
-        if (existing && (existing.contains(range.startContainer) || parent.closest(generatedIndexContinuation))) {
-            existing.replaceWith(inserted);
-        } else {
-            if (existing) {
-                // Only retire the generated model break, never a user's manual break.
-                var after = existing.nextElementSibling;
-                while (after && after.classList.contains('abene-page-flow')) after = after.nextElementSibling;
-                if (existing.matches('[data-abene-block="toc"]') && after && after.matches('[data-abene-break="model"]')) after.remove();
-                existing.remove();
-            }
-            var paragraph = parent.closest('p, h1, h2, h3, h4, h5, h6');
-            if (paragraph && editor.contains(paragraph)) {
-                var tail = range.cloneRange();
-                tail.setEnd(paragraph, paragraph.childNodes.length);
-                var next = paragraph.cloneNode(false);
-                next.removeAttribute('id');
-                next.appendChild(tail.extractContents());
-                paragraph.after(inserted, next);
-                if (!paragraph.textContent && !paragraph.querySelector('img,video,canvas,svg')) paragraph.remove();
-                if (!next.hasChildNodes()) next.innerHTML = '<br>';
+        if (!inserted) return false;
+
+        var inPlace = parent.closest(selector);
+        if (inPlace && inPlace.getAttribute && inPlace.getAttribute('data-abene-cont')) inPlace = null;
+        var anchorParent = parent;
+        var anchorParagraph = parent.closest('p, h1, h2, h3, h4, h5, h6');
+        var beforeNode = null;
+        if (inPlace) {
+            beforeNode = inPlace.nextSibling;
+            removeIndexBlocks(editor, selector);
+            if (beforeNode && beforeNode.parentNode === editor) {
+                editor.insertBefore(inserted, beforeNode);
+            } else if (beforeNode && beforeNode.parentNode) {
+                beforeNode.parentNode.insertBefore(inserted, beforeNode);
             } else {
-                range.insertNode(inserted);
+                editor.appendChild(inserted);
+            }
+        } else {
+            var bookmarkNode = range.startContainer;
+            var bookmarkOffset = range.startOffset;
+            removeIndexBlocks(editor, selector);
+            try {
+                if (editor.contains(bookmarkNode)) {
+                    range = document.createRange();
+                    range.setStart(bookmarkNode, Math.min(bookmarkOffset, bookmarkNode.nodeType === 3 ? bookmarkNode.length : bookmarkNode.childNodes.length));
+                    range.collapse(true);
+                    parent = range.startContainer.nodeType === 1 ? range.startContainer : range.startContainer.parentElement;
+                    anchorParagraph = parent && parent.closest ? parent.closest('p, h1, h2, h3, h4, h5, h6') : null;
+                } else {
+                    parent = anchorParent && editor.contains(anchorParent) ? anchorParent : editor;
+                    anchorParagraph = anchorParagraph && editor.contains(anchorParagraph) ? anchorParagraph : null;
+                    range = document.createRange();
+                    if (anchorParagraph) {
+                        range.selectNodeContents(anchorParagraph);
+                        range.collapse(true);
+                    } else {
+                        range.selectNodeContents(editor);
+                        range.collapse(true);
+                    }
+                }
+            } catch (eBk) {
+                parent = editor;
+                anchorParagraph = null;
+            }
+            var paragraph = anchorParagraph;
+            if (paragraph && editor.contains(paragraph) && !paragraph.closest('[data-abene-block="toc"], .field-toc, [data-field-type="toc"], [data-index], [data-figures-index], [data-tables-index], [data-illustrations-index]')) {
+                try {
+                    var tail = range.cloneRange();
+                    tail.setEnd(paragraph, paragraph.childNodes.length);
+                    var next = paragraph.cloneNode(false);
+                    next.removeAttribute('id');
+                    next.appendChild(tail.extractContents());
+                    paragraph.after(inserted, next);
+                    if (!String(paragraph.textContent || '').trim() && !paragraph.querySelector('img,video,canvas,svg')) paragraph.remove();
+                    if (!next.hasChildNodes()) next.innerHTML = '<br>';
+                } catch (eSplit) {
+                    paragraph.after(inserted);
+                }
+            } else {
+                try { range.insertNode(inserted); }
+                catch (eIns) { editor.appendChild(inserted); }
             }
         }
         removeGeneratedIndexContinuations(editor, selector);
         var selection = window.getSelection();
-        range = document.createRange(); range.setStartAfter(inserted); range.collapse(true);
-        selection.removeAllRanges(); selection.addRange(range); savedRange = range.cloneRange();
+        range = document.createRange();
+        range.setStartAfter(inserted);
+        range.collapse(true);
+        selection.removeAllRanges();
+        selection.addRange(range);
+        savedRange = range.cloneRange();
+        insertPointRange = range.cloneRange();
         if (typeof saveUndoState === 'function') saveUndoState();
         if (typeof window.abeneSchedulePageFlow === 'function') window.abeneSchedulePageFlow(true);
-        inserted.scrollIntoView({ block: 'nearest' });
+        try { inserted.scrollIntoView({ block: 'nearest' }); } catch (eScr) {}
         return true;
     }
     window.insertIllustrationsIndex = function () {
@@ -1207,10 +1307,10 @@
         });
     }
     var legacyInsertTOC = window.insertTOC;
-    window.insertTOC = function () {
+    window.abeneInsertTOC = window.insertTOC = function () {
         try {
+            captureInsertPoint();
             if (!headingTargets().length) { toast(tt('aNoToc')); return; }
-            var editor = editorEl();
             replaceOrInsert('[data-abene-block="toc"], [data-field-type="toc"], .field-toc', buildTocHtml(), true);
         } catch (err) {
             toast('Não foi possível inserir o índice: ' + String(err.message || err));
@@ -1814,6 +1914,7 @@
             '<button onclick="hideRibbonFlyout();document.getElementById(\'hiliteColor\').click()">' + tt('moreColors') + '</button>');
     };
     window.showTocMenu = function (ev) {
+        captureInsertPoint();
         showFly(ev,
             '<button onclick="hideRibbonFlyout();insertTOC()">' + tt('tocInsert') + '</button>' +
             '<button onclick="hideRibbonFlyout();abeneUpdateToc()">' + tt('tocUpdate') + '</button>' +
