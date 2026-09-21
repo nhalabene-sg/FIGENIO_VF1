@@ -10587,6 +10587,7 @@
             reader.onload = function(e) {
                 const raw = e.target.result;
                 const lower = file.name.toLowerCase();
+                documentState.archiveEntryId = '';
                 documentState.gdocsFileId = '';
                 documentState.gdocsUrl = '';
                 documentState.sentToClient = false;
@@ -10837,6 +10838,7 @@
             try {
                 const settings = JSON.parse(serialized);
                 if (settings.name) documentState.name = settings.name;
+                documentState.archiveEntryId = settings.archiveEntryId ? String(settings.archiveEntryId) : '';
                 documentState.gdocsFileId = settings.gdocsFileId ? String(settings.gdocsFileId) : '';
                 documentState.gdocsUrl = documentState.gdocsFileId
                     ? (settings.gdocsUrl || ('https://docs.google.com/document/d/' + documentState.gdocsFileId + '/edit'))
@@ -10846,7 +10848,6 @@
                 } else if (window.abeneGdocsClearLink) window.abeneGdocsClearLink();
                 documentState.sentToClient = !!settings.sentToClient;
                 documentState.pdfOwnerId = settings.pdfOwnerId ? String(settings.pdfOwnerId) : '';
-                documentState.archiveEntryId = settings.archiveEntryId ? String(settings.archiveEntryId) : '';
                 if (settings.language) { localStorage.setItem('abeneLanguage', settings.language); applyLanguage(settings.language); }
                 if (settings.company) { companyData = { ...defaultCompanyData, ...settings.company }; localStorage.setItem('abeneCompanyData', JSON.stringify(companyData)); }
                 if (settings.header !== undefined) { pageHeaderText = settings.header; localStorage.setItem('abeneHeader', pageHeaderText); }
@@ -12331,6 +12332,7 @@ table { border-collapse: collapse; }
                 const defaultFont = _docxDefaults.run.font || 'Calibri';
                 editor.style.fontFamily = JSON.stringify(defaultFont) + ', Calibri, sans-serif';
 
+                documentState.archiveEntryId = '';
                 documentState.gdocsFileId = '';
                 documentState.gdocsUrl = '';
                 documentState.sentToClient = false;
@@ -13183,7 +13185,7 @@ table { border-collapse: collapse; }
     <script src="libs/abene-sheets.js?v=20260920-pack-email-split-1"></script>
     <script src="libs/abene-document-sync.js?v=20260920-sync-7"></script>
     <script src="libs/abene-collab.js?v=20260915-share-1"></script>
-    <script src="libs/abene-gdocs.js?v=20260920-qa14-2"></script>
+    <script src="libs/abene-gdocs.js?v=20260921-audit1-1"></script>
     <script src="libs/abene-pickers.js?v=20260915-modo-2"></script>
     <script src="libs/abene-proof.js?v=20260915-smart-1"></script>
 

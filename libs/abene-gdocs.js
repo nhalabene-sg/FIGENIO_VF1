@@ -1,6 +1,6 @@
 /* Genius Raros — Google Docs ligado (mesmo ficheiro Drive, sem duplicar).
    Requer emaildrive ≥ 2.7 (OPEN_GDOCS update même fichier + PULL_GDOCS).
-   Fix #1: réutilise le même Google Doc lié (Arquivo + projectSettings + entry key). */
+   Fix #1: réutilise le même Google Doc lié (Arquivo + projectSettings + entry key).\n   Audit 2026-09-21: clearLink n'efface plus l'Arquivo par défaut; wipe sur not-owned/unavailable. */
 (function (root) {
     var MAX_BYTES = 4.5 * 1024 * 1024;
     var busy = false;
@@ -134,7 +134,11 @@
         persistLinkToArquivo(id, url);
         updateStatusUi();
     }
-    function clearLink() {
+    function clearLink(opts) {
+        // opts.wipeArquivo: only when the link is known dead (not-owned / unavailable).
+        // Default false — avoids wiping the previous Arquivo entry on import / Novo / detach.
+        opts = opts || {};
+        var wipeArquivo = !!opts.wipeArquivo;
         var st = docState();
         var oldId = st && st.gdocsFileId ? String(st.gdocsFileId) : '';
         var entryId = archiveEntryId();
@@ -155,12 +159,12 @@
             var settings = JSON.parse(localStorage.getItem('abeneProjectSettings') || '{}');
             settings.gdocsFileId = '';
             settings.gdocsUrl = '';
-            if (entryId && settings.gdocsByEntry && typeof settings.gdocsByEntry === 'object') {
+            if (wipeArquivo && entryId && settings.gdocsByEntry && typeof settings.gdocsByEntry === 'object') {
                 delete settings.gdocsByEntry[entryId];
             }
             localStorage.setItem('abeneProjectSettings', JSON.stringify(settings));
         } catch (e3) {}
-        persistLinkToArquivo('', '');
+        if (wipeArquivo) persistLinkToArquivo('', '');
         updateStatusUi();
     }
     function forkLinkOnCopy() {
@@ -363,11 +367,13 @@
         else if (/no-blob|aNoDocx/i.test(msg)) toast(tt('aNoDocx', 'A biblioteca DOCX não está carregada.'));
         else if (/^(id|NeedLink)$/.test(msg)) toast(tt('gdocsNeedLink', 'Ainda não há Google Docs ligado a este documento.'));
         else if (/linked-file-invalid|not-owned/i.test(msg)) {
+            try { clearLink({ wipeArquivo: true }); } catch (eOwn) {}
             toast(tt('gdocsNotOwned',
-                'O Google Docs ligado não está na pasta Google_Docs desta conta (ou não é seu). Não foi criado um documento novo. Corrija a ligação ou limpe-a e volte a abrir.'));
+                'O Google Docs ligado não está na pasta Google_Docs desta conta (ou não é seu). A ligação foi limpa. Volte a abrir para criar um Doc novo nesta conta.'));
         } else if (/linked-file-unavailable/i.test(msg)) {
+            try { clearLink({ wipeArquivo: true }); } catch (eUn) {}
             toast(tt('gdocsUnavailable',
-                'O Google Docs ligado está indisponível (apagado ou inacessível). Não foi criado um documento novo. Limpe a ligação e volte a abrir se precisar de um Doc novo.'));
+                'O Google Docs ligado está indisponível (apagado ou inacessível). A ligação foi limpa. Volte a abrir se precisar de um Doc novo.'));
         } else if (/linked-file-fork-blocked/i.test(msg)) {
             toast(tt('gdocsForkBlocked',
                 'A atualização teria criado outro Google Docs. Operação cancelada para conservar o mesmo ficheiro ligado.'));
