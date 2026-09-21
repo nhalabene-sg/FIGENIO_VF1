@@ -10761,6 +10761,7 @@
             if (!opts.silent) showToast(buildSaveToastMessage());
             closeAllDropdowns();
             if (typeof window.abeneDocumentSyncSave === 'function') window.abeneDocumentSyncSave();
+            if (!opts.silent && typeof window.abeneSheetsOnSave === 'function') window.abeneSheetsOnSave();
         }
 
         function saveForAccountant() {
@@ -13182,7 +13183,7 @@ table { border-collapse: collapse; }
     <script src="libs/abene-phone.js?v=20260920-wordphone-1"></script>
     <script src="libs/abene-excel-engine.js?v=20260914-essential-1"></script>
     <script src="libs/abene-excel.js?v=20260920-excel-export-1"></script>
-    <script src="libs/abene-sheets.js?v=20260920-pack-email-split-1"></script>
+    <script src="libs/abene-sheets.js?v=20260921-audit2-1"></script>
     <script src="libs/abene-document-sync.js?v=20260920-sync-7"></script>
     <script src="libs/abene-collab.js?v=20260915-share-1"></script>
     <script src="libs/abene-gdocs.js?v=20260921-audit1-1"></script>

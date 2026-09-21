@@ -865,6 +865,7 @@
     window.abeneSheetsOnExcelChange = function () { schedule('excel'); };
     window.abeneSheetsOnArquivoChange = function () { schedule('arquivo'); };
     window.abeneSheetsEnabled = enabled;
+    window.abeneSheetsOnSave = onSave; // Explicit Guardar -> PUSH excel/arquivo/metier (document uses SYNC_DOCUMENT)
     window.abeneSendEmail = sendEmail;
     window.abeneSendPackEmail = sendPackEmail;
     window.abeneSendTestEmail = sendTestEmail;
