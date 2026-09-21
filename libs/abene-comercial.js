@@ -891,10 +891,6 @@
         }
         var num = document.getElementById('devisNumber');
         if (num) num.value = nextNumber('ORC', 'abeneOrcCounter', false);
-        var notes = document.getElementById('devisNotes');
-        if (notes && /Paiement à 30 jours|Ce devis est valable/.test(notes.value)) {
-            notes.value = 'Pagamento por transferência bancária. Este orçamento é válido até à data indicada. Não constitui fatura.';
-        }
         var has = editorHasContent();
         var append = document.getElementById('devisModeAppend');
         var replace = document.getElementById('devisModeReplace');
@@ -903,6 +899,17 @@
         ensurePaperLetterhead();
         prefillFromDocument('devis');
         hydrateFromEditor('devis');
+        var notesDefaultPt = 'Pagamento por transferência bancária. Este orçamento é válido até à data indicada. Não constitui fatura.';
+        var notes = document.getElementById('devisNotes');
+        // FR leftovers or double-encoded UTF-8 defaults (mojibake) -> proper pt-PT
+        if (notes && (/Paiement à 30 jours|Ce devis est valable/.test(notes.value) ||
+            (/Pagamento por transfer/.test(notes.value) && /Ã.|Â./.test(notes.value)))) {
+            notes.value = notesDefaultPt;
+        }
+        var payTermsEl = document.getElementById('devisPayTerms');
+        if (payTermsEl && /Pronto pagamento/.test(payTermsEl.value || '') && /Ã.|Â./.test(payTermsEl.value || '')) {
+            payTermsEl.value = 'Pronto pagamento / transferência';
+        }
         var dateEl = document.getElementById('devisDate');
         if (dateEl && !dateEl.value) dateEl.value = todayIso();
         if (window.abeneContabilidade && window.abeneContabilidade.fillDevisFromTables) {
