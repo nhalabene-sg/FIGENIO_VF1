@@ -2817,7 +2817,9 @@
     };
 
     /* Fix #3: after Ctrl+Enter / Quebra de pagina, caret + #editorArea follow
-       the new page once layout (abeneSchedulePageFlow / bookmarks) finishes. */
+       the new page once layout (abeneSchedulePageFlow / bookmarks) finishes.
+       Align page sheet to the top of #editorArea so the new page is fully in view
+       (centering left only a sliver of the sheet). */
     function abeneRevealPageBreakTarget(target) {
         function resolve() {
             if (target && target.isConnected) return target;
@@ -2842,11 +2844,19 @@
         function scrollReveal(el) {
             if (!el || !el.isConnected) return;
             var area = document.getElementById('editorArea');
+            var editor = ed();
             if (area) {
                 try {
+                    /* Finish sheet sizing before measuring scroll targets. */
+                    if (editor && typeof window.abeneFitEditorSheets === 'function') {
+                        window.abeneFitEditorSheets(editor);
+                    }
+                    var ph = pageH();
+                    var z = 1;
+                    try { z = ((window.abene && window.abene.currentZoom) || 100) / 100; } catch (eZ) { z = 1; }
+                    if (!isFinite(z) || z <= 0) z = 1;
+
                     var a = area.getBoundingClientRect();
-                    var b = el.getBoundingClientRect();
-                    var mid = b.top + (b.height ? b.height / 2 : 0);
                     /* Phone: keep target in the visible viewport above the virtual keyboard */
                     var viewH = area.clientHeight;
                     try {
@@ -2855,15 +2865,41 @@
                             viewH = Math.max(80, Math.min(viewH, (vv.offsetTop + vv.height) - a.top - 8));
                         }
                     } catch (eVvPhone) {}
-                    var viewMid = a.top + viewH / 2;
-                    var delta = mid - viewMid;
-                    if (Math.abs(delta) > 4) {
-                        area.scrollTop = Math.max(0, area.scrollTop + delta);
+
+                    /* Prefer aligning the page sheet that contains the caret to the
+                       top of #editorArea so the full new page is in view. */
+                    var pageIndex = 0;
+                    if (editor && typeof yInEditor === 'function') {
+                        var yCss = yInEditor(el, editor);
+                        pageIndex = Math.max(0, Math.floor((yCss + 1) / Math.max(1, ph)));
                     }
-                    var ph = pageH();
-                    var z = 1;
-                    try { z = ((window.abene && window.abene.currentZoom) || 100) / 100; } catch (eZ) { z = 1; }
-                    if (!isFinite(z) || z <= 0) z = 1;
+                    var er = editor ? editor.getBoundingClientRect() : null;
+                    var scaleY = (er && er.height && editor && editor.offsetHeight)
+                        ? (er.height / editor.offsetHeight)
+                        : z;
+                    if (!isFinite(scaleY) || scaleY <= 0) scaleY = z;
+
+                    if (er && editor) {
+                        var pageTopView = er.top + (pageIndex * ph) * scaleY;
+                        var deltaPage = pageTopView - a.top;
+                        if (Math.abs(deltaPage) > 2) {
+                            area.scrollTop = Math.max(0, area.scrollTop + deltaPage / scaleY);
+                        }
+                    } else {
+                        area.scrollTop = Math.max(0, pageIndex * ph * z);
+                    }
+
+                    /* If the viewport is shorter than one sheet, keep the caret near the top. */
+                    a = area.getBoundingClientRect();
+                    var b = el.getBoundingClientRect();
+                    var topPad = 6;
+                    if (b.top < a.top + topPad - 2 || b.top > a.top + Math.min(viewH * 0.35, 120)) {
+                        var deltaCaret = b.top - (a.top + topPad);
+                        if (Math.abs(deltaCaret) > 2) {
+                            area.scrollTop = Math.max(0, area.scrollTop + deltaCaret / scaleY);
+                        }
+                    }
+
                     var cur = document.getElementById('pageNum');
                     if (cur) {
                         var page = Math.max(1, Math.floor(area.scrollTop / Math.max(1, ph * z)) + 1);
@@ -2875,7 +2911,7 @@
                 } catch (errScroll) {}
             }
             try {
-                if (el.scrollIntoView) el.scrollIntoView({ block: 'center', inline: 'nearest' });
+                if (el.scrollIntoView) el.scrollIntoView({ block: 'start', inline: 'nearest' });
             } catch (errView) {}
         }
         function run() {
@@ -2895,13 +2931,29 @@
         var tries = 0;
         function attempt() {
             tries += 1;
-            if (window._abeneLayingOut && tries < 25) {
+            if (window._abeneLayingOut && tries < 30) {
                 setTimeout(attempt, 40);
                 return;
             }
             var ok = run();
-            if (!ok && tries < 25) {
+            if (!ok && tries < 30) {
                 setTimeout(attempt, 40);
+                return;
+            }
+            /* One more pass after paint/fit so the full new sheet stays in view. */
+            if (ok) {
+                setTimeout(function () {
+                    if (window._abeneLayingOut && tries < 30) {
+                        attempt();
+                        return;
+                    }
+                    var el2 = resolve();
+                    if (el2) {
+                        placeCaret(el2);
+                        scrollReveal(el2);
+                    }
+                    clearMark();
+                }, 60);
                 return;
             }
             clearMark();
