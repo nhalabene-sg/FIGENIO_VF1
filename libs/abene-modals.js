@@ -691,9 +691,13 @@
             return '<button type="button" class="btn-secondary" style="width:100%;text-align:left;margin-bottom:8px;" onclick="closeModal(\'genericModal\');' + fn + '()">' +
                 icon + ' ' + esc(label) + '</button>';
         }
-        openGenericModal(tt('exportDoc'),
-            btn('exportDocx', '📘', tt('saveAsWord') || tt('fileDocx')) +
-            btn('exportPDF', '📥', tt('saveAsPdf') || tt('filePdf')) +
+        // Export only — never confuse with Guardar/Save (which never downloads).
+        var title = tt('exportAsTitle') || tt('exportDoc') || tt('saveAsTitle');
+        var hint = tt('exportAsHint') || tt('saveAsHint') || '';
+        openGenericModal(title,
+            (hint ? ('<p class="save-as-hint">' + esc(hint) + '</p>') : '') +
+            btn('exportDocx', '📘', tt('exportAsWord') || tt('saveAsWord') || tt('fileDocx')) +
+            btn('exportPDF', '📥', tt('exportAsPdf') || tt('saveAsPdf') || tt('filePdf')) +
             btn('saveForAccountant', '📊', tt('saveAsAcct') || tt('acctCsv')) +
             btn('exportWord', '📄', tt('fileDoc')) +
             btn('exportHtml', '🌐', tt('exportHtml')) +

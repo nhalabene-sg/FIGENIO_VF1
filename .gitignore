@@ -30,7 +30,7 @@ exec-url.txt
 **/.git/
 
 # Éléments locaux non utilisés par la page GitHub Pages
-/apps-script/
+# /apps-script/  # tracked: LEIA-ME + emaildrive for redeploy
 /abene-*.js
 /docx.umd.js
 /html2pdf.bundle.min.js

@@ -1,10 +1,15 @@
-/* Genius Raros — adaptation téléphone (navigation, menus, zoom page). N’altère pas le bureau. */
+/* Genius Raros — adaptation téléphone (navigation, menus, zoom page). N’altère pas le bureau.
+   Fix #7: Arquivo mobile — historique Retour (aperçu→fichiers→dossiers), chrome ouvert.
+   Word phone UX: caret + clavier virtuel, barre outils si friso replié, status ≤44px (CSS), zoom/scroll. */
 (function () {
     var MQ = '(max-width: 820px), (max-width: 960px) and (pointer: coarse), (max-width: 960px) and (max-height: 480px) and (orientation: landscape)';
     var userZoomed = false;
     var origSetZoom = null;
     var lastViewportWidth = 0;
     var ribbonTouched = false;
+    var ribbonCollapsedByKb = false;
+    var caretTimer = null;
+    var lastKbOpen = false;
 
     function isPhone() {
         try { return window.matchMedia(MQ).matches; } catch (e) { return window.innerWidth <= 820; }
@@ -275,6 +280,7 @@
             }
             var out = orig.apply(this, arguments);
             scrollActiveNav();
+            syncPhoneWordBar();
             return out;
         };
         window.switchTab._abenePhoneNav = true;
@@ -283,8 +289,13 @@
         if (typeof window.toggleRibbonCollapse !== 'function' || window.toggleRibbonCollapse._abenePhone) return;
         var orig = window.toggleRibbonCollapse;
         window.toggleRibbonCollapse = function () {
-            if (document.body.classList.contains('abene-phone')) ribbonTouched = true;
-            return orig.apply(this, arguments);
+            if (document.body.classList.contains('abene-phone')) {
+                ribbonTouched = true;
+                ribbonCollapsedByKb = false;
+            }
+            var out = orig.apply(this, arguments);
+            syncPhoneWordBar();
+            return out;
         };
         window.toggleRibbonCollapse._abenePhone = true;
     }
@@ -294,6 +305,7 @@
             window.abeneExcelEnter = function () {
                 var out = ent.apply(this, arguments);
                 layoutPhoneZoom();
+                syncPhoneWordBar();
                 return out;
             };
             window.abeneExcelEnter._abenePhone = true;
@@ -303,22 +315,240 @@
             window.abeneExcelLeave = function () {
                 var out = lv.apply(this, arguments);
                 layoutPhoneZoom();
+                syncPhoneWordBar();
                 return out;
             };
             window.abeneExcelLeave._abenePhone = true;
         }
     }
     function onKb() {
-        if (!document.body.classList.contains('abene-phone')) return;
+        if (!document.body.classList.contains('abene-phone')) {
+            document.body.classList.remove('abene-kb-open');
+            document.body.style.removeProperty('--abene-kb');
+            var barOff = document.querySelector('.status-bar');
+            if (barOff) barOff.style.marginBottom = '';
+            lastKbOpen = false;
+            return;
+        }
         var vv = window.visualViewport;
         if (!vv) return;
         var kb = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
         document.body.style.setProperty('--abene-kb', kb + 'px');
+        var open = kb > 80;
+        document.body.classList.toggle('abene-kb-open', open);
         var bar = document.querySelector('.status-bar');
-        if (bar) bar.style.marginBottom = kb > 40 ? kb + 'px' : '';
+        if (bar) bar.style.marginBottom = open ? kb + 'px' : '';
+        /* Collapse ribbon while typing to free editor height; restore when KB closes if we collapsed it. */
+        if (open && !lastKbOpen) {
+            if (!document.body.classList.contains('abene-ribbon-collapsed')) {
+                document.body.classList.add('abene-ribbon-collapsed');
+                ribbonCollapsedByKb = true;
+            }
+            syncPhoneWordBar();
+            scheduleCaretVisible(60);
+        } else if (!open && lastKbOpen) {
+            if (ribbonCollapsedByKb && !ribbonTouched) {
+                document.body.classList.remove('abene-ribbon-collapsed');
+            }
+            ribbonCollapsedByKb = false;
+            syncPhoneWordBar();
+        } else if (open) {
+            scheduleCaretVisible(40);
+        }
+        lastKbOpen = open;
+        clampOpenUi();
+    }
+
+    function scheduleCaretVisible(delay) {
+        if (caretTimer) clearTimeout(caretTimer);
+        caretTimer = setTimeout(function () {
+            caretTimer = null;
+            ensureCaretVisible();
+        }, delay == null ? 50 : delay);
+    }
+
+    function ensureCaretVisible() {
+        if (!document.body.classList.contains('abene-phone')) return;
+        if (document.body.classList.contains('abene-excel-mode')) return;
+        if (isArqOpen()) return;
+        var area = document.getElementById('editorArea');
+        var editor = document.getElementById('editor');
+        if (!area || !editor) return;
+        var sel = window.getSelection();
+        if (!sel || !sel.rangeCount) return;
+        var node = sel.focusNode || sel.anchorNode;
+        if (!node || !editor.contains(node.nodeType === 1 ? node : node.parentNode)) return;
+        var range;
+        try { range = sel.getRangeAt(0).cloneRange(); } catch (e) { return; }
+        var rect = range.getBoundingClientRect();
+        if ((!rect || (!rect.height && !rect.width)) && typeof range.getClientRects === 'function') {
+            var rects = range.getClientRects();
+            if (rects && rects.length) rect = rects[rects.length - 1];
+        }
+        if (!rect || (!rect.top && !rect.bottom && !rect.height)) return;
+        var a = area.getBoundingClientRect();
+        var vv = window.visualViewport;
+        var viewBottom = vv ? (vv.offsetTop + vv.height) : window.innerHeight;
+        var visibleBottom = Math.min(a.bottom, viewBottom) - 12;
+        var visibleTop = a.top + 10;
+        var y = rect.bottom || rect.top;
+        if (y > visibleBottom) {
+            area.scrollTop += (y - visibleBottom + 28);
+        } else if (rect.top < visibleTop) {
+            area.scrollTop = Math.max(0, area.scrollTop - (visibleTop - rect.top + 12));
+        }
+        /* Mild horizontal keep-in-view when zoomed past fit width */
+        var x = rect.left;
+        if (x < a.left + 6) area.scrollLeft = Math.max(0, area.scrollLeft - (a.left + 6 - x));
+        else if (rect.right > a.right - 6) area.scrollLeft += (rect.right - (a.right - 6));
+    }
+
+    function syncPhoneWordBar() {
+        var bar = document.getElementById('abenePhoneWordBar');
+        var phone = document.body.classList.contains('abene-phone') || isPhone();
+        var hide = !phone || document.body.classList.contains('abene-excel-mode') || isArqOpen();
+        if (hide) {
+            if (bar) bar.hidden = true;
+            return;
+        }
+        if (!bar) {
+            bar = document.createElement('div');
+            bar.id = 'abenePhoneWordBar';
+            bar.className = 'abene-phone-word-bar';
+            bar.setAttribute('role', 'toolbar');
+            bar.setAttribute('aria-label', 'Word téléphone');
+            bar.innerHTML =
+                '<button type="button" data-act="ribbon" title="Friso">⌃ Friso</button>' +
+                '<button type="button" data-act="break" title="Quebra de página">📃 Quebra</button>' +
+                '<button type="button" data-act="fit" title="Ajustar zoom">⊡ Zoom</button>' +
+                '<button type="button" data-act="file" title="Ficheiro — Guardar / Export / Arquivo">📁 Ficheiro</button>';
+            bar.addEventListener('click', function (ev) {
+                var btn = ev.target && ev.target.closest && ev.target.closest('button[data-act]');
+                if (!btn) return;
+                ev.preventDefault();
+                var act = btn.getAttribute('data-act');
+                if (act === 'ribbon') {
+                    ribbonTouched = true;
+                    ribbonCollapsedByKb = false;
+                    if (typeof window.toggleRibbonCollapse === 'function') window.toggleRibbonCollapse();
+                    setTimeout(syncPhoneWordBar, 0);
+                } else if (act === 'break') {
+                    if (typeof window.insertPageBreak === 'function') window.insertPageBreak();
+                    else if (typeof window.abeneInsertPageBreak === 'function') window.abeneInsertPageBreak();
+                    scheduleCaretVisible(120);
+                } else if (act === 'fit') {
+                    userZoomed = false;
+                    fitPageToPhone(true);
+                } else if (act === 'file') {
+                    var fe = document.getElementById('btnFile');
+                    if (typeof window.showFileMenu === 'function' && fe) {
+                        window.showFileMenu({
+                            stopPropagation: function () {},
+                            preventDefault: function () {},
+                            currentTarget: fe,
+                            target: fe
+                        });
+                    }
+                }
+            });
+            var sb = document.querySelector('.status-bar');
+            if (sb && sb.parentNode) sb.parentNode.insertBefore(bar, sb);
+            else document.body.appendChild(bar);
+        }
+        var show = document.body.classList.contains('abene-ribbon-collapsed') ||
+            document.body.classList.contains('abene-kb-open');
+        bar.hidden = !show;
+        bar.setAttribute('aria-hidden', show ? 'false' : 'true');
+        var ribBtn = bar.querySelector('button[data-act="ribbon"]');
+        if (ribBtn) {
+            var collapsed = document.body.classList.contains('abene-ribbon-collapsed');
+            ribBtn.textContent = collapsed ? '▾ Friso' : '⌃ Friso';
+            ribBtn.title = collapsed ? 'Mostrar friso' : 'Ocultar friso';
+        }
+    }
+
+    function bindEditorCaret() {
+        var editor = document.getElementById('editor');
+        if (!editor || editor._abenePhoneCaret) return;
+        editor._abenePhoneCaret = true;
+        ['focusin', 'keyup', 'input'].forEach(function (evt) {
+            editor.addEventListener(evt, function () {
+                if (!document.body.classList.contains('abene-phone')) return;
+                scheduleCaretVisible(evt === 'input' ? 30 : 50);
+            }, { passive: true });
+        });
+        document.addEventListener('selectionchange', function () {
+            if (!document.body.classList.contains('abene-phone')) return;
+            if (document.activeElement !== editor && !(editor.contains && editor.contains(document.activeElement))) {
+                var sel = window.getSelection();
+                if (!sel || !sel.anchorNode || !editor.contains(sel.anchorNode)) return;
+            }
+            scheduleCaretVisible(80);
+        });
+    }
+    function isArqOpen() {
+        var el = document.getElementById('arqOverlay');
+        return !!(el && el.classList.contains('open'));
+    }
+    function syncArqOpenClass() {
+        var open = isArqOpen();
+        document.body.classList.toggle('abene-arq-open', open);
+        try {
+            document.documentElement.style.overflow = (open && isPhone()) ? 'hidden' : '';
+        } catch (e) {}
+    }
+    function onArqOpen(mobile) {
+        syncArqOpenClass();
+        if (mobile || isPhone()) {
+            try {
+                if (!history.state || !history.state.abeneArq) {
+                    history.pushState({ abeneArq: true, root: true }, '');
+                }
+            } catch (e) {}
+            layoutPhoneZoom();
+            syncPhoneWordBar();
+        }
+    }
+    function onArqClose() {
+        syncArqOpenClass();
+        layoutPhoneZoom();
+        syncPhoneWordBar();
+    }
+    function onArqPane(pane, mobile) {
+        /* Pane changes are handled inside abene-arquivo (tabs + Voltar). */
+        if ((mobile || isPhone()) && isArqOpen()) layoutPhoneZoom();
+    }
+    function onPopState(ev) {
+        if (!isPhone() || !isArqOpen()) return;
+        /* Hardware/browser back: step preview→files→folders, then close. */
+        if (typeof window.abeneArquivoMobileBack === 'function' && window.abeneArquivoMobileBack()) {
+            try { history.pushState({ abeneArq: true }, ''); } catch (e) {}
+            return;
+        }
+        if (typeof window.closeArquivoWindow === 'function') window.closeArquivoWindow();
+    }
+    function watchArquivoOverlay() {
+        var boot = function () {
+            var el = document.getElementById('arqOverlay');
+            if (!el || el._abenePhoneWatch) return !!el;
+            el._abenePhoneWatch = true;
+            if (window.MutationObserver) {
+                new MutationObserver(function () {
+                    syncArqOpenClass();
+                    if (isArqOpen() && isPhone()) layoutPhoneZoom();
+                    syncPhoneWordBar();
+                }).observe(el, { attributes: true, attributeFilter: ['class'] });
+            }
+            return true;
+        };
+        if (!boot()) {
+            setTimeout(boot, 400);
+            setTimeout(boot, 1200);
+        }
     }
     function bind() {
         markPhone();
+
         lastViewportWidth = visSize().w;
         if (isPhone()) {
             var savedRibbon = null;
@@ -335,6 +565,9 @@
         setTimeout(wrapSwitchTab, 80);
         fitPageToPhone(false);
         scrollActiveNav();
+        bindEditorCaret();
+        syncPhoneWordBar();
+        onKb();
         bindLongPress(document.getElementById('editor'), function (ev) {
             if (typeof window.showContextMenu === 'function') {
                 ev.preventDefault();
@@ -371,6 +604,7 @@
                 }
                 fitPageToPhone(true);
                 scrollActiveNav();
+                syncPhoneWordBar();
             }, 180);
         });
         window.addEventListener('resize', function () {
@@ -387,11 +621,13 @@
             }
             lastViewportWidth = nextWidth;
             clampOpenUi();
+            syncPhoneWordBar();
         });
         if (window.visualViewport) {
             window.visualViewport.addEventListener('resize', onKb);
             window.visualViewport.addEventListener('scroll', onKb);
         }
+        window.abeneEnsureCaretVisible = ensureCaretVisible;
         window.abenePlaceSheetMenu = placeSheetMenu;
         window.abeneIsPhone = function () { return document.body.classList.contains('abene-phone') || isPhone(); };
         window.abeneLayoutPhoneZoom = layoutPhoneZoom;
@@ -405,6 +641,12 @@
         requestAnimationFrame(function () {
             setTimeout(function () { fitPageToPhone(false); }, 80);
         });
+        window.abeneArquivoOnOpen = onArqOpen;
+        window.abeneArquivoOnClose = onArqClose;
+        window.abeneArquivoOnMobilePane = onArqPane;
+        window.addEventListener('popstate', onPopState);
+        watchArquivoOverlay();
+        syncArqOpenClass();
     }
     window.abenePlaceSheetMenu = placeSheetMenu;
     window.abeneIsPhone = function () { return document.body.classList.contains('abene-phone') || isPhone(); };

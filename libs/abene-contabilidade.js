@@ -1213,8 +1213,9 @@
             '<div class="pack-section"><div class="pack-group-title">' + esc(tt('packContents', 'Conteúdo do ficheiro')) + '</div><div class="pack-outputs">' +
             '<label><input type="checkbox" id="packIncludeCsv" checked> ' + esc(tt('packIncludeCsv', 'CSV para Excel / importação ERP')) + '</label>' +
             '<label><input type="checkbox" id="packIncludePdf" checked> ' + esc(tt('packIncludePdf', 'PDFs finais gravados no Arquivo')) + '</label></div></div>' +
-            '<div class="pack-section"><label><input type="checkbox" id="packEmail"> Enviar também por email ao contabilista</label>' +
-            '<label style="display:block">Email do contabilista <input type="email" id="packEmailTo" autocomplete="email" style="max-width:100%;width:320px"></label></div>' +
+            '<div class="pack-section"><label><input type="checkbox" id="packEmail"> ' + esc(tt('packEmailAlso', 'Enviar também por email ao contabilista')) + '</label>' +
+            '<label style="display:block">' + esc(tt('packEmailTo', 'Email do contabilista')) + ' <input type="email" id="packEmailTo" autocomplete="email" style="max-width:100%;width:320px"></label>' +
+            '<p id="packEmailStatus" style="font-size:12px;margin:6px 0 0;color:#555;"></p></div>' +
             '<div class="pack-section"><div class="pack-actions"><label class="pack-check"><input type="checkbox" id="packAllDocs" checked> ' + esc(tt('packAllDocs', 'Selecionar todos os resultados filtrados')) + '</label>' +
             '<button type="button" class="btn-secondary" id="packSelectAllBtn">' + esc(tt('packSelectAll', 'Selecionar tudo')) + '</button>' +
             '<button type="button" class="btn-secondary" id="packSelectNoneBtn">' + esc(tt('packSelectNone', 'Limpar seleção')) + '</button></div>' +
@@ -1304,6 +1305,30 @@
                 var scope = document.getElementById('packScope');
                 if (scope && openOpts.defaultScope) scope.value = openOpts.defaultScope;
                 renderDocs();
+                (function refreshPackMailStatus() {
+                    var el = document.getElementById('packEmailStatus');
+                    if (!el) return;
+                    var pf = typeof window.abeneEmailPreflight === 'function'
+                        ? window.abeneEmailPreflight({ action: 'SEND_EMAIL' })
+                        : null;
+                    if (typeof window.abeneMailStatusRefresh === 'function') window.abeneMailStatusRefresh();
+                    if (!pf) {
+                        el.textContent = tt('mailStatusUnknown', 'Gmail: …');
+                        el.style.color = '#555';
+                        return;
+                    }
+                    el.textContent = pf.ok
+                        ? tt('mailStatusReady', 'Gmail prêt')
+                        : (pf.message || tt('mailStatusSetup', 'Gmail: configurar'));
+                    el.style.color = pf.ok ? '#1e6b3a' : '#a33';
+                    if (pf.ok && window.abeneEmailCapabilities) {
+                        var caps = window.abeneEmailCapabilities();
+                        if (caps && caps.modern === false) {
+                            el.textContent = tt('mailStatusUpdate', 'Gmail: atualizar Apps Script');
+                            el.style.color = '#b7791f';
+                        }
+                    }
+                })();
                 bindChange('packScope');
                 bindChange('packPeriod', setPeriod);
                 bindChange('packIncludeUndated');
@@ -1375,10 +1400,10 @@
                         emailTo = emailInput.value.trim();
                         if (!emailTo || !emailInput.checkValidity()) {
                             emailInput.reportValidity();
-                            if (typeof showToast === 'function') showToast('Indique um email válido para o contabilista.');
+                            if (typeof showToast === 'function') showToast(tt('packEmailInvalid', 'Indique um email válido para o contabilista.'));
                             return;
                         }
-                        if (!window.confirm('Enviar os ' + selected.length + ' documentos selecionados para ' + emailTo + '?')) return;
+                        if (!window.confirm(tt('packEmailConfirm', 'Enviar os {n} documentos selecionados para {email}?').replace('{n}', String(selected.length)).replace('{email}', emailTo))) return;
                     }
                     if (typeof closeModal === 'function') closeModal('genericModal');
                     runPackDownload({ papers: selected, entries: selectedEntries }, {
@@ -1395,6 +1420,230 @@
         }
     }
 
+
+    function mailMaxAttachmentBytes() {
+        var maxBytes = 15 * 1024 * 1024;
+        if (typeof window.abeneEmailCapabilities === 'function') {
+            var caps0 = window.abeneEmailCapabilities();
+            if (caps0 && Number(caps0.maxAttachmentBytes) > 0) maxBytes = Number(caps0.maxAttachmentBytes);
+        }
+        return maxBytes;
+    }
+    function entriesMatchingPapers(entries, papers) {
+        var api = window.abeneArquivoApi;
+        return (entries || []).filter(function (entry) {
+            var owner = api && api.ownerIdOf ? api.ownerIdOf(entry) : entry.id;
+            return (papers || []).some(function (paper) {
+                if (paper.ownerId && owner) return String(paper.ownerId) === String(owner);
+                return paper.numero && String(entry.number || '') === String(paper.numero);
+            });
+        });
+    }
+    function generatePackBlob(papers, entries, opts) {
+        opts = opts || {};
+        var includeCsv = opts.includeCsv !== false;
+        var includePdf = opts.includePdf !== false;
+        var zip = new JSZip();
+        var meta = Object.assign({}, opts.exportMeta || {}, {
+            documentCount: (papers || []).length
+        });
+        if (opts.emailPart != null) meta.emailPart = opts.emailPart;
+        if (opts.emailParts != null) meta.emailParts = opts.emailParts;
+        if (includeCsv) fillZipCore(zip, papers, meta);
+        else zip.file('LEIA-ME.txt', 'Pack parcial — só PDFs selecionados.\n');
+        var pdfPromise = includePdf ? attachFinalPdfs(zip, entriesMatchingPapers(entries, papers), papers) : Promise.resolve(0);
+        return pdfPromise.then(function (pdfCount) {
+            if (includeCsv) {
+                meta.pdfCount = Number(pdfCount) || 0;
+                zip.file('11_parametros_exportacao.json', JSON.stringify(meta, null, 2));
+            }
+            return zip.generateAsync({ type: 'blob' });
+        });
+    }
+    function packBlobToBase64(blob) {
+        return new Promise(function (resolve, reject) {
+            var reader = new FileReader();
+            reader.onerror = function () { reject(new Error(tt('packEmailReadFail', 'Não foi possível ler o pack para envio.'))); };
+            reader.onload = function () { resolve(String(reader.result).split(',')[1]); };
+            reader.readAsDataURL(blob);
+        });
+    }
+    function dispatchPackEmail(payload) {
+        if (typeof window.abeneSendPackEmail === 'function') return window.abeneSendPackEmail(payload);
+        if (typeof window.abeneSheetsCall !== 'function') return Promise.reject(new Error(tt('packEmailNoLink', 'Ligação ao email indisponível.')));
+        return window.abeneSheetsCall('SEND_EMAIL', payload);
+    }
+    /** Build ordered list of valid subset zips that each fit under safeMax (never raw zip-split). */
+    function planPackEmailParts(src, opts, safeMax) {
+        var papers = (src.papers || []).slice();
+        var entries = src.entries || [];
+        var MAX_PARTS = 15;
+        if (!papers.length) return Promise.reject(new Error(tt('packSelectOne', 'Selecione pelo menos um documento.')));
+
+        function buildSlice(from, to, partMeta) {
+            var slice = papers.slice(from, to);
+            return generatePackBlob(slice, entries, Object.assign({}, opts, partMeta || {}));
+        }
+
+        var parts = [];
+        var start = 0;
+
+        function nextPart() {
+            if (start >= papers.length) return Promise.resolve({ parts: parts });
+            return buildSlice(start, start + 1).then(function (oneBlob) {
+                if (oneBlob.size > safeMax) {
+                    return {
+                        error: 'single-too-large',
+                        size: oneBlob.size,
+                        parts: []
+                    };
+                }
+                var lo = start + 1;
+                var hi = papers.length;
+                var best = start + 1;
+                var bestBlob = oneBlob;
+
+                function probe(end) {
+                    if (end === start + 1) return Promise.resolve(oneBlob);
+                    return buildSlice(start, end);
+                }
+
+                function binSearch() {
+                    if (lo > hi) {
+                        parts.push({
+                            papers: papers.slice(start, best),
+                            blob: bestBlob,
+                            from: start,
+                            to: best
+                        });
+                        if (parts.length > MAX_PARTS) {
+                            return {
+                                error: 'too-many-parts',
+                                parts: parts,
+                                size: null
+                            };
+                        }
+                        start = best;
+                        return nextPart();
+                    }
+                    var mid = (lo + hi + 1) >> 1;
+                    return probe(mid).then(function (blob) {
+                        if (blob.size <= safeMax) {
+                            best = mid;
+                            bestBlob = blob;
+                            lo = mid + 1;
+                        } else {
+                            hi = mid - 1;
+                        }
+                        return binSearch();
+                    });
+                }
+                return binSearch();
+            });
+        }
+
+        return nextPart().then(function (plan) {
+            if (plan && plan.error) return plan;
+            // Attach part indices into regenerated blobs with meta (optional; keep measured blobs)
+            var n = plan.parts.length;
+            plan.parts.forEach(function (p, i) {
+                p.partIndex = i + 1;
+                p.partTotal = n;
+            });
+            return plan;
+        });
+    }
+    function sendPackEmailFlow(src, opts, fullBlob, stamp) {
+        var emailTo = opts.emailTo;
+        var maxBytes = mailMaxAttachmentBytes();
+        var safeMax = Math.max(1024 * 1024, maxBytes - 512 * 1024);
+        var sizeMb = (fullBlob.size / (1024 * 1024)).toFixed(1);
+        var limMb = String(Math.max(1, Math.round(maxBytes / (1024 * 1024))));
+
+        function sendBlobPart(blob, partIndex, partTotal) {
+            var subject = partTotal > 1
+                ? tt('packEmailSplitSubject', 'Pack contabilista — {date} (parte {i}/{n})')
+                    .replace('{date}', stamp).replace('{i}', String(partIndex)).replace('{n}', String(partTotal))
+                : tt('packEmailSubject', 'Pack contabilista — {date}').replace('{date}', stamp);
+            var body = partTotal > 1
+                ? tt('packEmailSplitBody', 'Segue a parte {i}/{n} do pack (ZIP válido com subconjunto dos documentos). Não substitui faturação certificada.')
+                    .replace('{i}', String(partIndex)).replace('{n}', String(partTotal))
+                : tt('packEmailBody', 'Segue o pack dos documentos selecionados. Não substitui faturação certificada.');
+            var fileName = partTotal > 1
+                ? ('Pacote_Contabilista_' + stamp + '_parte_' + partIndex + '_de_' + partTotal + '.zip')
+                : ('Pacote_Contabilista_' + stamp + '.zip');
+            if (typeof window.abeneEmailPreflight === 'function') {
+                var pfPack = window.abeneEmailPreflight({ action: 'SEND_EMAIL', bytes: blob.size });
+                if (!pfPack.ok) throw new Error(pfPack.message || pfPack.code || 'email-preflight');
+            }
+            return packBlobToBase64(blob).then(function (base64) {
+                return dispatchPackEmail({
+                    to: emailTo,
+                    subject: subject,
+                    body: body,
+                    attachments: [{ name: fileName, mimeType: 'application/zip', data: base64 }],
+                    bytes: blob.size
+                });
+            });
+        }
+
+        if (fullBlob.size <= maxBytes) {
+            return sendBlobPart(fullBlob, 1, 1).then(function () {
+                if (typeof showToast === 'function') {
+                    showToast(tt('packEmailSent', 'Pack descarregado e enviado para {email}.').replace('{email}', emailTo));
+                }
+            });
+        }
+
+        if (typeof showToast === 'function') {
+            showToast(tt('packEmailSplitPlanning', 'Pack grande ({size} MB). A preparar partes para e-mail…')
+                .replace('{size}', sizeMb));
+        }
+
+        return planPackEmailParts(src, opts, safeMax).then(function (plan) {
+            if (plan.error === 'single-too-large') {
+                var oneMb = (Number(plan.size) / (1024 * 1024)).toFixed(1);
+                throw new Error(tt('packEmailSingleTooLarge', 'O pack foi descarregado ({size} MB), mas um único documento ({one} MB) excede o limite de {mb} MB para e-mail. Use a descarga local.')
+                    .replace('{size}', sizeMb).replace('{one}', oneMb).replace('{mb}', limMb));
+            }
+            if (plan.error === 'too-many-parts') {
+                throw new Error(tt('packEmailTooManyParts', 'O pack foi descarregado ({size} MB), mas precisaria de mais de {max} e-mails (limite {mb} MB). Selecione menos documentos.')
+                    .replace('{size}', sizeMb).replace('{max}', '15').replace('{mb}', limMb));
+            }
+            var n = plan.parts.length;
+            if (n < 2) {
+                // Edge: full over maxBytes but safeMax allowed one part — try sending with maxBytes check fail → refuse
+                throw new Error(tt('packEmailTooLarge', 'O pack foi descarregado ({size} MB), mas excede o limite de {mb} MB para e-mail. Selecione menos documentos.')
+                    .replace('{size}', sizeMb).replace('{mb}', limMb));
+            }
+            var ask = tt('packEmailSplitConfirm', 'O pack tem {size} MB (limite {mb} MB). Enviar em {n} e-mails com ZIPs válidos (parte 1/{n} … {n}/{n})?')
+                .replace(/{size}/g, sizeMb).replace(/{mb}/g, limMb).replace(/{n}/g, String(n));
+            if (!window.confirm(ask)) {
+                throw new Error(tt('packEmailSplitRefuse', 'Envio cancelado. Pack descarregado ({size} MB); limite de e-mail {mb} MB.')
+                    .replace('{size}', sizeMb).replace('{mb}', limMb));
+            }
+            var chain = Promise.resolve();
+            plan.parts.forEach(function (part, idx) {
+                chain = chain.then(function () {
+                    var i = idx + 1;
+                    if (typeof showToast === 'function') {
+                        showToast(tt('packEmailSplitSending', 'A enviar parte {i}/{n}…')
+                            .replace('{i}', String(i)).replace('{n}', String(n)));
+                    }
+                    return sendBlobPart(part.blob, i, n).then(function (res) {
+                        return new Promise(function (resolve) { setTimeout(function () { resolve(res); }, 600); });
+                    });
+                });
+            });
+            return chain.then(function () {
+                if (typeof showToast === 'function') {
+                    showToast(tt('packEmailSplitSent', 'Pack descarregado e enviado em {n} e-mails para {email}.')
+                        .replace('{n}', String(n)).replace('{email}', emailTo));
+                }
+            });
+        });
+    }
+
     function runPackDownload(src, opts) {
         opts = opts || {};
         var stamp = new Date().toISOString().slice(0, 10);
@@ -1404,40 +1653,15 @@
             if (includeCsv) downloadBlob('01_clientes_moloni.csv', '\uFEFF' + buildClientsCsv(src.papers), 'text/csv;charset=utf-8');
             return;
         }
-        var zip = new JSZip();
-        if (includeCsv) fillZipCore(zip, src.papers, opts.exportMeta);
-        else zip.file('LEIA-ME.txt', 'Pack parcial — só PDFs selecionados.\n');
-        var pdfPromise = includePdf ? attachFinalPdfs(zip, src.entries, src.papers) : Promise.resolve(0);
-        pdfPromise.then(function (pdfCount) {
-            if (includeCsv && opts.exportMeta) {
-                opts.exportMeta.pdfCount = Number(pdfCount) || 0;
-                zip.file('11_parametros_exportacao.json', JSON.stringify(opts.exportMeta, null, 2));
-            }
-            return zip.generateAsync({ type: 'blob' });
-        }).then(function (blob) {
+        generatePackBlob(src.papers, src.entries, opts).then(function (blob) {
             var meta = opts.exportMeta || {};
             var period = meta.dateFrom || meta.dateTo
                 ? [meta.dateFrom || 'inicio', meta.dateTo || 'fim'].join('_a_')
                 : (meta.period && meta.period !== 'all' ? meta.period : 'todas-as-datas');
+            /* Download-all always works locally — independent of Gmail attachment limit */
             downloadBlob('Pacote_Contabilista_PT_' + period.replace(/[^a-zA-Z0-9_-]+/g, '-') + '_' + stamp + '.zip', blob, 'application/zip');
             if (opts.emailTo) {
-                if (blob.size > 15 * 1024 * 1024) throw new Error('O pack foi descarregado, mas excede 15 MB para envio. Selecione menos documentos.');
-                return new Promise(function (resolve, reject) {
-                    var reader = new FileReader();
-                    reader.onerror = function () { reject(new Error('Não foi possível ler o pack para envio.')); };
-                    reader.onload = function () { resolve(String(reader.result).split(',')[1]); };
-                    reader.readAsDataURL(blob);
-                }).then(function (base64) {
-                    if (typeof window.abeneSheetsCall !== 'function') throw new Error('Ligação ao email indisponível.');
-                    return window.abeneSheetsCall('SEND_EMAIL', {
-                        to: opts.emailTo,
-                        subject: 'Pack contabilista — ' + stamp,
-                        body: 'Segue o pack dos documentos selecionados. Não substitui faturação certificada.',
-                        attachments: [{ name: 'Pacote_Contabilista_' + stamp + '.zip', mimeType: 'application/zip', data: base64 }]
-                    });
-                }).then(function () {
-                    if (typeof showToast === 'function') showToast('Pack descarregado e enviado para ' + opts.emailTo);
-                });
+                return sendPackEmailFlow(src, opts, blob, stamp);
             }
             var emit = issuerNifPack(company().nif);
             var msg = tt('packOk', 'Pack contabilista PT descarregado (' + src.papers.length + ' documento(s)).');
@@ -1446,7 +1670,12 @@
             }
             if (typeof showToast === 'function') showToast(msg);
         }).catch(function (error) {
-            if (typeof showToast === 'function') showToast('Pack / email: ' + String(error.message || error));
+            if (typeof showToast === 'function') {
+                var em = (error && error.abeneMessage) ||
+                    (typeof window.abeneEmailExplainError === 'function' ? window.abeneEmailExplainError(error) : '') ||
+                    String(error.message || error);
+                showToast(tt('packEmailError', 'Pack / email: {err}').replace('{err}', em));
+            }
         });
     }
 

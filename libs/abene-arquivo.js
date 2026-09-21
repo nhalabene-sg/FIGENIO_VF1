@@ -1,6 +1,8 @@
 /* Genius Raros — janela Arquivo (independente do editor Word).
    Não altera Guardar / autosave / versões / modelos existentes.
-   Cópia só de leitura: o documento em curso não é tocado ao consultar. */
+   Cópia só de leitura: o documento em curso não é tocado ao consultar.
+   Fix #7 (mobile nav): back path preview→files→folders, tools collapse,
+   44px targets, reachable panes without crushing desktop layout. */
 (function () {
     var STORE = 'abeneArquivoV1';
     var FOLDERS_STORE = 'abeneArquivoFoldersV1';
@@ -20,6 +22,7 @@
         previewTab: 'doc',
         selectedPdfId: null,
         mobilePane: 'folders',
+        toolsCollapsed: true,
         eventsBound: false
     };
 
@@ -554,6 +557,56 @@
     };
     Object.keys(TRASHSTR).forEach(function (l) {
         if (STR[l]) Object.assign(STR[l], TRASHSTR[l]);
+    });
+
+    var MOBILESTR = {
+        'pt-PT': {
+            back: 'Voltar',
+            backToFiles: '← Ficheiros',
+            backToFolders: '← Pastas',
+            toolsMore: 'Filtros e ações',
+            toolsLess: 'Recolher',
+            navHintMobile: 'Pastas → ficheiros → pré-visualização. Use Voltar para regressar.',
+            mobileTrailFolders: 'Pastas',
+            mobileTrailFiles: 'Ficheiros',
+            mobileTrailPreview: 'Pré-visualização'
+        },
+        'fr-FR': {
+            back: 'Retour',
+            backToFiles: '← Fichiers',
+            backToFolders: '← Dossiers',
+            toolsMore: 'Filtres et actions',
+            toolsLess: 'Réduire',
+            navHintMobile: 'Dossiers → fichiers → aperçu. Utilisez Retour pour revenir.',
+            mobileTrailFolders: 'Dossiers',
+            mobileTrailFiles: 'Fichiers',
+            mobileTrailPreview: 'Aperçu'
+        },
+        'en-US': {
+            back: 'Back',
+            backToFiles: '← Files',
+            backToFolders: '← Folders',
+            toolsMore: 'Filters & actions',
+            toolsLess: 'Collapse',
+            navHintMobile: 'Folders → files → preview. Use Back to return.',
+            mobileTrailFolders: 'Folders',
+            mobileTrailFiles: 'Files',
+            mobileTrailPreview: 'Preview'
+        },
+        'es-ES': {
+            back: 'Volver',
+            backToFiles: '← Ficheros',
+            backToFolders: '← Carpetas',
+            toolsMore: 'Filtros y acciones',
+            toolsLess: 'Contraer',
+            navHintMobile: 'Carpetas → ficheros → vista previa. Use Volver para regresar.',
+            mobileTrailFolders: 'Carpetas',
+            mobileTrailFiles: 'Ficheros',
+            mobileTrailPreview: 'Vista previa'
+        }
+    };
+    Object.keys(MOBILESTR).forEach(function (l) {
+        if (STR[l]) Object.assign(STR[l], MOBILESTR[l]);
     });
 
     function lang() {
@@ -1335,6 +1388,8 @@
             '.arq-archive-panel .arq-panel-title{grid-column:1/-1;font-size:12px;font-weight:700;color:' + NAVY + ';}' +
             '.arq-body{flex:1;display:grid;grid-template-columns:260px minmax(260px,1fr) minmax(340px,1.25fr);min-height:0;}' +
             '.arq-mobile-nav{display:none;}' +
+            '.arq-mobile-back{display:none;}' +
+            '.arq-tools-toggle{display:none;}' +
             '.arq-col{overflow:auto;background:#fff;border-right:1px solid #e5e5e5;min-height:0;}' +
             '.arq-col.arq-list-col{display:flex;flex-direction:column;}' +
             '.arq-list{flex:1;overflow:auto;outline:none;}' +
@@ -1376,52 +1431,84 @@
             '@media(max-width:900px){.arq-body{grid-template-columns:1fr;}.arq-archive-panel{grid-template-columns:1fr;}}' +
             '@media(max-width:820px),(max-width:960px) and (max-height:480px) and (orientation:landscape){' +
             '#arqOverlay{height:100dvh;max-height:100dvh;overflow:hidden;}' +
-            '.arq-top{flex-wrap:wrap;gap:8px;padding:8px 12px;padding-top:max(8px,env(safe-area-inset-top,0px));}' +
+            '.arq-top{flex-wrap:wrap;gap:8px;padding:8px 12px;padding-top:max(8px,env(safe-area-inset-top,0px));flex-shrink:0;}' +
             '.arq-top>div:nth-child(2){min-width:0;flex:1;}' +
             '.arq-top h2{font-size:15px;}' +
             '.arq-top p{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}' +
             '.arq-top-actions{margin-left:0;width:100%;display:grid;grid-template-columns:minmax(0,1fr) auto;}' +
             '.arq-btn{min-height:44px;min-width:44px;padding:8px 12px;font-size:13px;}' +
-            '.arq-tools{display:block;padding:8px 12px;}' +
-            '.arq-tool-filters{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center;}' +
-            '.arq-tool-filters #arqSearch{grid-column:1/-1;}' +
-            '.arq-tool-filters label{min-height:44px;white-space:nowrap;}' +
-            '.arq-date-filter{grid-template-columns:1fr!important;gap:3px!important;white-space:normal!important;}' +
-            '.arq-date-filter input{min-width:0!important;}' +
+            '.arq-tools{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 8px;align-items:center;padding:6px 10px;flex-shrink:0;max-height:34dvh;overflow-y:auto;overscroll-behavior:contain;}' +
+            '.arq-tools-toggle{display:inline-flex!important;align-items:center;justify-content:center;grid-column:2;grid-row:1;min-height:44px;min-width:44px;padding:8px 10px;font-size:12px;font-weight:700;white-space:nowrap;}' +
+            '.arq-tool-filters{display:contents;}' +
+            '.arq-tools #arqSearch{grid-column:1;grid-row:1;min-width:0;width:100%;max-width:100%;font-size:16px;min-height:44px;}' +
+            '.arq-tools.is-collapsed{max-height:none;overflow:visible;}' +
+            '.arq-tools.is-collapsed .arq-tool-actions,.arq-tools.is-collapsed .arq-date-filter,.arq-tools.is-collapsed #arqType,.arq-tools.is-collapsed label:has(#arqDoneOnly){display:none!important;}' +
+            '.arq-tools:not(.is-collapsed){grid-template-columns:minmax(0,1fr);}' +
+            '.arq-tools:not(.is-collapsed) .arq-tools-toggle{grid-column:1/-1;grid-row:auto;justify-self:stretch;}' +
+            '.arq-tools:not(.is-collapsed) .arq-tool-filters{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center;grid-column:1/-1;}' +
+            '.arq-tools:not(.is-collapsed) .arq-tool-filters #arqSearch{grid-column:1/-1;grid-row:auto;}' +
+            '.arq-tools:not(.is-collapsed) .arq-tool-filters label{min-height:44px;white-space:nowrap;}' +
+            '.arq-tools:not(.is-collapsed) .arq-date-filter{grid-template-columns:1fr!important;gap:3px!important;white-space:normal!important;}' +
+            '.arq-tools:not(.is-collapsed) .arq-date-filter input{min-width:0!important;}' +
             '.arq-tools input,.arq-tools select{min-width:0;width:100%;max-width:100%;font-size:16px;min-height:44px;}' +
-            '.arq-tool-actions{display:flex;gap:8px;overflow-x:auto;padding-top:8px;-webkit-overflow-scrolling:touch;scrollbar-width:thin;}' +
+            '.arq-tools:not(.is-collapsed) .arq-tool-actions{display:flex;gap:8px;overflow-x:auto;padding-top:4px;grid-column:1/-1;-webkit-overflow-scrolling:touch;scrollbar-width:thin;}' +
             '.arq-tool-actions .arq-btn{flex:0 0 auto;}' +
-            '.arq-selection-bar{padding:6px 8px;gap:6px;overflow-x:auto;-webkit-overflow-scrolling:touch;}' +
+            '.arq-selection-bar{padding:6px 8px;gap:6px;overflow-x:auto;-webkit-overflow-scrolling:touch;flex-shrink:0;max-height:56px;}' +
             '.arq-selection-actions{flex-wrap:nowrap;}' +
             '.arq-selection-actions .arq-btn{flex:0 0 auto;}' +
             '.arq-mobile-nav{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));background:#fff;border-bottom:1px solid #d9d9d9;flex:0 0 46px;}' +
             '.arq-mobile-nav button{min-width:0;min-height:46px;border:0;border-bottom:3px solid transparent;background:#fff;color:#475569;font-size:13px;font-weight:600;padding:6px 4px;}' +
             '.arq-mobile-nav button.on{color:' + NAVY + ';border-bottom-color:' + GOLD + ';background:#fff8e8;}' +
-            '.arq-body{display:block;min-height:0;overflow:hidden;}' +
-            '.arq-body>.arq-col{display:none!important;height:100%;border-right:0;}' +
+            '.arq-mobile-back{display:flex;align-items:center;gap:8px;padding:4px 8px;background:#fff;border-bottom:1px solid #e5e5e5;flex:0 0 auto;min-height:48px;}' +
+            '.arq-mobile-back[hidden]{display:none!important;}' +
+            '.arq-pane-back{border:1px solid #c5c5c5;background:#fff;color:' + NAVY + ';font-weight:700;font-size:13px;min-height:44px;min-width:44px;padding:8px 12px;border-radius:3px;cursor:pointer;flex:0 0 auto;}' +
+            '.arq-mobile-trail{font-size:12px;color:#64748b;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}' +
+            '.arq-mobile-trail strong{color:' + NAVY + ';}' +
+            '.arq-body{display:block;min-height:0;overflow:hidden;flex:1;position:relative;}' +
+            '.arq-body>.arq-col{display:none!important;position:absolute;inset:0;height:auto!important;border-right:0;overflow:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;}' +
             '.arq-body[data-mobile-pane="folders"]>.arq-folders-col{display:block!important;}' +
-            '.arq-body[data-mobile-pane="files"]>.arq-list-col{display:flex!important;}' +
+            '.arq-body[data-mobile-pane="files"]>.arq-list-col{display:flex!important;flex-direction:column;}' +
             '.arq-body[data-mobile-pane="preview"]>.arq-preview{display:flex!important;}' +
             '.arq-tree button,.arq-list button.arq-row{min-height:44px;padding:10px 12px;}' +
+            '.arq-tree summary{min-height:44px;display:flex;align-items:center;}' +
             '.arq-row-wrap{grid-template-columns:48px minmax(0,1fr);}' +
-            '.arq-preview iframe,#arqPdfFrame,#arqPdfFrame.show{min-height:180px;}' +
+            '.arq-row-select{min-height:44px;min-width:44px;}' +
+            '.arq-crumb{padding:6px 10px;display:flex;flex-wrap:wrap;gap:4px;align-items:center;}' +
+            '.arq-crumb button{min-height:44px;padding:8px 10px;text-decoration:none;border:1px solid #e2e8f0;border-radius:3px;background:#fff;}' +
+            '.arq-preview-tabs button{min-height:44px;padding:10px 14px;}' +
+            '.arq-preview iframe,#arqPdfFrame,#arqPdfFrame.show{min-height:160px;flex:1 1 auto;}' +
             '.arq-preview{padding-bottom:max(12px,env(safe-area-inset-bottom,0px));}' +
-            '.arq-top,.arq-mobile-nav{flex-shrink:0;}' +
-            '.arq-tools{max-height:35dvh;overflow-y:auto;flex-shrink:0;}' +
-            '.arq-list,.arq-folders-col{min-height:0;overflow:auto;overscroll-behavior:contain;}' +
+            '.arq-top,.arq-mobile-nav,.arq-mobile-back{flex-shrink:0;}' +
+            '.arq-list,.arq-folders-col .arq-tree{min-height:0;overflow:auto;overscroll-behavior:contain;}' +
+            '.arq-list-col>.arq-list{flex:1;min-height:0;}' +
             '.arq-preview>*{flex-shrink:0;max-width:100%;box-sizing:border-box;}' +
             '.arq-preview .arq-actions .arq-btn{white-space:normal;overflow-wrap:anywhere;}' +
+            '.arq-preview iframe,#arqPdfFrame{flex-shrink:1!important;}' +
             '}' +
-            '@media(max-width:960px) and (max-height:480px) and (orientation:landscape){' +
+'@media(max-width:820px) and (max-height:640px),(max-width:960px) and (max-height:480px) and (orientation:landscape){' +
+            '.arq-top p{display:none;}' +
+            '.arq-tools{max-height:28dvh;padding:4px 8px;}' +
+            '.arq-tools.is-collapsed{max-height:none;}' +
+            '.arq-selection-bar{max-height:48px;padding:4px 8px;}' +
+            '.arq-preview iframe,#arqPdfFrame,#arqPdfFrame.show{min-height:110px;}' +
+            '.arq-mobile-nav{flex-basis:42px;}.arq-mobile-nav button{min-height:42px;font-size:12px;}' +
+            '.arq-mobile-back{min-height:44px;padding:2px 8px;}' +
+            '}' +
+'@media(max-width:960px) and (max-height:480px) and (orientation:landscape){' +
             '.arq-top{flex-wrap:nowrap;padding:5px 8px;}.arq-top p{display:none;}.arq-top-actions{width:auto;margin-left:auto;display:flex;flex-wrap:nowrap;}' +
-            '.arq-tools{display:flex;flex-wrap:nowrap;overflow-x:auto;padding:4px 8px;-webkit-overflow-scrolling:touch;}' +
-            '.arq-tool-filters,.arq-tool-actions{display:flex;flex:0 0 auto;gap:6px;padding:0;align-items:center;}' +
-            '.arq-tool-filters #arqSearch{grid-column:auto;width:180px;}.arq-tool-filters label{min-height:36px;}' +
-            '.arq-tools input,.arq-tools select{width:150px;min-height:36px;font-size:14px;}.arq-date-filter{display:flex!important;grid-template-columns:none!important;gap:4px!important;}' +
-            '.arq-date-filter input{width:138px!important;}.arq-btn{min-height:36px;padding:6px 10px;}' +
+            '.arq-tools{display:flex;flex-wrap:nowrap;overflow-x:auto;padding:4px 8px;max-height:none;-webkit-overflow-scrolling:touch;align-items:center;}' +
+            '.arq-tools.is-collapsed{display:flex;}' +
+            '.arq-tools-toggle{flex:0 0 auto;min-height:36px;}' +
+            '.arq-tools.is-collapsed .arq-tool-actions,.arq-tools.is-collapsed .arq-date-filter,.arq-tools.is-collapsed #arqType,.arq-tools.is-collapsed label:has(#arqDoneOnly){display:none!important;}' +
+            '.arq-tools:not(.is-collapsed) .arq-tool-filters,.arq-tools:not(.is-collapsed) .arq-tool-actions{display:flex;flex:0 0 auto;gap:6px;padding:0;align-items:center;}' +
+            '.arq-tool-filters #arqSearch{width:160px;}.arq-tool-filters label{min-height:36px;}' +
+            '.arq-tools input,.arq-tools select{width:140px;min-height:36px;font-size:14px;}.arq-date-filter{display:flex!important;grid-template-columns:none!important;gap:4px!important;}' +
+            '.arq-date-filter input{width:128px!important;}.arq-btn{min-height:36px;padding:6px 10px;}' +
             '.arq-selection-bar{min-height:40px;padding:4px 8px;}.arq-mobile-nav{flex-basis:40px;}.arq-mobile-nav button{min-height:40px;}' +
+            '.arq-pane-back{min-height:36px;}' +
+            '.arq-body>.arq-col{padding-bottom:4px;}' +
             '}' +
-            '@media(max-width:400px){.arq-top p{display:none;}.arq-top-actions{width:auto;margin-left:auto;}.arq-top-actions .arq-btn{padding:6px 9px;font-size:12px;}.arq-tools{padding:6px 8px;}.arq-tool-actions{padding-top:6px;}.arq-selection-summary{position:sticky;left:0;background:#eef2f7;padding-right:4px;}}';
+'@media(max-width:400px){.arq-top p{display:none;}.arq-top-actions{width:auto;margin-left:auto;}.arq-top-actions .arq-btn{padding:6px 9px;font-size:12px;}.arq-tools{padding:6px 8px;}.arq-tool-actions{padding-top:6px;}.arq-selection-summary{position:sticky;left:0;background:#eef2f7;padding-right:4px;}.arq-mobile-nav button{font-size:12px;padding:6px 2px;}.arq-tools-toggle{font-size:11px;padding:8px 8px;}}';
     }
     function archivePanelHtml() {
         return '<div class="arq-archive-panel" id="arqArchivePanel">' +
@@ -1729,9 +1816,7 @@
         document.getElementById('arqNewClientBtn').onclick = createClientFolder;
         document.getElementById('arqNewPastaBtn').onclick = createPastaFolder;
         document.getElementById('arqDriveBtn').onclick = openDriveRoot;
-        document.querySelectorAll('#arqMobileNav [data-pane]').forEach(function (btn) {
-            btn.onclick = function () { setMobilePane(btn.getAttribute('data-pane')); };
-        });
+        bindMobileChromeEvents();
         var archGo = document.getElementById('arqArchGo');
         var archCancel = document.getElementById('arqArchCancel');
         if (archGo) archGo.onclick = commitArchivePanel;
@@ -1788,6 +1873,10 @@
                 e.preventDefault();
                 return;
             }
+            if (isMobileArchive() && mobileBack()) {
+                e.preventDefault();
+                return;
+            }
             e.preventDefault();
             closeArquivo();
         });
@@ -1806,9 +1895,16 @@
         if (tools && !document.getElementById('arqSelectionBar')) {
             tools.insertAdjacentHTML('afterend', selectionBarHtml());
         }
+        if (tools && !document.getElementById('arqToolsToggle')) {
+            tools.insertAdjacentHTML('afterbegin', toolsToggleHtml());
+        }
+        if (tools) tools.classList.toggle('is-collapsed', !!state.toolsCollapsed);
         var body = wrap.querySelector('.arq-body');
         if (body && !document.getElementById('arqMobileNav')) {
             body.insertAdjacentHTML('beforebegin', mobileNavHtml());
+        }
+        if (body && !document.getElementById('arqMobileBack')) {
+            body.insertAdjacentHTML('beforebegin', mobileBackHtml());
         }
         var cols = body ? body.querySelectorAll(':scope > .arq-col') : [];
         if (cols[0]) cols[0].classList.add('arq-folders-col');
@@ -1823,6 +1919,7 @@
             var list = document.getElementById('arqList');
             if (list) list.setAttribute('tabindex', '0');
         }
+        bindMobileChromeEvents();
         bindArquivoEvents();
     }
     function ensureDom() {
@@ -1844,7 +1941,8 @@
             '<button type="button" class="arq-btn gold" id="arqArchiveBtn"></button>' +
             '<button type="button" class="arq-btn" id="arqCloseBtn"></button>' +
             '</div></div>' +
-            '<div class="arq-tools">' +
+            '<div class="arq-tools is-collapsed">' +
+            toolsToggleHtml() +
             '<div class="arq-tool-filters">' +
             '<input type="search" id="arqSearch" />' +
             '<select id="arqType"></select>' +
@@ -1861,6 +1959,7 @@
             archivePanelHtml() +
             folderPanelHtml() +
             mobileNavHtml() +
+            mobileBackHtml() +
             '<div class="arq-body">' +
             '<div class="arq-col arq-folders-col"><h3 id="arqFoldersTitle"></h3><div class="arq-tree" id="arqTree"></div></div>' +
             '<div class="arq-col arq-list-col"><h3 id="arqListTitle"></h3><div class="arq-crumb" id="arqCrumb"></div><div class="arq-list" id="arqList" tabindex="0"></div></div>' +
@@ -1877,6 +1976,15 @@
             '<button type="button" data-pane="files" role="tab"></button>' +
             '<button type="button" data-pane="preview" role="tab"></button>' +
             '</div>';
+    }
+    function mobileBackHtml() {
+        return '<div class="arq-mobile-back" id="arqMobileBack" hidden>' +
+            '<button type="button" class="arq-pane-back" id="arqMobileBackBtn"></button>' +
+            '<span class="arq-mobile-trail" id="arqMobileTrail"></span>' +
+            '</div>';
+    }
+    function toolsToggleHtml() {
+        return '<button type="button" class="arq-btn arq-tools-toggle" id="arqToolsToggle" aria-expanded="false"></button>';
     }
 
     function dateFiltersHtml() {
@@ -1898,6 +2006,80 @@
             '</div></div>';
     }
 
+    function bindMobileChromeEvents() {
+        document.querySelectorAll('#arqMobileNav [data-pane]').forEach(function (btn) {
+            btn.onclick = function () { setMobilePane(btn.getAttribute('data-pane')); };
+        });
+        var backBtn = document.getElementById('arqMobileBackBtn');
+        if (backBtn) backBtn.onclick = function () { mobileBack(); };
+        var toolsToggle = document.getElementById('arqToolsToggle');
+        if (toolsToggle) toolsToggle.onclick = function () { setToolsCollapsed(!state.toolsCollapsed); };
+    }
+    function setToolsCollapsed(on) {
+        state.toolsCollapsed = !!on;
+        var tools = document.querySelector('#arqOverlay .arq-tools');
+        if (tools) tools.classList.toggle('is-collapsed', state.toolsCollapsed);
+        var tog = document.getElementById('arqToolsToggle');
+        if (tog) {
+            tog.textContent = state.toolsCollapsed ? tr('toolsMore') : tr('toolsLess');
+            tog.setAttribute('aria-expanded', state.toolsCollapsed ? 'false' : 'true');
+        }
+    }
+    function syncMobileChrome() {
+        var mobile = isMobileArchive();
+        var backWrap = document.getElementById('arqMobileBack');
+        var backBtn = document.getElementById('arqMobileBackBtn');
+        var trail = document.getElementById('arqMobileTrail');
+        var pane = state.mobilePane || 'folders';
+        if (backWrap) {
+            if (!mobile || pane === 'folders') {
+                backWrap.hidden = true;
+            } else {
+                backWrap.hidden = false;
+                if (backBtn) {
+                    backBtn.textContent = pane === 'preview' ? tr('backToFiles') : tr('backToFolders');
+                    backBtn.setAttribute('data-back-to', pane === 'preview' ? 'files' : 'folders');
+                }
+                if (trail) {
+                    var parts = [tr('mobileTrailFolders')];
+                    if (pane === 'files' || pane === 'preview') parts.push(tr('mobileTrailFiles'));
+                    if (pane === 'preview') parts.push(tr('mobileTrailPreview'));
+                    trail.innerHTML = parts.map(function (p, i) {
+                        return i === parts.length - 1 ? ('<strong>' + esc(p) + '</strong>') : esc(p);
+                    }).join(' · ');
+                }
+            }
+        }
+        var tools = document.querySelector('#arqOverlay .arq-tools');
+        if (tools) {
+            if (mobile) tools.classList.toggle('is-collapsed', state.toolsCollapsed);
+            else tools.classList.remove('is-collapsed');
+        }
+        var tog = document.getElementById('arqToolsToggle');
+        if (tog) {
+            tog.style.display = mobile ? '' : 'none';
+            if (mobile) {
+                tog.textContent = state.toolsCollapsed ? tr('toolsMore') : tr('toolsLess');
+                tog.setAttribute('aria-expanded', state.toolsCollapsed ? 'false' : 'true');
+            }
+        }
+        try {
+            document.body.classList.toggle('abene-arq-open', !!(document.getElementById('arqOverlay') && document.getElementById('arqOverlay').classList.contains('open')));
+            if (typeof window.abeneArquivoOnMobilePane === 'function') window.abeneArquivoOnMobilePane(pane, mobile);
+        } catch (eSync) {}
+    }
+    function mobileBack() {
+        if (!isMobileArchive()) return false;
+        if (state.mobilePane === 'preview') {
+            setMobilePane('files');
+            return true;
+        }
+        if (state.mobilePane === 'files') {
+            setMobilePane('folders');
+            return true;
+        }
+        return false;
+    }
     function setMobilePane(pane) {
         if (['folders', 'files', 'preview'].indexOf(pane) < 0) pane = 'folders';
         state.mobilePane = pane;
@@ -1908,10 +2090,19 @@
             btn.classList.toggle('on', on);
             btn.setAttribute('aria-selected', on ? 'true' : 'false');
         });
+        syncMobileChrome();
+        try {
+            var active = document.querySelector('#arqOverlay .arq-body > .arq-col[style], #arqOverlay .arq-body > .arq-folders-col, #arqOverlay .arq-body > .arq-list-col, #arqOverlay .arq-body > .arq-preview');
+            var paneEl = null;
+            if (pane === 'folders') paneEl = document.querySelector('#arqOverlay .arq-folders-col');
+            else if (pane === 'files') paneEl = document.querySelector('#arqOverlay .arq-list-col');
+            else paneEl = document.getElementById('arqPreview');
+            if (paneEl && typeof paneEl.scrollTop === 'number') paneEl.scrollTop = 0;
+        } catch (eScroll) {}
     }
     function fillChrome() {
         document.getElementById('arqTitle').textContent = tr('title');
-        document.getElementById('arqSub').textContent = tr('subtitle') + ' — ' + tr('navHint');
+        document.getElementById('arqSub').textContent = tr('subtitle') + ' — ' + tr(isMobileArchive() ? 'navHintMobile' : 'navHint');
         document.getElementById('arqArchiveBtn').textContent = tr('archiveNow');
         document.getElementById('arqCloseBtn').textContent = tr('close');
         document.getElementById('arqSearch').placeholder = tr('search');
@@ -1945,6 +2136,7 @@
         document.querySelectorAll('#arqMobileNav [data-pane]').forEach(function (btn) {
             btn.textContent = paneLabels[btn.getAttribute('data-pane')] || '';
         });
+        setToolsCollapsed(state.toolsCollapsed);
         setMobilePane(state.mobilePane);
         var sel = document.getElementById('arqType');
         var types = [
@@ -2424,12 +2616,20 @@
         if (!editor) return false;
         try {
             if (typeof saveDocument === 'function') saveDocument({ silent: true });
-        } catch (eSave) {}
+        } catch (eSave) {
+            if (typeof showToast === 'function') showToast('Não foi possível guardar o documento atual. A abertura foi cancelada para conservar o trabalho.');
+            return false;
+        }
         var prepared = asCopy && typeof window.abenePrepareCopyAsNewHtml === 'function'
             ? window.abenePrepareCopyAsNewHtml(html)
             : cleanArchiveHtml(html);
         editor.innerHTML = prepared || '<p></p>';
         docState().archiveEntryId = !asCopy && !readOnly ? (archiveEntryId || '') : '';
+        var linkedEntry = !asCopy && !readOnly && archiveEntryId
+            ? loadStore().filter(function (item) { return item.id === archiveEntryId; })[0] : null;
+        if (linkedEntry && linkedEntry.gdocsFileId && window.abeneGdocsSetLink) {
+            window.abeneGdocsSetLink(linkedEntry.gdocsFileId, linkedEntry.gdocsUrl);
+        } else if (window.abeneGdocsClearLink) window.abeneGdocsClearLink();
         if (typeof window.abeneEnhanceCheckTables === 'function') window.abeneEnhanceCheckTables(editor);
         editor.contentEditable = readOnly ? 'false' : 'true';
         if (typeof renameDocument === 'function') renameDocument(name);
@@ -2445,6 +2645,10 @@
         if (typeof saveUndoState === 'function') saveUndoState();
         if (typeof updateStats === 'function') updateStats();
         if (typeof updateNavigation === 'function') updateNavigation();
+        try {
+            /* Fix #5: read-only opens must not rebind Drive sync to "current". */
+            if (!readOnly && typeof window.abeneDocumentSyncOnDocChange === 'function') window.abeneDocumentSyncOnDocChange();
+        } catch (eSyncDoc) {}
         if (typeof refreshPagination === 'function') refreshPagination();
         if (typeof updateSaveStatus === 'function') updateSaveStatus();
         closeArquivo();
@@ -2642,6 +2846,14 @@
             existing.hasDevis = entry.hasDevis;
             existing.hasReceipt = entry.hasReceipt;
             existing.hasReport = entry.hasReport;
+            // Preserve / update Google Docs link (same Doc per Arquivo entry).
+            if (Object.prototype.hasOwnProperty.call(entry, 'gdocsFileId')) {
+                existing.gdocsFileId = entry.gdocsFileId || '';
+                existing.gdocsUrl = entry.gdocsUrl || '';
+            } else if (!existing.gdocsFileId && entry.gdocsFileId) {
+                existing.gdocsFileId = entry.gdocsFileId;
+                existing.gdocsUrl = entry.gdocsUrl || '';
+            }
             state.selectedId = existing.id;
         } else {
             list.unshift(entry);
@@ -2676,6 +2888,7 @@
             openArchivePanel();
             return null;
         }
+        var ds = docState() || {};
         var entry = {
             id: uid(),
             name: snap.name,
@@ -2693,9 +2906,19 @@
             archivedAt: new Date().toISOString(),
             hasDevis: meta.hasDevis,
             hasReceipt: meta.hasReceipt,
-            hasReport: meta.hasReport
+            hasReport: meta.hasReport,
+            gdocsFileId: ds.gdocsFileId || '',
+            gdocsUrl: ds.gdocsUrl || ''
         };
-        if (!upsertArchiveEntry(entry)) return null;
+        var boundId = upsertArchiveEntry(entry);
+        if (!boundId) return null;
+        // Keep the open document bound to this Arquivo entry so later Guardar updates the same ficha.
+        try {
+            if (ds) ds.archiveEntryId = boundId;
+        } catch (eBind) {}
+        try {
+            if (typeof window.abeneDocumentSyncOnDocChange === 'function') window.abeneDocumentSyncOnDocChange();
+        } catch (eSyncBind) {}
         saveLastJob({ client: entry.client, pasta: entry.pasta, nif: entry.nif });
         if (!opts.silent) {
             var cLabel = entry.client || tr('noClient');
@@ -2757,17 +2980,32 @@
         fillChrome();
         if (typeof closeAllDropdowns === 'function') closeAllDropdowns();
         document.getElementById('arqOverlay').classList.add('open');
-        if (isMobileArchive()) setMobilePane('folders');
+        try { document.body.classList.add('abene-arq-open'); } catch (eOpen) {}
+        if (isMobileArchive()) {
+            state.toolsCollapsed = true;
+            setToolsCollapsed(true);
+            setMobilePane('folders');
+        } else {
+            setToolsCollapsed(false);
+            syncMobileChrome();
+        }
         renderTree();
         renderList();
         renderPreview();
         var listEl = document.getElementById('arqList');
         if (listEl) listEl.focus();
+        try {
+            if (typeof window.abeneArquivoOnOpen === 'function') window.abeneArquivoOnOpen(isMobileArchive());
+        } catch (eHook) {}
     }
     function closeArquivo() {
         revokePdfPreview();
         var el = document.getElementById('arqOverlay');
         if (el) el.classList.remove('open');
+        try { document.body.classList.remove('abene-arq-open'); } catch (eClose) {}
+        try {
+            if (typeof window.abeneArquivoOnClose === 'function') window.abeneArquivoOnClose();
+        } catch (eHook2) {}
     }
 
     function markSentToClient(meta) {
@@ -2823,8 +3061,37 @@
 
     window.openArquivoWindow = openArquivo;
     window.closeArquivoWindow = closeArquivo;
+    window.abeneArquivoMobileBack = mobileBack;
+    window.abeneArquivoSetMobilePane = setMobilePane;
+    window.abeneArquivoIsMobile = isMobileArchive;
     window.abeneArquivoArchive = function (opts) { return archiveCurrent(opts || { silent: true }); };
     window.abeneArquivoApi = {
+        getEntryGdocsLink: function (entryId) {
+            entryId = String(entryId || '');
+            if (!entryId) return null;
+            var list = loadStore();
+            var entry = list.filter(function (item) { return item && String(item.id || '') === entryId; })[0];
+            if (!entry || !entry.gdocsFileId) return null;
+            return {
+                id: String(entry.gdocsFileId),
+                url: entry.gdocsUrl || ('https://docs.google.com/document/d/' + entry.gdocsFileId + '/edit')
+            };
+        },
+        persistGdocsLink: function (entryId, fileId, url) {
+            entryId = String(entryId || '');
+            if (!entryId) return false;
+            var list = loadStore();
+            var entry = list.filter(function (item) { return item && String(item.id || '') === entryId; })[0];
+            if (!entry || entry.deletedAt) return false;
+            entry.gdocsFileId = String(fileId || '').replace(/[^a-zA-Z0-9_-]/g, '');
+            entry.gdocsUrl = entry.gdocsFileId
+                ? (url || ('https://docs.google.com/document/d/' + entry.gdocsFileId + '/edit'))
+                : '';
+            entry.updatedAt = new Date().toISOString();
+            if (!saveStore(list)) return false;
+            refreshArquivoIfOpen();
+            return true;
+        },
         saveOpenedDocument: function (html, name) {
             var id = docState().archiveEntryId;
             if (!id) return;
@@ -2832,10 +3099,13 @@
             var entry = list.filter(function (item) { return item.id === id; })[0];
             if (!entry || entry.deletedAt || entry.protected || entry.concluded || entry.readOnlyOrigin) return;
             var clean = cleanArchiveHtml(html);
-            if (entry.html === clean && entry.name === name) return;
+            var linkId = docState().gdocsFileId || '';
+            if (entry.html === clean && entry.name === name && (entry.gdocsFileId || '') === linkId) return;
             localStorage.setItem('abeneArchiveBeforeSave', JSON.stringify(entry));
             entry.html = clean;
             entry.name = name || entry.name;
+            entry.gdocsFileId = linkId;
+            entry.gdocsUrl = docState().gdocsUrl || '';
             entry.updatedAt = new Date().toISOString();
             if (!saveStore(list)) throw new Error('Não foi possível atualizar o documento no Arquivo.');
             refreshArquivoIfOpen();
@@ -2855,7 +3125,10 @@
         waitForArchivePdfs: function () { return lastArchivePdfPromise; },
         lastJob: loadLastJob,
         saveLastJob: saveLastJob,
-        markSentToClient: markSentToClient
+        markSentToClient: markSentToClient,
+        mobileBack: mobileBack,
+        setMobilePane: setMobilePane,
+        isMobileArchive: isMobileArchive
     };
     window.addEventListener('abene:languagechange', function () {
         var overlay = document.getElementById('arqOverlay');

@@ -81,6 +81,7 @@
         setStatus(tt('sheetsOffline', 'Documento local — sincroniza quando houver internet'), true);
         var el = document.getElementById('sheetsSyncStatus');
         if (el) el.style.color = '#C9A84C';
+        refreshMailStatus();
     }
     function refreshStatusI18n() {
         if (lastKind === 'syncing') setStatus(tt('sheetsSyncing', 'A sincronizar…'));
@@ -95,6 +96,7 @@
         } else if (lastKind === 'fail') {
             setStatus(tt('sheetsFail', 'Sheets: falha') + (lastFailMsg ? ' (' + lastFailMsg + ')' : ''), false);
         }
+        refreshMailStatus();
     }
     function enabled() {
         var c = company();
@@ -106,6 +108,162 @@
     function token() {
         var c = company();
         return String(c.syncToken || '').trim();
+    }
+
+    /* Fix #8 — Gmail / orçamento email preflight + status (additive) */
+    var lastCaps = null;
+    var MAIL_MAX_BYTES = 15 * 1024 * 1024;
+
+    function rememberCaps(json) {
+        if (!json || typeof json !== 'object') return;
+        var modern = json.canSendEmail === true || json.canSendClientPdf === true ||
+            !!(json.capabilities && (json.capabilities.sendEmail || json.capabilities.sendClientPdf));
+        var mailOn = json.mailEnabled !== false;
+        if (json.mailEnabled == null && json.canSendEmail == null && json.canSendClientPdf == null && !modern) {
+            // Ancient script without flags: assume mail may work after Testar, but suggest update.
+            mailOn = true;
+            modern = false;
+        }
+        var canMail = json.canSendEmail === true || json.mailEnabled === true || (mailOn && !modern);
+        var canPdf = json.canSendClientPdf === true || json.mailEnabled === true || (mailOn && !modern);
+        lastCaps = {
+            at: json.at || new Date().toISOString(),
+            version: String(json.version || ''),
+            script: String(json.script || ''),
+            mailEnabled: mailOn && (canMail || canPdf),
+            canSendEmail: !!canMail,
+            canSendClientPdf: !!canPdf,
+            maxAttachmentBytes: Number(json.maxAttachmentBytes) > 0 ? Number(json.maxAttachmentBytes) : MAIL_MAX_BYTES,
+            ownerEmail: String(json.ownerEmail || ''),
+            known: true,
+            modern: modern
+        };
+        refreshMailStatus();
+    }
+
+    function estimateAttachmentBytes(payload) {
+        payload = payload || {};
+        var list = payload.attachments || [];
+        var n = 0;
+        for (var i = 0; i < list.length; i++) {
+            var raw = String((list[i] && (list[i].data || list[i].base64 || list[i].content)) || '');
+            raw = raw.replace(/^data:[^;]+;base64,/, '');
+            if (raw) n += Math.floor(raw.length * 0.75);
+        }
+        if (payload.bytes != null) n = Math.max(n, Number(payload.bytes) || 0);
+        return n;
+    }
+
+    function emailPreflight(opts) {
+        opts = opts || {};
+        var action = String(opts.action || 'SEND_CLIENT_PDF').toUpperCase();
+        if (!isOnline()) {
+            return { ok: false, code: 'offline', message: tt('mailOffline', 'Sem internet. O e-mail não pode ser enviado agora.') };
+        }
+        if (!execUrl()) {
+            return { ok: false, code: 'no-url', message: tt('mailNeedUrl', 'Configure o URL /exec nas Definições para enviar por Gmail.') };
+        }
+        if (!token()) {
+            return { ok: false, code: 'no-token', message: tt('mailNeedToken', 'Configure a Chave de acesso da API nas Definições.') };
+        }
+        var c = company();
+        if (c.databaseEnabled === false || c.databaseEnabled === 'false') {
+            return { ok: false, code: 'off', message: tt('mailNeedDb', 'Ative a sincronização Google nas Definições para enviar e-mails.') };
+        }
+        if (lastCaps && lastCaps.known) {
+            if (lastCaps.mailEnabled === false) {
+                return { ok: false, code: 'no-mail', message: tt('mailNeedScriptUpdate', 'Atualize o Apps Script (emaildrive) e autorize o Gmail.') };
+            }
+            if (action === 'SEND_CLIENT_PDF' && lastCaps.canSendClientPdf === false) {
+                return { ok: false, code: 'no-pdf', message: tt('mailNeedScriptUpdate', 'Atualize o Apps Script (emaildrive) e autorize o Gmail.') };
+            }
+            if ((action === 'SEND_EMAIL' || action === 'EMAIL' || action === 'SENDMAIL') && lastCaps.canSendEmail === false) {
+                return { ok: false, code: 'no-email', message: tt('mailNeedScriptUpdate', 'Atualize o Apps Script (emaildrive) e autorize o Gmail.') };
+            }
+        }
+        var bytes = opts.bytes != null ? Number(opts.bytes) : estimateAttachmentBytes(opts);
+        var maxB = (lastCaps && lastCaps.maxAttachmentBytes) || MAIL_MAX_BYTES;
+        if (bytes > maxB) {
+            var maxMb = Math.max(1, Math.round(maxB / (1024 * 1024)));
+            return {
+                ok: false,
+                code: 'too-large',
+                message: tt('mailTooLarge', 'Anexo demasiado grande para envio (limite {mb} MB). Reduza o conteúdo.').replace('{mb}', String(maxMb)),
+                maxBytes: maxB,
+                bytes: bytes
+            };
+        }
+        return {
+            ok: true,
+            code: 'ok',
+            caps: lastCaps,
+            message: tt('mailStatusReady', 'Gmail prêt'),
+            maxBytes: maxB
+        };
+    }
+
+    function mailStatusState() {
+        if (!isOnline()) {
+            return { kind: 'offline', text: tt('mailStatusOffline', 'Gmail: offline'), color: '#C9A84C' };
+        }
+        if (!execUrl() || !token() || !enabled()) {
+            return { kind: 'setup', text: tt('mailStatusSetup', 'Gmail: configurar'), color: '#c0392b' };
+        }
+        if (lastCaps && lastCaps.known && lastCaps.mailEnabled === false) {
+            return { kind: 'update', text: tt('mailStatusUpdate', 'Gmail: atualizar Apps Script'), color: '#c0392b' };
+        }
+        if (lastCaps && lastCaps.known && lastCaps.modern === false) {
+            return { kind: 'update', text: tt('mailStatusUpdate', 'Gmail: atualizar Apps Script'), color: '#C9A84C' };
+        }
+        if (lastCaps && lastCaps.known && lastCaps.mailEnabled) {
+            return { kind: 'ready', text: tt('mailStatusReady', 'Gmail prêt'), color: '#7dcea0' };
+        }
+        return { kind: 'unknown', text: tt('mailStatusUnknown', 'Gmail: …'), color: '' };
+    }
+
+    function refreshMailStatus() {
+        var st = mailStatusState();
+        var el = document.getElementById('gmailMailStatus');
+        if (!el) return;
+        el.textContent = st.text;
+        el.style.color = st.color || '';
+        var tip = st.text;
+        if (lastCaps && lastCaps.ownerEmail) tip += ' · ' + lastCaps.ownerEmail;
+        if (lastCaps && lastCaps.version) tip += ' · v' + lastCaps.version;
+        el.title = tip;
+        el.style.display = (enabled() || st.kind === 'setup' || st.kind === 'offline') ? '' : 'none';
+    }
+
+    function explainEmailError(err) {
+        var code = String((err && err.message) || err || '');
+        var map = {
+            offline: tt('mailOffline', 'Sem internet. O e-mail não pode ser enviado agora.'),
+            off: tt('mailNeedDb', 'Ative a sincronização Google nas Definições para enviar e-mails.'),
+            'no-url': tt('mailNeedUrl', 'Configure o URL /exec nas Definições para enviar por Gmail.'),
+            'no-token': tt('mailNeedToken', 'Configure a Chave de acesso da API nas Definições.'),
+            token: tt('mailBadToken', 'Chave de acesso inválida. Verifique o jeton nas Definições.'),
+            'no-to': tt('mailNoTo', 'Indique um e-mail de destinatário válido.'),
+            'pdf-required': tt('mailPdfRequired', 'É necessário um único anexo PDF válido.'),
+            'bad-pdf': tt('mailBadPdf', 'O PDF está corrompido ou inválido. Nada foi enviado.'),
+            'too-large': tt('mailTooLarge', 'Anexo demasiado grande para envio (limite {mb} MB). Reduza o conteúdo.').replace('{mb}', '15'),
+            'attachment-too-large': tt('mailTooLargeGmail', 'O Gmail/Apps Script recusou o anexo (demasiado grande).'),
+            'no-mail': tt('mailNeedScriptUpdate', 'Atualize o Apps Script (emaildrive) e autorize o Gmail.'),
+            'no-pdf': tt('mailNeedScriptUpdate', 'Atualize o Apps Script (emaildrive) e autorize o Gmail.'),
+            'no-email': tt('mailNeedScriptUpdate', 'Atualize o Apps Script (emaildrive) e autorize o Gmail.'),
+            'jsonp-timeout': tt('mailTimeout', 'O Apps Script não respondeu a tempo. Tente novamente.'),
+            'jsonp-fail': tt('mailTimeout', 'O Apps Script não respondeu a tempo. Tente novamente.'),
+            'google-html-response': tt('mailBadDeploy', 'Resposta inválida do Apps Script. Reimplante a aplicação Web (/exec).'),
+            'invalid-api-response': tt('mailBadDeploy', 'Resposta inválida do Apps Script. Reimplante a aplicação Web (/exec).')
+        };
+        if (map[code]) return map[code];
+        if (/^api-http-/.test(code)) return tt('mailHttpFail', 'Falha HTTP no Apps Script ({code}). Verifique o URL /exec.').replace('{code}', code.replace('api-http-', ''));
+        if (/Attachment size|tamanho|too large|exceeds|Limite|quota/i.test(code)) {
+            return tt('mailTooLargeGmail', 'O Gmail/Apps Script recusou o anexo (demasiado grande).');
+        }
+        if (/Authorization|autoriz|GmailApp|Exception: /i.test(code)) {
+            return tt('mailNeedAuth', 'Autorize o Gmail no Apps Script (initialiserSysteme ou e-mail de teste do menu).');
+        }
+        return tt('mailFailDetail', 'Falha no Gmail ligado: {err}. Nada foi enviado.').replace('{err}', code.slice(0, 140));
     }
     function setStatus(text, ok) {
         lastStatus = text;
@@ -313,7 +471,10 @@
         c.sheetsLastSync = at || new Date().toISOString();
         if (spreadsheetId) c.spreadsheetId = spreadsheetId;
         saveCompany(c);
-        if (json) rememberDrive(json);
+        if (json) {
+            rememberDrive(json);
+            rememberCaps(json);
+        }
         var when = c.sheetsLastSync;
         try {
             var d = new Date(when);
@@ -564,6 +725,7 @@
     function boot() {
         if (!enabled()) {
             setStatus('');
+            refreshMailStatus();
             return;
         }
         if (!isOnline()) {
@@ -582,22 +744,30 @@
     }
 
     window.addEventListener('offline', function () {
+        refreshMailStatus();
         if (!enabled()) return;
         markPending();
         setLocalStatus();
     });
     window.addEventListener('online', function () {
+        refreshMailStatus();
         if (!enabled()) return;
         push('reconnect').catch(function () {});
     });
 
     function sendEmail(payload) {
-        if (!enabled()) return Promise.reject(new Error('off'));
-        if (!isOnline()) {
-            setLocalStatus();
-            return Promise.reject(new Error('offline'));
-        }
         payload = payload || {};
+        var pf = emailPreflight({
+            action: 'SEND_CLIENT_PDF',
+            attachments: payload.attachments,
+            bytes: payload.bytes
+        });
+        if (!pf.ok) {
+            refreshMailStatus();
+            var e0 = new Error(pf.code);
+            e0.abeneMessage = pf.message;
+            return Promise.reject(e0);
+        }
         return callApi('SEND_CLIENT_PDF', {
             to: payload.to || '',
             cc: payload.cc || '',
@@ -609,6 +779,79 @@
             name: payload.name || (company().name || ''),
             attachments: payload.attachments || [],
             pdfOnly: true
+        }).catch(function (err) {
+            var e1 = err instanceof Error ? err : new Error(String(err && err.message || err || 'fail'));
+            e1.abeneMessage = explainEmailError(e1);
+            throw e1;
+        });
+    }
+
+    function sendPackEmail(payload) {
+        payload = payload || {};
+        var pf = emailPreflight({
+            action: 'SEND_EMAIL',
+            attachments: payload.attachments,
+            bytes: payload.bytes
+        });
+        if (!pf.ok) {
+            refreshMailStatus();
+            var e0 = new Error(pf.code);
+            e0.abeneMessage = pf.message;
+            return Promise.reject(e0);
+        }
+        return callApi('SEND_EMAIL', {
+            to: payload.to || '',
+            cc: payload.cc || '',
+            bcc: payload.bcc || '',
+            replyTo: payload.replyTo || '',
+            subject: payload.subject || '',
+            body: payload.body || payload.plainBody || '',
+            html: payload.html || payload.htmlBody || '',
+            name: payload.name || (company().name || ''),
+            attachments: payload.attachments || []
+        }).catch(function (err) {
+            var e1 = err instanceof Error ? err : new Error(String(err && err.message || err || 'fail'));
+            e1.abeneMessage = explainEmailError(e1);
+            throw e1;
+        });
+    }
+
+    function sendTestEmail() {
+        var pf = emailPreflight({ action: 'SEND_EMAIL' });
+        if (!pf.ok) {
+            toast(pf.message);
+            if (pf.code === 'no-mail' || pf.code === 'no-email' || pf.code === 'no-pdf') {
+                toast(tt('mailTestHint', 'No Apps Script: menu Genius Raros → 4. Enviar e-mail de teste (ver LEIA-ME).'));
+            }
+            return Promise.reject(new Error(pf.code));
+        }
+        var c = company();
+        var to = String(c.googleOwnerEmail || c.email || '').trim();
+        if (!to) {
+            to = window.prompt(tt('mailTestAskTo', 'E-mail de destino para o teste Gmail:'), c.installerEmail || '') || '';
+            to = String(to).trim();
+        }
+        if (!to) {
+            toast(tt('mailNoTo', 'Indique um e-mail de destinatário válido.'));
+            return Promise.reject(new Error('no-to'));
+        }
+        toast(tt('mailTestSending', 'A enviar e-mail de teste pelo Gmail ligado…'));
+        return callApi('SEND_EMAIL', {
+            to: to,
+            subject: (c.name || 'Genius Raros') + ' — teste emaildrive',
+            body: tt('mailTestBody', 'Teste ABENE: o envio pelo Gmail desta conta funciona.') + '\n' + new Date().toISOString(),
+            name: c.name || 'Genius Raros',
+            attachments: []
+        }).then(function (json) {
+            var from = (json && json.from) || c.googleOwnerEmail || '';
+            toast(tt('mailTestOk', 'E-mail de teste enviado{from}.').replace('{from}', from ? (' por ' + from) : ''));
+            rememberCaps(Object.assign({}, lastCaps || {}, json || {}, { mailEnabled: true, canSendEmail: true, canSendClientPdf: true, modern: true }));
+            return json;
+        }).catch(function (err) {
+            var msg = (err && err.abeneMessage) || explainEmailError(err);
+            toast(msg);
+            toast(tt('mailTestHint', 'No Apps Script: menu Genius Raros → 4. Enviar e-mail de teste (ver LEIA-ME).'));
+            throw err;
         });
     }
 
@@ -623,6 +866,15 @@
     window.abeneSheetsOnArquivoChange = function () { schedule('arquivo'); };
     window.abeneSheetsEnabled = enabled;
     window.abeneSendEmail = sendEmail;
+    window.abeneSendPackEmail = sendPackEmail;
+    window.abeneSendTestEmail = sendTestEmail;
+    window.abeneEmailPreflight = emailPreflight;
+    window.abeneEmailExplainError = explainEmailError;
+    window.abeneEmailCapabilities = function () { return lastCaps ? Object.assign({}, lastCaps) : null; };
+    window.abeneMailMaxBytes = function () {
+        return (lastCaps && lastCaps.maxAttachmentBytes) || MAIL_MAX_BYTES;
+    };
+    window.abeneMailStatusRefresh = refreshMailStatus;
     window.abeneExtractSheetId = extractSheetId;
     window.abeneSheetsRefreshI18n = refreshStatusI18n;
     window.abeneSheetsMetierSnapshot = function () {

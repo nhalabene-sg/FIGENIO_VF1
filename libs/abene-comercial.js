@@ -819,9 +819,13 @@
     var quotePaymentOptions = [
         { id: 'advance20', label: '20% na aceitação + 80% na conclusão', text: 'Pagamento: 20% do valor total do orçamento após a aceitação por escrito; os restantes 80% na conclusão dos trabalhos, contra apresentação da respetiva fatura.' },
         { id: 'advance50', label: '50% na aceitação + 50% na conclusão', text: 'Pagamento: 50% do valor total do orçamento após a aceitação por escrito; os restantes 50% na conclusão dos trabalhos, contra apresentação da respetiva fatura.' },
+        { id: 'advance30', label: '30% na aceitação + 70% na conclusão', text: 'Pagamento: 30% do valor total do orçamento após a aceitação por escrito; os restantes 70% na conclusão dos trabalhos, contra apresentação da respetiva fatura.' },
+        { id: 'stages404020', label: '40% aceitação + 40% fase + 20% conclusão', text: 'Pagamento faseado: 40% do valor total após a aceitação por escrito, 40% após a conclusão de uma fase intermédia definida por escrito entre as partes e 20% na conclusão dos trabalhos, mediante a respetiva faturação.' },
         { id: 'stages', label: '30% na aceitação + 40% por etapa + 30% no final', text: 'Pagamento faseado: 30% do valor total após a aceitação por escrito, 40% após a conclusão de uma etapa definida por escrito entre as partes e 30% na conclusão dos trabalhos, mediante a respetiva faturação.' },
+        { id: 'delivery100', label: '100% na entrega', text: 'Pagamento: 100% do valor total na entrega dos bens ou na conclusão da prestação do serviço, contra apresentação da respetiva fatura.' },
         { id: 'completion', label: '100% na conclusão dos trabalhos', text: 'Pagamento: 100% do valor total na conclusão dos trabalhos, contra apresentação da respetiva fatura.' },
-        { id: 'invoice15', label: 'Pagamento a 15 dias da fatura', text: 'Pagamento: no prazo de 15 dias após a emissão da fatura correspondente aos trabalhos realizados.' }
+        { id: 'invoice15', label: 'Pagamento a 15 dias da fatura', text: 'Pagamento: no prazo de 15 dias após a emissão da fatura correspondente aos trabalhos realizados.' },
+        { id: 'invoice30', label: 'Pagamento a 30 dias da fatura', text: 'Pagamento: no prazo de 30 dias após a emissão da fatura correspondente aos trabalhos realizados.' }
     ];
     var quoteClauseOptions = [
         { id: 'written', label: 'Aceitação por escrito', text: 'A adjudicação depende da aceitação por escrito deste orçamento e das condições acordadas.' },
@@ -834,14 +838,24 @@
         var notes = document.getElementById('devisNotes');
         if (!host || !notes) return;
         var text = notes.value || '';
-        host.innerHTML = '<fieldset style="min-width:0;padding:8px"><legend>Plano de pagamento (escolha uma opção)</legend>' +
-            '<label style="display:block"><input type="radio" name="devisPaymentChoice" value="custom"' + (!quotePaymentOptions.some(function (p) { return text.indexOf(p.text) >= 0; }) ? ' checked' : '') + '> Só texto livre / personalizado</label>' +
+        function quoteUi(key, fallback) {
+            if (typeof t !== 'function') return fallback;
+            var s = t(key);
+            return (!s || s === key) ? fallback : s;
+        }
+        var payLegend = quoteUi('quotePayPlan', 'Plano de pagamento (escolha uma opção)');
+        var customLabel = quoteUi('quotePayCustom', 'Só texto livre / personalizado');
+        var clauseLegend = quoteUi('quoteClauses', 'Cláusulas opcionais');
+        var hint = quoteUi('quoteCondHint', 'Propostas a acordar com o cliente. Pode completar ou alterar livremente o texto abaixo.');
+        host.innerHTML = '<fieldset style="min-width:0;padding:8px"><legend>' + esc(payLegend) + '</legend>' +
+            '<label style="display:block"><input type="radio" name="devisPaymentChoice" value="custom"' + (!quotePaymentOptions.some(function (p) { return text.indexOf(p.text) >= 0; }) ? ' checked' : '') + '> ' + esc(customLabel) + '</label>' +
             quotePaymentOptions.map(function (p) {
-                return '<label style="display:block;margin:6px 0"><input type="radio" name="devisPaymentChoice" value="' + p.id + '"' + (text.indexOf(p.text) >= 0 ? ' checked' : '') + '> ' + esc(p.label) + '</label>';
-            }).join('') + '</fieldset><fieldset style="min-width:0;padding:8px"><legend>Cláusulas opcionais</legend>' +
+                var highlight = (p.id === 'advance20' || p.id === 'advance50') ? 'font-weight:600;' : '';
+                return '<label style="display:block;margin:6px 0;' + highlight + '"><input type="radio" name="devisPaymentChoice" value="' + p.id + '"' + (text.indexOf(p.text) >= 0 ? ' checked' : '') + '> ' + esc(p.label) + '</label>';
+            }).join('') + '</fieldset><fieldset style="min-width:0;padding:8px"><legend>' + esc(clauseLegend) + '</legend>' +
             quoteClauseOptions.map(function (p) {
                 return '<label style="display:block;margin:6px 0"><input type="checkbox" data-quote-clause="' + p.id + '"' + (text.indexOf(p.text) >= 0 ? ' checked' : '') + '> ' + esc(p.label) + '</label>';
-            }).join('') + '</fieldset><small>Propostas a acordar com o cliente. Pode completar ou alterar livremente o texto abaixo.</small>';
+            }).join('') + '</fieldset><small>' + esc(hint) + '</small>';
         host.onchange = function (event) {
             var input = event.target;
             var value = notes.value;
@@ -864,6 +878,8 @@
             notes.value = value.replace(/\n{3,}/g, '\n\n').trim();
             notes.dispatchEvent(new Event('input', { bubbles: true }));
         };
+        host.style.display = 'grid';
+        host.setAttribute('data-abene-quote-conditions', '1');
     }
 
     window.openDevisModal = function () {
@@ -887,15 +903,16 @@
         ensurePaperLetterhead();
         prefillFromDocument('devis');
         hydrateFromEditor('devis');
-        setupQuoteConditions();
         var dateEl = document.getElementById('devisDate');
         if (dateEl && !dateEl.value) dateEl.value = todayIso();
         if (window.abeneContabilidade && window.abeneContabilidade.fillDevisFromTables) {
             window.abeneContabilidade.fillDevisFromTables(false);
             window.abeneContabilidade.refreshDevisTotals();
         }
+        setupQuoteConditions();
         document.getElementById('devisModal').classList.add('visible');
     };
+    window.__abeneOpenDevisModalImpl = window.openDevisModal;
 
     window.openReceiptModal = function () {
         if (typeof applyCompanyDefaults === 'function') applyCompanyDefaults();
@@ -922,6 +939,7 @@
         if (rDate && !rDate.value) rDate.value = todayIso();
         document.getElementById('receiptModal').classList.add('visible');
     };
+    window.__abeneOpenReceiptModalImpl = window.openReceiptModal;
 
     window.addDevisItem = function () {
         var container = document.getElementById('devisItems');
@@ -1360,17 +1378,28 @@
             (total != null ? (' no valor de ' + money(total)) : '') + '.\n\n' +
             'Este documento não constitui fatura certificada (AT).\n\n' +
             'Com os melhores cumprimentos,\n' + (co.name || 'Genius Raros');
-        var sheet = document.getElementById('paperPreviewSheet');
+                var sheet = document.getElementById('paperPreviewSheet');
+        var preflight = typeof window.abeneEmailPreflight === 'function'
+            ? window.abeneEmailPreflight({ action: 'SEND_CLIENT_PDF' })
+            : null;
         var gmailOn = typeof window.abeneSendEmail === 'function' &&
             typeof window.abeneSheetsEnabled === 'function' &&
             window.abeneSheetsEnabled() &&
-            navigator.onLine !== false;
+            navigator.onLine !== false &&
+            (!preflight || preflight.ok);
 
         function sendWith(atts) {
             var list = Array.isArray(atts) ? atts : [];
             if (list.length !== 1 || list[0].mimeType !== 'application/pdf' || !list[0].data) {
                 toastMsg('mailFail', 'O PDF não pôde ser criado. Nada foi enviado.');
                 return;
+            }
+            if (typeof window.abeneEmailPreflight === 'function') {
+                var pfSize = window.abeneEmailPreflight({ action: 'SEND_CLIENT_PDF', attachments: list });
+                if (!pfSize.ok) {
+                    toastMsg('mailFail', pfSize.message || 'Falha no Gmail ligado. Nada foi enviado.');
+                    return;
+                }
             }
             toastMsg('mailSending', 'A enviar PDF pelo Gmail da conta Google ligada…');
             window.abeneSendEmail({
@@ -1386,8 +1415,11 @@
                     ? ('PDF enviado por ' + from + ' (não definitivo).')
                     : 'PDF enviado ao cliente (não definitivo).');
                 markSentToClient();
-            }).catch(function () {
-                toastMsg('mailFail', 'Falha no Gmail ligado. Nada foi enviado; verifique a ligação e tente novamente.');
+            }).catch(function (err) {
+                var detail = (err && err.abeneMessage) ||
+                    (typeof window.abeneEmailExplainError === 'function' ? window.abeneEmailExplainError(err) : '') ||
+                    ui('mailFail', 'Falha no Gmail ligado. Nada foi enviado; verifique a ligação e tente novamente.');
+                toastMsg('mailFail', detail);
             });
         }
 
@@ -1410,7 +1442,12 @@
         }
 
         if (!gmailOn) {
-            toastMsg('mailFail', 'Ligue o Gmail/Apps Script nas Definições para enviar o PDF. Nada foi enviado.');
+            var why = (preflight && preflight.message) ||
+                ui('mailNeedSetup', 'Ligue o Gmail/Apps Script nas Definições para enviar o PDF. Nada foi enviado.');
+            toastMsg('mailFail', why);
+            if (preflight && (preflight.code === 'no-mail' || preflight.code === 'no-pdf' || preflight.code === 'no-email')) {
+                toastMsg('mailTestHint', 'No Apps Script: menu Genius Raros → 4. Enviar e-mail de teste (ver LEIA-ME).');
+            }
             return;
         }
 
@@ -1731,6 +1768,9 @@
         buildLetterhead: letterhead,
         brandFooter: brandFooter,
         refreshLetterheads: refreshLetterheads,
-        ensurePaperLetterhead: ensurePaperLetterhead
+        ensurePaperLetterhead: ensurePaperLetterhead,
+        setupQuoteConditions: setupQuoteConditions,
+        openDevisModal: window.openDevisModal,
+        openReceiptModal: window.openReceiptModal
     };
 })();

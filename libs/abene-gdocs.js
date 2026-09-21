@@ -1,5 +1,6 @@
 /* Genius Raros — Google Docs ligado (mesmo ficheiro Drive, sem duplicar).
-   Requer emaildrive ≥ 2.5 (OPEN_GDOCS update + PULL_GDOCS). */
+   Requer emaildrive ≥ 2.7 (OPEN_GDOCS update même fichier + PULL_GDOCS).
+   Fix #1: réutilise le même Google Doc lié (Arquivo + projectSettings + entry key). */
 (function (root) {
     var MAX_BYTES = 4.5 * 1024 * 1024;
     var busy = false;
@@ -32,6 +33,12 @@
             && typeof root.abeneSheetsCall === 'function'
             && root.navigator.onLine !== false;
     }
+    function documentStamp() {
+        var st = docState() || {};
+        var ed = (root.abene && root.abene.editor) || document.getElementById('editor');
+        return JSON.stringify([st.archiveEntryId || '', st.name || '', st.gdocsFileId || '',
+            typeof root.persistableEditorHtml === 'function' ? root.persistableEditorHtml() : (ed ? ed.innerHTML : '')]);
+    }
     function readLinkStore() {
         try {
             return JSON.parse(localStorage.getItem(LINK_KEY) || '{}') || {};
@@ -42,13 +49,59 @@
     function writeLinkStore(map) {
         try { localStorage.setItem(LINK_KEY, JSON.stringify(map || {})); } catch (e) {}
     }
+    function archiveEntryId() {
+        var st = docState();
+        return st && st.archiveEntryId ? String(st.archiveEntryId) : '';
+    }
+    function linkFromParts(id, url) {
+        id = String(id || '').replace(/[^a-zA-Z0-9_-]/g, '');
+        if (!id) return null;
+        return {
+            id: id,
+            url: url || ('https://docs.google.com/document/d/' + id + '/edit')
+        };
+    }
+    function readArquivoEntryLink(entryId) {
+        entryId = String(entryId || '');
+        if (!entryId) return null;
+        try {
+            var api = root.abeneArquivoApi;
+            if (api && typeof api.getEntryGdocsLink === 'function') {
+                var fromApi = api.getEntryGdocsLink(entryId);
+                if (fromApi && fromApi.id) return linkFromParts(fromApi.id, fromApi.url);
+            }
+            var list = JSON.parse(localStorage.getItem('abeneArquivoV1') || '[]');
+            if (!Array.isArray(list)) return null;
+            var hit = list.filter(function (item) { return item && String(item.id || '') === entryId; })[0];
+            if (hit && hit.gdocsFileId) return linkFromParts(hit.gdocsFileId, hit.gdocsUrl);
+        } catch (eArq) {}
+        return null;
+    }
+    function persistLinkToArquivo(id, url) {
+        var entryId = archiveEntryId();
+        if (!entryId) return;
+        try {
+            var api = root.abeneArquivoApi;
+            if (api && typeof api.persistGdocsLink === 'function') {
+                api.persistGdocsLink(entryId, id || '', url || '');
+                return;
+            }
+        } catch (eP) {}
+    }
     function getLink() {
         var st = docState();
         if (st && st.gdocsFileId) {
-            return {
-                id: String(st.gdocsFileId),
-                url: st.gdocsUrl || ('https://docs.google.com/document/d/' + st.gdocsFileId + '/edit')
-            };
+            return linkFromParts(st.gdocsFileId, st.gdocsUrl);
+        }
+        var entryId = archiveEntryId();
+        if (entryId) {
+            var fromEntry = readArquivoEntryLink(entryId);
+            if (fromEntry) return fromEntry;
+            try {
+                var map = readLinkStore();
+                var keyed = map['entry:' + entryId];
+                if (keyed && keyed.id) return linkFromParts(keyed.id, keyed.url);
+            } catch (eMap) {}
         }
         return null;
     }
@@ -62,7 +115,10 @@
             st.gdocsUrl = url;
         }
         var map = readLinkStore();
-        map[docName()] = { id: id, url: url, at: new Date().toISOString() };
+        var entryId = archiveEntryId();
+        if (entryId) map['entry:' + entryId] = { id: id, url: url, at: new Date().toISOString() };
+        // Keep name key only as non-authoritative cache (identity = archiveEntryId).
+        map[docName()] = { id: id, url: url, at: new Date().toISOString(), entryId: entryId || '' };
         writeLinkStore(map);
         try {
             localStorage.setItem('abeneGdocsFileId', id);
@@ -70,13 +126,18 @@
             var settings = JSON.parse(localStorage.getItem('abeneProjectSettings') || '{}');
             settings.gdocsFileId = id;
             settings.gdocsUrl = url;
+            if (entryId) settings.archiveEntryId = entryId;
+            if (!settings.gdocsByEntry || typeof settings.gdocsByEntry !== 'object') settings.gdocsByEntry = {};
+            if (entryId) settings.gdocsByEntry[entryId] = { id: id, url: url };
             localStorage.setItem('abeneProjectSettings', JSON.stringify(settings));
         } catch (e2) {}
+        persistLinkToArquivo(id, url);
         updateStatusUi();
     }
     function clearLink() {
         var st = docState();
         var oldId = st && st.gdocsFileId ? String(st.gdocsFileId) : '';
+        var entryId = archiveEntryId();
         if (st) {
             st.gdocsFileId = '';
             st.gdocsUrl = '';
@@ -84,7 +145,8 @@
         var map = readLinkStore();
         Object.keys(map).forEach(function (key) {
             var hit = map[key] || {};
-            if (key === docName() || (oldId && String(hit.id || '') === oldId)) delete map[key];
+            if (key === docName() || (entryId && key === ('entry:' + entryId)) ||
+                (oldId && String(hit.id || '') === oldId)) delete map[key];
         });
         writeLinkStore(map);
         try {
@@ -93,11 +155,16 @@
             var settings = JSON.parse(localStorage.getItem('abeneProjectSettings') || '{}');
             settings.gdocsFileId = '';
             settings.gdocsUrl = '';
+            if (entryId && settings.gdocsByEntry && typeof settings.gdocsByEntry === 'object') {
+                delete settings.gdocsByEntry[entryId];
+            }
             localStorage.setItem('abeneProjectSettings', JSON.stringify(settings));
         } catch (e3) {}
+        persistLinkToArquivo('', '');
         updateStatusUi();
     }
     function forkLinkOnCopy() {
+        // Copy must never share the previous report's Google Doc.
         clearLink();
     }
     function blobToBase64(blob) {
@@ -204,17 +271,28 @@
             return;
         }
         busy = true;
+        var startedStamp = documentStamp();
+        var startedName = docName();
         var pendingTab = root.open('about:blank', '_blank');
         if (pendingTab) pendingTab.opener = null;
         toast(existing
             ? tt('gdocsUpdating', 'A atualizar o Google Docs ligado…')
             : tt('gdocsSending', 'A enviar para o Google Docs…'));
-        root.abeneSheetsCall('PING').then(function () { return root.buildDocxBlob(); }).then(function (blob) {
+        root.abeneSheetsCall('PING').then(function () {
+            if (documentStamp() !== startedStamp) throw new Error('document-changed');
+            return root.buildDocxBlob();
+        }).then(function (blob) {
+            if (documentStamp() !== startedStamp) throw new Error('document-changed');
             if (!blob) throw new Error('no-blob');
             if (blob.size > MAX_BYTES) throw new Error('too-large');
             return blobToBase64(blob).then(function (b64) {
-                var payload = { name: docName(), base64: b64 };
-                if (existing && existing.id) payload.fileId = existing.id;
+                if (documentStamp() !== startedStamp) throw new Error('document-changed');
+                var payload = { name: startedName, base64: b64 };
+                if (existing && existing.id) {
+                    payload.fileId = existing.id;
+                    payload.gdocsFileId = existing.id;
+                    payload.id = existing.id;
+                }
                 return root.abeneSheetsCall('OPEN_GDOCS', payload);
             });
         }).then(function (json) {
@@ -222,6 +300,17 @@
             var url = (json && (json.url || json.webViewLink)) || '';
             if (!url && id) url = 'https://docs.google.com/document/d/' + String(id).replace(/[^a-zA-Z0-9_-]/g, '') + '/edit';
             if (!id || !url) throw new Error('no-url');
+            // Guard: if we asked to update an existing link, never silently adopt a different new Doc.
+            if (existing && existing.id && String(id) !== String(existing.id) && !json.updated) {
+                throw new Error('linked-file-fork-blocked');
+            }
+            if (documentStamp() !== startedStamp) {
+                // Keep the returned link recoverable without attaching it to another report.
+                localStorage.setItem('abenePendingGdocsLink', JSON.stringify({name: startedName, id: id, url: url, at: new Date().toISOString()}));
+                if (pendingTab && !pendingTab.closed) pendingTab.location.href = 'https://docs.google.com/document/d/' + id + '/edit';
+                toast('Documento enviado, mas o relatório aberto mudou. A ligação foi conservada para recuperação; o documento atual não foi substituído.');
+                return;
+            }
             setLink(id, url);
             toast(json.updated
                 ? tt('gdocsUpdatedOpen', 'Mesmo documento atualizado — a abrir o Google Docs.')
@@ -245,11 +334,17 @@
             openSettingsHint();
             return;
         }
+        if ((docState() || {}).protected) {
+            toast('Documento protegido: crie uma cópia editável antes de importar do Google Docs.');
+            return;
+        }
         if (!root.confirm('Carregar as alterações do Google Docs neste documento ABENE? A versão local atual será conservada como cópia de segurança.')) return;
+        var startedStamp = documentStamp();
         busy = true;
         toast(tt('gdocsPulling', 'A atualizar a partir do Google Docs…'));
         root.abeneSheetsCall('PULL_GDOCS', { fileId: link.id }).then(function (json) {
             if (!json || !json.html) throw new Error('empty');
+            if (documentStamp() !== startedStamp) throw new Error('document-changed');
             if (!applyHtmlToEditor(json.html)) throw new Error('no-editor');
             if (json.url) setLink(link.id, json.url);
             toast(tt('gdocsPulled', 'Documento atualizado a partir do Google Docs.'));
@@ -259,14 +354,24 @@
     }
     function handleErr(err) {
         var msg = String((err && err.message) || err || '');
-        if (msg === 'token') toast('Ligação Google recusada: a chave de acesso nas Definições não corresponde à chave do Apps Script. O documento local foi conservado.');
+        if (msg === 'document-changed') toast('O documento mudou durante a operação. As alterações locais foram conservadas; tente novamente no relatório pretendido.');
+        else if (msg === 'token') toast('Ligação Google recusada: a chave de acesso nas Definições não corresponde à chave do Apps Script. O documento local foi conservado.');
         else if (/google-html-response|api-http-(401|403|404|405)|<!doctype|<html/i.test(msg)) toast('O Google devolveu uma página de acesso ou de erro, não a resposta da API. Verifique o URL /exec, o deployment e a autorização do Apps Script. O documento local foi conservado.');
         else if (/no-url|no-cloud/i.test(msg) || msg === 'no-url') openSettingsHint();
         else if (/too-large/i.test(msg)) toast(tt('gdocsTooLarge', 'Documento demasiado grande (máx. ~4,5 MB). Reduza imagens e tente de novo.'));
-        else if (/Unknown action/i.test(msg)) toast(tt('gdocsNeedUpdate', 'Atualize o script emaildrive no Google (versão 2.5) e implante uma nova aplicação web.'));
+        else if (/Unknown action/i.test(msg)) toast(tt('gdocsNeedUpdate', 'Atualize o script emaildrive no Google (versão 2.7+) e implante uma nova aplicação web.'));
         else if (/no-blob|aNoDocx/i.test(msg)) toast(tt('aNoDocx', 'A biblioteca DOCX não está carregada.'));
-        else if (/id|NeedLink/i.test(msg)) toast(tt('gdocsNeedLink', 'Ainda não há Google Docs ligado a este documento.'));
-        else toast(tt('gdocsFail', 'Não foi possível sincronizar com o Google Docs.') + (msg ? ' (' + msg.slice(0, 80) + ')' : ''));
+        else if (/^(id|NeedLink)$/.test(msg)) toast(tt('gdocsNeedLink', 'Ainda não há Google Docs ligado a este documento.'));
+        else if (/linked-file-invalid|not-owned/i.test(msg)) {
+            toast(tt('gdocsNotOwned',
+                'O Google Docs ligado não está na pasta Google_Docs desta conta (ou não é seu). Não foi criado um documento novo. Corrija a ligação ou limpe-a e volte a abrir.'));
+        } else if (/linked-file-unavailable/i.test(msg)) {
+            toast(tt('gdocsUnavailable',
+                'O Google Docs ligado está indisponível (apagado ou inacessível). Não foi criado um documento novo. Limpe a ligação e volte a abrir se precisar de um Doc novo.'));
+        } else if (/linked-file-fork-blocked/i.test(msg)) {
+            toast(tt('gdocsForkBlocked',
+                'A atualização teria criado outro Google Docs. Operação cancelada para conservar o mesmo ficheiro ligado.'));
+        } else toast(tt('gdocsFail', 'Não foi possível sincronizar com o Google Docs.') + (msg ? ' (' + msg.slice(0, 80) + ')' : ''));
     }
     function restoreFromStorage() {
         var st = docState();
@@ -274,7 +379,33 @@
             updateStatusUi();
             return;
         }
-        // A global last-used ID can belong to a different document.
+        // Restore only via archiveEntryId (never a global last-used ID alone).
+        var entryId = archiveEntryId();
+        var restored = null;
+        if (entryId) {
+            restored = readArquivoEntryLink(entryId);
+            if (!restored) {
+                try {
+                    var map = readLinkStore();
+                    var keyed = map['entry:' + entryId];
+                    if (keyed && keyed.id) restored = linkFromParts(keyed.id, keyed.url);
+                } catch (eM) {}
+            }
+            if (!restored) {
+                try {
+                    var settings = JSON.parse(localStorage.getItem('abeneProjectSettings') || '{}');
+                    if (settings && settings.gdocsByEntry && settings.gdocsByEntry[entryId]) {
+                        restored = linkFromParts(settings.gdocsByEntry[entryId].id, settings.gdocsByEntry[entryId].url);
+                    } else if (settings && String(settings.archiveEntryId || '') === entryId && settings.gdocsFileId) {
+                        restored = linkFromParts(settings.gdocsFileId, settings.gdocsUrl);
+                    }
+                } catch (eS) {}
+            }
+        }
+        if (restored && st) {
+            st.gdocsFileId = restored.id;
+            st.gdocsUrl = restored.url;
+        }
         updateStatusUi();
     }
 

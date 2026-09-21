@@ -1,6 +1,14 @@
 /* Genius Raros — Export (P12).
    Éditeur paginé ≈ imprimir ≈ PDF. DOCX lit ABENE.Document.
-   Les boutons Guardar / PDF / DOCX / Imprimir existants restent. */
+   Les boutons Guardar / PDF / DOCX / Imprimir existants restent.
+   Fix #6 (DOCX fidelity, additive): PageGeometry size/margins/orientation,
+   page breaks, table header repeat, inline+floating images (CORS-safe),
+   Modelo headers/footers, commercial orçamento/recibo structure.
+   Commercial DOCX (additive): letterhead brand+title, dual goldbar,
+   parties boxes, totals (grand navy), signatures/stamp, condições notes.
+   PDF (html2pdf / paged capture) path is intentionally untouched.
+   Remaining DOCX limits: absolute float z-order, complex nested HTML in cells,
+   full CSS layout, watermarks, and pixel-perfect commercial chrome. */
 (function (root) {
     root.ABENE = root.ABENE || {};
     var useEngine = true;
@@ -28,7 +36,103 @@
                 right: pg.marginRight || 96,
                 bottom: pg.marginBottom || 96,
                 left: pg.marginLeft || 96
+            },
+            paperSizeId: pg.paperSize || A().pageSizeId || 'a4'
+        };
+    }
+
+    /* Portrait paper size (docx wants unswapped w/h + orientation flag). */
+    function docxPaperProps() {
+        var pg = G();
+        var a = A();
+        var orient = (pg.orientation || a.pageOrientation || 'portrait') === 'landscape' ? 'landscape' : 'portrait';
+        var portrait = { w: 794, h: 1123 };
+        if (typeof pg.sizePx === 'function') {
+            try { portrait = pg.sizePx(pg.paperSize || a.pageSizeId || 'a4') || portrait; } catch (e0) {}
+        }
+        if (a.pageSize && a.pageSize.w && a.pageSize.h) {
+            portrait = { w: Number(a.pageSize.w) || portrait.w, h: Number(a.pageSize.h) || portrait.h };
+        }
+        var m = {
+            top: pg.marginTop != null ? pg.marginTop : ((a.pageMargins && a.pageMargins.top) || 96),
+            right: pg.marginRight != null ? pg.marginRight : ((a.pageMargins && a.pageMargins.right) || 96),
+            bottom: pg.marginBottom != null ? pg.marginBottom : ((a.pageMargins && a.pageMargins.bottom) || 96),
+            left: pg.marginLeft != null ? pg.marginLeft : ((a.pageMargins && a.pageMargins.left) || 96)
+        };
+        var dpi = pg.dpi || 96;
+        var pxToTwip = function (px) { return Math.round((Number(px) || 0) * 1440 / dpi); };
+        return {
+            portrait: portrait,
+            orientation: orient,
+            margins: m,
+            paperSizeId: pg.paperSize || a.pageSizeId || 'a4',
+            pxToTwip: pxToTwip,
+            dpi: dpi
+        };
+    }
+
+    function cssColorToHexLocal(c) {
+        if (!c) return '';
+        c = String(c).trim();
+        if (c.charAt(0) === '#') return c.replace('#', '').slice(0, 6);
+        var m = c.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/);
+        if (m) return [m[1], m[2], m[3]].map(function (x) { return ('0' + Number(x).toString(16)).slice(-2); }).join('');
+        return '';
+    }
+
+    function docxBorderLocal(api, color, sz) {
+        var BorderStyle = (root.docx && root.docx.BorderStyle) || (api && api.BorderStyle);
+        var style = BorderStyle ? BorderStyle.SINGLE : 'single';
+        return { style: style, size: sz || 4, color: color || '0B1223' };
+    }
+
+    function modeloZoneText(kind) {
+        try {
+            var chrome = document.getElementById('pageChrome');
+            if (!chrome) return '';
+            var sel = kind === 'footer'
+                ? '.page-footer-zone .footer-content'
+                : '.page-header-zone .header-content';
+            var zone = chrome.querySelector(sel);
+            if (!zone) return '';
+            var clone = zone.cloneNode(true);
+            clone.querySelectorAll('.hf-placeholder, .hf-tab, .hf-rule, .hf-close').forEach(function (n) { n.remove(); });
+            return String(clone.innerText || '').replace(/ /g, ' ').replace(/\s+/g, ' ').trim();
+        } catch (e) { return ''; }
+    }
+
+    function readModeloHf() {
+        var a = A();
+        var tpl = a.pageHeaderTemplate || '';
+        var fields = a.pageHeaderFields || {};
+        var headerText = a.pageHeaderText || '';
+        var footerText = a.pageFooterText;
+        if (footerText == null || footerText === undefined) footerText = 'Página {PAGE} / {NUMPAGES}';
+        try {
+            if (!tpl && root.localStorage) tpl = root.localStorage.getItem('abeneHeaderTemplate') || '';
+            if (!headerText && root.localStorage) headerText = root.localStorage.getItem('abeneHeader') || '';
+            if ((footerText == null || footerText === '') && root.localStorage) {
+                var ft = root.localStorage.getItem('abeneFooter');
+                if (ft != null) footerText = ft;
             }
+            if ((!fields || !Object.keys(fields).length) && root.localStorage) {
+                try { fields = JSON.parse(root.localStorage.getItem('abeneHeaderFields') || '{}') || {}; } catch (eF) { fields = {}; }
+            }
+        } catch (eLs) {}
+        if (!tpl) tpl = headerText ? 'text' : 'blank';
+        var liveH = modeloZoneText('header');
+        var liveF = modeloZoneText('footer');
+        if (!headerText && liveH) headerText = liveH;
+        if (!footerText && liveF) footerText = liveF;
+        if (!footerText) footerText = 'Página {PAGE} / {NUMPAGES}';
+        return {
+            headerTpl: tpl,
+            headerFields: fields || {},
+            headerText: headerText || liveH || '',
+            footerText: footerText || liveF || 'Página {PAGE} / {NUMPAGES}',
+            liveHeader: liveH,
+            liveFooter: liveF,
+            companyName: ((a.companyData) || {}).name || 'Genius Raros'
         };
     }
 
@@ -172,6 +276,14 @@
         return c.toDataURL('image/png');
     }
 
+    function markImageCorsSkip(img, reason) {
+        if (!img || !img.setAttribute) return;
+        try {
+            img.setAttribute('data-abene-docx-img', 'skipped');
+            if (reason) img.setAttribute('data-abene-docx-img-reason', String(reason).slice(0, 80));
+        } catch (e0) {}
+    }
+
     function rasterizeOne(img) {
         var src = (img && (img.getAttribute('src') || img.currentSrc || img.src)) || '';
         if (!img || !src || isRasterData(src)) return Promise.resolve();
@@ -197,8 +309,12 @@
                         img.style.setProperty('height', Math.max(1, boxH) + 'px', 'important');
                         img.setAttribute('width', String(Math.round(boxW)));
                         img.setAttribute('height', String(Math.round(boxH)));
+                        img.removeAttribute('data-abene-docx-img');
                     }
-                } catch (e) {}
+                } catch (eCors) {
+                    /* Tainted canvas / CORS — skip image rather than abort DOCX. */
+                    markImageCorsSkip(img, 'cors-canvas');
+                }
                 finish();
             };
             if (img.complete && img.naturalWidth) {
@@ -206,16 +322,29 @@
                 return;
             }
             var probe = new Image();
+            try { probe.crossOrigin = 'anonymous'; } catch (eX) {}
             probe.onload = function () { applyFrom(probe.naturalWidth ? probe : img); };
             probe.onerror = function () {
-                if (img.complete && img.naturalWidth) applyFrom(img);
-                else finish();
+                /* Retry without CORS; if still fails, skip gracefully. */
+                var probe2 = new Image();
+                probe2.onload = function () { applyFrom(probe2.naturalWidth ? probe2 : img); };
+                probe2.onerror = function () {
+                    if (img.complete && img.naturalWidth) applyFrom(img);
+                    else {
+                        markImageCorsSkip(img, 'load-error');
+                        finish();
+                    }
+                };
+                probe2.src = src;
             };
             probe.src = src;
             setTimeout(function () {
                 if (finished) return;
                 if (img.complete && img.naturalWidth) applyFrom(img);
-                else finish();
+                else {
+                    markImageCorsSkip(img, 'timeout');
+                    finish();
+                }
             }, 2500);
         });
     }
@@ -259,7 +388,8 @@
         root.docxImageRun = function (img, ImageRun) {
             if (!useEngine) return orig.apply(this, arguments);
             if (!img || !ImageRun) return orig.apply(this, arguments);
-            var src = img.src || '';
+            if (img.getAttribute && img.getAttribute('data-abene-docx-img') === 'skipped') return null;
+            var src = img.src || img.getAttribute('src') || '';
             if (!/^data:image\//i.test(src)) return orig.apply(this, arguments);
             var pic = img.closest && img.closest('.abene-pic, [data-abene-obj="pic"]');
             var wrap = pic ? (pic.getAttribute('data-wrap') || '') : '';
@@ -381,14 +511,706 @@
         });
         return true;
     }
+    function emitDocxPageBreak(children, api) {
+        if (!api || !api.PageBreak || !api.Paragraph) return;
+        children.push(new api.Paragraph({ children: [new api.PageBreak()] }));
+    }
+
+    function noneBorderLocal(api) {
+        var none = docxBorderLocal(api, 'FFFFFF', 0);
+        none.style = (root.docx && root.docx.BorderStyle && root.docx.BorderStyle.NONE) || 'nil';
+        return none;
+    }
+    function borderBoxLocal(api, color, sz) {
+        var b = docxBorderLocal(api, color || '0B1223', sz || 8);
+        return { top: b, bottom: b, left: b, right: b };
+    }
+    function plainTextLocal(el) {
+        return String((el && (el.innerText || el.textContent)) || '').replace(/\u00a0/g, ' ').replace(/\s+/g, ' ').trim();
+    }
+    function splitNoteLines(node) {
+        var lines = [];
+        function walk(n) {
+            if (!n) return;
+            if (n.nodeType === 3) {
+                var raw = String(n.textContent || '').replace(/\u00a0/g, ' ');
+                if (!raw) return;
+                raw.split(/\n/).forEach(function (part) {
+                    if (lines.length && part === '' && lines[lines.length - 1] === '') return;
+                    if (lines.length === 0 && !String(part).trim()) return;
+                    lines.push(part);
+                });
+                return;
+            }
+            if (n.nodeType !== 1) return;
+            var tag = String(n.tagName || '').toUpperCase();
+            if (tag === 'BR') { lines.push(''); return; }
+            if (tag === 'STRONG' || tag === 'B' || tag === 'EM' || tag === 'I' || tag === 'SPAN') {
+                walkChildren(n);
+                return;
+            }
+            if (tag === 'P' || tag === 'DIV') {
+                if (lines.length && lines[lines.length - 1] !== '') lines.push('');
+                walkChildren(n);
+                return;
+            }
+            walkChildren(n);
+        }
+        function walkChildren(n) {
+            Array.prototype.forEach.call(n.childNodes || [], walk);
+        }
+        walkChildren(node);
+        /* collapse trailing empties */
+        while (lines.length && !String(lines[lines.length - 1]).trim()) lines.pop();
+        if (!lines.length) {
+            var t = plainTextLocal(node);
+            if (t) lines.push(t);
+        }
+        return lines;
+    }
+    function emitStyledPara(api, text, opts) {
+        opts = opts || {};
+        var Paragraph = api.Paragraph, TextRun = api.TextRun, AlignmentType = api.AlignmentType;
+        var para = {
+            alignment: opts.align || AlignmentType.LEFT,
+            spacing: opts.spacing || { after: 60 },
+            children: [new TextRun({
+                text: (text == null || text === '') ? ' ' : String(text),
+                font: 'Calibri',
+                bold: !!opts.bold,
+                italics: !!opts.italics,
+                color: opts.color || '0B1223',
+                size: opts.size || 20
+            })]
+        };
+        if (opts.border) para.border = opts.border;
+        if (opts.indent) para.indent = opts.indent;
+        return new Paragraph(para);
+    }
+    function emitBrandRow(node, children, api) {
+        var Table = api.Table, TableRow = api.TableRow, TableCell = api.TableCell;
+        var WidthType = api.WidthType, Paragraph = api.Paragraph, TextRun = api.TextRun;
+        var ImageRun = api.ImageRun, AlignmentType = api.AlignmentType;
+        var img = node.querySelector && node.querySelector('img.gr-brand-mark, img');
+        var textHost = node.querySelector && (node.querySelector('.gr-brand-text') || node);
+        var nameEl = textHost && textHost.querySelector && textHost.querySelector('.gr-co-name');
+        var sloganEl = textHost && textHost.querySelector && textHost.querySelector('.gr-slogan');
+        var leftKids = [];
+        var ir = img && typeof root.docxImageRun === 'function' ? root.docxImageRun(img, ImageRun) : null;
+        if (ir) leftKids.push(new Paragraph({ children: [ir] }));
+        else leftKids.push(new Paragraph({ children: [new TextRun({ text: ' ', font: 'Calibri' })] }));
+        var rightKids = [];
+        if (nameEl) rightKids.push(emitStyledPara(api, plainTextLocal(nameEl), { bold: true, size: 32, color: '0B1223', spacing: { after: 40 } }));
+        if (sloganEl) rightKids.push(emitStyledPara(api, plainTextLocal(sloganEl), { bold: true, size: 15, color: '8F7328', spacing: { after: 40 } }));
+        if (!rightKids.length) {
+            var fallback = plainTextLocal(textHost);
+            if (fallback) rightKids.push(emitStyledPara(api, fallback, { bold: true, size: 28 }));
+            else rightKids.push(new Paragraph({ children: [new TextRun({ text: ' ', font: 'Calibri' })] }));
+        }
+        var none = noneBorderLocal(api);
+        children.push(new Table({
+            width: { size: 100, type: WidthType.PERCENTAGE },
+            rows: [new TableRow({
+                cantSplit: true,
+                children: [
+                    new TableCell({
+                        width: { size: 18, type: WidthType.PERCENTAGE },
+                        borders: { top: none, bottom: none, left: none, right: none },
+                        margins: { top: 40, bottom: 40, left: 0, right: 80 },
+                        children: leftKids
+                    }),
+                    new TableCell({
+                        width: { size: 82, type: WidthType.PERCENTAGE },
+                        borders: { top: none, bottom: none, left: none, right: none },
+                        margins: { top: 40, bottom: 40, left: 40, right: 40 },
+                        children: rightKids
+                    })
+                ]
+            })]
+        }));
+        return true;
+    }
+    function emitPartyBox(node, children, api) {
+        var Table = api.Table, TableRow = api.TableRow, TableCell = api.TableCell;
+        var WidthType = api.WidthType, Paragraph = api.Paragraph, TextRun = api.TextRun;
+        var ShadingType = api.ShadingType;
+        var label = node.querySelector && node.querySelector('.gr-party-label');
+        var body = node.querySelector && node.querySelector('.gr-party-body');
+        var labelTxt = plainTextLocal(label) || ' ';
+        var bodyLines = body ? splitNoteLines(body) : [plainTextLocal(node)];
+        if (!bodyLines.length) bodyLines = [' '];
+        var navy = docxBorderLocal(api, '0B1223', 8);
+        var gold = docxBorderLocal(api, 'C9A84C', 18);
+        var bodyParas = bodyLines.map(function (ln, idx) {
+            var t = String(ln || '');
+            var isStrong = idx === 0 && body && body.querySelector && body.querySelector('strong');
+            return new Paragraph({
+                spacing: { after: 40 },
+                children: [new TextRun({
+                    text: t.trim() ? t : ' ',
+                    font: 'Calibri',
+                    bold: !!(isStrong && idx === 0),
+                    size: (isStrong && idx === 0) ? 22 : 20,
+                    color: '0B1223'
+                })]
+            });
+        });
+        children.push(new Table({
+            width: { size: 100, type: WidthType.PERCENTAGE },
+            rows: [
+                new TableRow({
+                    cantSplit: true,
+                    children: [new TableCell({
+                        width: { size: 100, type: WidthType.PERCENTAGE },
+                        shading: ShadingType ? { type: ShadingType.CLEAR, fill: '0B1223' } : undefined,
+                        borders: { top: navy, left: navy, right: navy, bottom: gold },
+                        margins: { top: 40, bottom: 40, left: 80, right: 80 },
+                        children: [new Paragraph({
+                            children: [new TextRun({
+                                text: labelTxt.toUpperCase(),
+                                font: 'Calibri', bold: true, color: 'F8F6F0', size: 15
+                            })]
+                        })]
+                    })]
+                }),
+                new TableRow({
+                    cantSplit: true,
+                    children: [new TableCell({
+                        width: { size: 100, type: WidthType.PERCENTAGE },
+                        borders: { top: navy, bottom: navy, left: navy, right: navy },
+                        margins: { top: 80, bottom: 80, left: 90, right: 90 },
+                        children: bodyParas
+                    })]
+                })
+            ]
+        }));
+        children.push(new Paragraph({ children: [new TextRun({ text: ' ', font: 'Calibri' })], spacing: { after: 60 } }));
+        return true;
+    }
+    function emitSignLine(node, children, api) {
+        var AlignmentType = api.AlignmentType;
+        var label = plainTextLocal(node) || ' ';
+        children.push(emitStyledPara(api, ' ', {
+            align: AlignmentType.CENTER,
+            spacing: { before: 200, after: 0 },
+            size: 18
+        }));
+        children.push(emitStyledPara(api, label, {
+            align: AlignmentType.CENTER,
+            bold: true,
+            size: 19,
+            color: '0B1223',
+            spacing: { before: 280, after: 100 },
+            border: { top: { color: '0B1223', space: 10, style: 'single', size: 12 } }
+        }));
+        return true;
+    }
+    function emitStamp(node, children, api) {
+        var Table = api.Table, TableRow = api.TableRow, TableCell = api.TableCell;
+        var WidthType = api.WidthType, Paragraph = api.Paragraph, TextRun = api.TextRun;
+        var AlignmentType = api.AlignmentType;
+        var txt = plainTextLocal(node) || ' ';
+        var b = docxBorderLocal(api, '0B1223', 18);
+        children.push(new Table({
+            width: { size: 55, type: WidthType.PERCENTAGE },
+            rows: [new TableRow({
+                cantSplit: true,
+                children: [new TableCell({
+                    width: { size: 100, type: WidthType.PERCENTAGE },
+                    borders: { top: b, bottom: b, left: b, right: b },
+                    margins: { top: 100, bottom: 100, left: 140, right: 140 },
+                    children: [new Paragraph({
+                        alignment: AlignmentType.CENTER,
+                        children: [new TextRun({
+                            text: txt.toUpperCase(),
+                            font: 'Calibri', bold: true, size: 24, color: '0B1223'
+                        })]
+                    })]
+                })]
+            })]
+        }));
+        children.push(new Paragraph({
+            alignment: AlignmentType.CENTER,
+            children: [new TextRun({ text: ' ', font: 'Calibri' })],
+            spacing: { after: 80 }
+        }));
+        return true;
+    }
+    function emitNoteBlock(node, children, api, kind) {
+        var Table = api.Table, TableRow = api.TableRow, TableCell = api.TableCell;
+        var WidthType = api.WidthType, Paragraph = api.Paragraph, TextRun = api.TextRun;
+        var ShadingType = api.ShadingType;
+        var lines = splitNoteLines(node);
+        if (!lines.length) lines = [plainTextLocal(node) || ' '];
+        var gold = docxBorderLocal(api, 'C9A84C', 24);
+        var soft = docxBorderLocal(api, 'D4CFC2', 4);
+        var paras = [];
+        lines.forEach(function (ln, idx) {
+            var raw = String(ln || '');
+            var isTitle = idx === 0 && /^(Condições|Condicoes|Notas|Pagamento)\b/i.test(raw.trim());
+            var body = raw;
+            if (isTitle) {
+                paras.push(new Paragraph({
+                    spacing: { after: 60 },
+                    children: [new TextRun({
+                        text: raw.trim(),
+                        font: 'Calibri', bold: true, size: 20, color: '0B1223'
+                    })]
+                }));
+                return;
+            }
+            paras.push(new Paragraph({
+                spacing: { after: 40 },
+                children: [new TextRun({
+                    text: body.trim() ? body : ' ',
+                    font: 'Calibri',
+                    size: kind === 'iva' ? 18 : 20,
+                    italics: kind === 'iva',
+                    color: kind === 'iva' ? '333333' : '1A1A1A'
+                })]
+            }));
+        });
+        if (!paras.length) paras.push(new Paragraph({ children: [new TextRun({ text: ' ', font: 'Calibri' })] }));
+        if (kind === 'iva' || kind === 'foot') {
+            paras.forEach(function (p) { children.push(p); });
+            if (kind === 'foot') {
+                /* gold top rule above footer line already approximated via spacing */
+            }
+            return true;
+        }
+        children.push(new Table({
+            width: { size: 100, type: WidthType.PERCENTAGE },
+            rows: [new TableRow({
+                cantSplit: true,
+                children: [new TableCell({
+                    width: { size: 100, type: WidthType.PERCENTAGE },
+                    shading: ShadingType ? { type: ShadingType.CLEAR, fill: 'F7F4EB' } : undefined,
+                    borders: { top: soft, bottom: soft, right: soft, left: gold },
+                    margins: { top: 80, bottom: 80, left: 100, right: 100 },
+                    children: paras
+                })]
+            })]
+        }));
+        children.push(new Paragraph({ children: [new TextRun({ text: ' ', font: 'Calibri' })], spacing: { after: 80 } }));
+        return true;
+    }
+    function emitDocxFoot(node, children, api) {
+        var AlignmentType = api.AlignmentType;
+        var lines = splitNoteLines(node);
+        if (!lines.length) lines = [plainTextLocal(node) || ' '];
+        children.push(emitStyledPara(api, ' ', {
+            align: AlignmentType.CENTER,
+            spacing: { before: 160, after: 0 },
+            border: { top: { color: 'C9A84C', space: 8, style: 'single', size: 12 } },
+            size: 14
+        }));
+        lines.forEach(function (ln) {
+            children.push(emitStyledPara(api, String(ln || '').trim() || ' ', {
+                align: AlignmentType.CENTER,
+                size: 15,
+                color: '333333',
+                spacing: { after: 40 }
+            }));
+        });
+        return true;
+    }
+    function emitTotalsRight(node, children, api) {
+        var Table = api.Table, TableRow = api.TableRow, TableCell = api.TableCell;
+        var WidthType = api.WidthType, Paragraph = api.Paragraph, TextRun = api.TextRun;
+        var ShadingType = api.ShadingType, AlignmentType = api.AlignmentType;
+        var none = noneBorderLocal(api);
+        var inner = [];
+        emitDocxTable(node, inner, api, { totalsLayout: true });
+        if (!inner.length) return;
+        children.push(new Table({
+            width: { size: 100, type: WidthType.PERCENTAGE },
+            rows: [new TableRow({
+                cantSplit: true,
+                children: [
+                    new TableCell({
+                        width: { size: 48, type: WidthType.PERCENTAGE },
+                        borders: { top: none, bottom: none, left: none, right: none },
+                        children: [new Paragraph({ children: [new TextRun({ text: ' ', font: 'Calibri' })] })]
+                    }),
+                    new TableCell({
+                        width: { size: 52, type: WidthType.PERCENTAGE },
+                        borders: { top: none, bottom: none, left: none, right: none },
+                        margins: { top: 0, bottom: 0, left: 0, right: 0 },
+                        children: inner
+                    })
+                ]
+            })]
+        }));
+    }
+
+    function emitCellBlocks(cell, api) {
+        var Paragraph = api.Paragraph, TextRun = api.TextRun, ImageRun = api.ImageRun;
+        var AlignmentType = api.AlignmentType;
+        var out = [];
+        var hasBlock = false;
+        Array.prototype.forEach.call(cell.childNodes || [], function (ch) {
+            if (ch.nodeType === 1 && /^(DIV|P|H[1-6]|TABLE|UL|OL|BLOCKQUOTE)$/i.test(ch.tagName)) hasBlock = true;
+        });
+        if (!hasBlock) {
+            var runs = typeof root.docxRuns === 'function'
+                ? root.docxRuns(cell, TextRun, ImageRun)
+                : [new TextRun({ text: String(cell.innerText || ' ').replace(/\s+/g, ' ').trim() || ' ', font: 'Calibri' })];
+            var align = typeof root.docxAlign === 'function' ? root.docxAlign(cell, AlignmentType) : AlignmentType.LEFT;
+            if (cell.classList && (cell.classList.contains('gr-lh-doc') || cell.classList.contains('c-eur'))) {
+                align = AlignmentType.RIGHT;
+            }
+            out.push(new Paragraph({ children: runs, alignment: align }));
+            return out;
+        }
+        Array.prototype.forEach.call(cell.childNodes || [], function (ch) {
+            if (ch.nodeType === 3) {
+                var t = String(ch.textContent || '').replace(/\u00a0/g, ' ').trim();
+                if (t) out.push(new Paragraph({ children: [new TextRun({ text: t, font: 'Calibri' })] }));
+                return;
+            }
+            if (ch.nodeType !== 1) return;
+            if (ch.tagName === 'TABLE') {
+                emitDocxTable(ch, out, api);
+                return;
+            }
+            if (ch.tagName === 'BR') {
+                out.push(new Paragraph({ children: [new TextRun({ text: ' ' })] }));
+                return;
+            }
+            if (typeof root.docxPushBlock === 'function') {
+                var before = out.length;
+                try {
+                    root.docxPushBlock(ch, out, api);
+                } catch (ePush) {
+                    var txt = String(ch.innerText || '').replace(/\s+/g, ' ').trim();
+                    if (txt) out.push(new Paragraph({ children: [new TextRun({ text: txt, font: 'Calibri' })] }));
+                }
+                if (out.length === before) {
+                    var t2 = String(ch.innerText || '').replace(/\s+/g, ' ').trim();
+                    if (t2) out.push(new Paragraph({ children: [new TextRun({ text: t2, font: 'Calibri' })] }));
+                }
+            }
+        });
+        if (!out.length) out.push(new Paragraph({ children: [new TextRun({ text: ' ' })] }));
+        return out;
+    }
+
+    function emitDocxTable(node, children, api, layoutOpts) {
+        if (!node || !api || !api.Table) return;
+        if (node.getAttribute && node.getAttribute('data-abene-cont')) return;
+        layoutOpts = layoutOpts || {};
+        var Table = api.Table, TableRow = api.TableRow, TableCell = api.TableCell;
+        var WidthType = api.WidthType, Paragraph = api.Paragraph, TextRun = api.TextRun;
+        var ImageRun = api.ImageRun, ShadingType = api.ShadingType, AlignmentType = api.AlignmentType;
+        var cls = String(node.className || '');
+        var isItems = /\bgr-items\b|\babene-quote-table\b|\bdevis-items-table\b/.test(cls);
+        var isMeta = /\bgr-meta\b/.test(cls);
+        var isKv = /\bgr-kv\b/.test(cls);
+        var isTotals = /\bgr-totals\b/.test(cls);
+        var isLetter = /\bgr-letterhead\b/.test(cls);
+        var isParties = /\bgr-parties\b/.test(cls);
+        var isSigns = /\bgr-signs\b/.test(cls);
+        var isPartiesOrSigns = isParties || isSigns;
+        var tblW = Math.max(1, node.offsetWidth || 600);
+        var colCount = 0;
+        try {
+            if (node.rows && node.rows[0]) colCount = node.rows[0].cells.length;
+        } catch (eC) { colCount = 0; }
+
+        var rows = Array.from(node.rows || []).filter(function (row) {
+            return !(row.getAttribute && row.getAttribute('data-abene-cloned-head'));
+        }).map(function (row) {
+            var isHead = !!(row.parentNode && row.parentNode.tagName === 'THEAD') ||
+                !!(row.cells.length && row.querySelector('th') && !row.querySelector('td'));
+            var isGrand = !!(row.classList && row.classList.contains('gr-tot-grand'));
+            var isDisc = !!(row.classList && row.classList.contains('gr-tot-disc'));
+            return new TableRow({
+                tableHeader: !!(isHead && (isItems || row.parentNode && row.parentNode.tagName === 'THEAD')),
+                cantSplit: true,
+                children: Array.from(row.cells).map(function (cell, cellIdx) {
+                    var cs = (typeof getComputedStyle === 'function') ? getComputedStyle(cell) : cell.style;
+                    var bgRaw = cssColorToHexLocal((cs && cs.backgroundColor) || cell.style.backgroundColor);
+                    var isTh = cell.tagName === 'TH' || isHead;
+                    var fill = '';
+                    if (isGrand) fill = '0B1223';
+                    else if (isTh && isItems) fill = '0B1223';
+                    else if (bgRaw && bgRaw !== '000000' && bgRaw.toLowerCase() !== 'ffffff') fill = bgRaw;
+                    else if (isKv && isTh) fill = 'F6F3EA';
+                    else if (isMeta && isTh) fill = '';
+                    else if (isLetter && isTh) fill = '';
+
+                    var cellKids;
+                    if (isTh && isItems) {
+                        cellKids = [new Paragraph({
+                            alignment: AlignmentType.CENTER,
+                            children: [new TextRun({
+                                text: (cell.innerText || ' ').replace(/\s+/g, ' ').trim() || ' ',
+                                font: 'Calibri', bold: true, color: 'FFFFFF', size: 16
+                            })]
+                        })];
+                    } else if (isMeta) {
+                        var metaTxt = plainTextLocal(cell) || ' ';
+                        cellKids = [new Paragraph({
+                            alignment: AlignmentType.RIGHT,
+                            children: [new TextRun({
+                                text: metaTxt,
+                                font: 'Calibri',
+                                bold: !isTh,
+                                color: isTh ? '8F7328' : '0B1223',
+                                size: isTh ? 18 : 19
+                            })]
+                        })];
+                    } else if (isTotals) {
+                        var totTxt = plainTextLocal(cell) || ' ';
+                        var right = !!(cell.classList && cell.classList.contains('c-eur')) || cellIdx === row.cells.length - 1;
+                        cellKids = [new Paragraph({
+                            alignment: right ? AlignmentType.RIGHT : AlignmentType.LEFT,
+                            children: [new TextRun({
+                                text: totTxt,
+                                font: 'Calibri',
+                                bold: !!(isGrand || right),
+                                color: isGrand ? 'FFFFFF' : (isDisc ? '9A3412' : '0B1223'),
+                                size: isGrand ? 24 : 20
+                            })]
+                        })];
+                    } else if (isLetter && cell.classList && cell.classList.contains('gr-lh-doc')) {
+                        cellKids = emitCellBlocks(cell, api);
+                        /* force right-ish title block: already handled via child classes */
+                    } else {
+                        cellKids = emitCellBlocks(cell, api);
+                    }
+
+                    var pct;
+                    if (isLetter && colCount === 2) pct = cellIdx === 0 ? 58 : 42;
+                    else if (isParties && colCount === 3) pct = cellIdx === 1 ? 4 : 48;
+                    else if (isSigns && colCount === 3) pct = cellIdx === 1 ? 8 : 46;
+                    else if (isKv && colCount === 2) pct = cellIdx === 0 ? 34 : 66;
+                    else if (isTotals && colCount === 2) pct = cellIdx === 0 ? 62 : 38;
+                    else if (isMeta && colCount === 2) pct = cellIdx === 0 ? 40 : 60;
+                    else pct = Math.max(6, Math.round(((cell.offsetWidth || 80) / tblW) * 100));
+
+                    if (isPartiesOrSigns && row.cells.length === 3 && !(isLetter)) {
+                        var idx = Array.prototype.indexOf.call(row.cells, cell);
+                        if (isParties) pct = idx === 1 ? 4 : 48;
+                        if (isSigns) pct = idx === 1 ? 8 : 46;
+                    }
+
+                    var cellOpts = {
+                        width: { size: pct, type: WidthType.PERCENTAGE },
+                        margins: {
+                            top: isLetter || isMeta ? 40 : 60,
+                            bottom: isLetter || isMeta ? 40 : 60,
+                            left: isMeta ? 40 : 80,
+                            right: isMeta ? 40 : 80
+                        },
+                        children: cellKids
+                    };
+                    if (fill && ShadingType) cellOpts.shading = { type: ShadingType.CLEAR, fill: fill };
+
+                    var bColor = isItems ? (isTh ? '243049' : 'D4CFC2')
+                        : (isKv || isTotals ? '0B1223' : (isMeta || isLetter || isPartiesOrSigns ? 'FFFFFF' : 'CCCCCC'));
+                    var bSz = (isMeta || isLetter || isPartiesOrSigns) ? 0 : (isKv || isTotals ? 8 : 4);
+                    var border = docxBorderLocal(api, bColor, bSz || 1);
+                    if (isMeta || isLetter || isPartiesOrSigns) {
+                        var none = noneBorderLocal(api);
+                        cellOpts.borders = { top: none, bottom: none, left: none, right: none };
+                    } else if (isTotals) {
+                        var tn = docxBorderLocal(api, '0B1223', 10);
+                        var soft = docxBorderLocal(api, 'D4CFC2', 4);
+                        if (isGrand) {
+                            cellOpts.borders = { top: tn, bottom: tn, left: tn, right: tn };
+                        } else {
+                            cellOpts.borders = { top: soft, bottom: soft, left: tn, right: tn };
+                        }
+                    } else if (isKv) {
+                        var kn = docxBorderLocal(api, '0B1223', 8);
+                        var ks = docxBorderLocal(api, 'D4CFC2', 4);
+                        cellOpts.borders = { top: ks, bottom: ks, left: kn, right: kn };
+                    } else {
+                        cellOpts.borders = { top: border, bottom: border, left: border, right: border };
+                    }
+                    if (isLetter && cell.classList && cell.classList.contains('gr-lh-doc')) {
+                        cellOpts.margins = { top: 40, bottom: 40, left: 80, right: 0 };
+                    }
+                    return new TableCell(cellOpts);
+                })
+            });
+        });
+        if (!rows.length) return;
+        children.push(new Table({
+            rows: rows,
+            width: { size: 100, type: WidthType.PERCENTAGE }
+        }));
+        if (!layoutOpts.totalsLayout) {
+            children.push(new Paragraph({ children: [new TextRun({ text: ' ' })], spacing: { after: 80 } }));
+        }
+    }
+
+    function emitCommercialChrome(node, children, api) {
+        if (!node || !node.classList) return false;
+        var Paragraph = api.Paragraph, TextRun = api.TextRun, AlignmentType = api.AlignmentType;
+        if (node.classList.contains('abene-status-banner') || node.classList.contains('abene-check-toolbar')) {
+            return true; /* omit UI chrome from DOCX */
+        }
+        if (node.classList.contains('gr-brand-row')) {
+            return emitBrandRow(node, children, api);
+        }
+        if (node.classList.contains('gr-co-name')) {
+            children.push(emitStyledPara(api, plainTextLocal(node), { bold: true, size: 32, color: '0B1223', spacing: { after: 40 } }));
+            return true;
+        }
+        if (node.classList.contains('gr-slogan')) {
+            children.push(emitStyledPara(api, plainTextLocal(node), { bold: true, size: 15, color: '8F7328', spacing: { after: 40 } }));
+            return true;
+        }
+        if (node.classList.contains('gr-co-meta')) {
+            splitNoteLines(node).forEach(function (ln) {
+                children.push(emitStyledPara(api, String(ln || '').trim() || ' ', { size: 17, color: '2A2A2A', spacing: { after: 20 } }));
+            });
+            return true;
+        }
+        if (node.classList.contains('gr-doc-kicker')) {
+            children.push(emitStyledPara(api, plainTextLocal(node).toUpperCase(), {
+                align: AlignmentType.RIGHT, bold: true, size: 14, color: '8F7328', spacing: { after: 40 }
+            }));
+            return true;
+        }
+        if (node.classList.contains('gr-doc-title')) {
+            children.push(emitStyledPara(api, plainTextLocal(node), {
+                align: AlignmentType.RIGHT, bold: true, size: 34, color: '0B1223', spacing: { after: 80 }
+            }));
+            return true;
+        }
+        if (node.classList.contains('gr-party')) {
+            return emitPartyBox(node, children, api);
+        }
+        if (node.classList.contains('gr-sign-line')) {
+            return emitSignLine(node, children, api);
+        }
+        if (node.classList.contains('gr-sign-hint')) {
+            children.push(emitStyledPara(api, plainTextLocal(node), {
+                align: AlignmentType.CENTER, size: 16, color: '444444', spacing: { before: 40, after: 200 }
+            }));
+            return true;
+        }
+        if (node.classList.contains('gr-stamp')) {
+            return emitStamp(node, children, api);
+        }
+        if (node.classList.contains('gr-amount-box')) {
+            var label = node.querySelector('.gr-amount-label');
+            var amount = node.querySelector('.gr-amount');
+            var words = node.querySelector('.gr-amount-words');
+            var Table = api.Table, TableRow = api.TableRow, TableCell = api.TableCell;
+            var WidthType = api.WidthType, ShadingType = api.ShadingType;
+            var soft = docxBorderLocal(api, '0B1223', 10);
+            var goldTop = docxBorderLocal(api, 'C9A84C', 24);
+            var boxKids = [];
+            if (label) boxKids.push(emitStyledPara(api, plainTextLocal(label).toUpperCase(), {
+                align: AlignmentType.CENTER, bold: true, size: 15, color: '8F7328', spacing: { after: 60 }
+            }));
+            if (amount) boxKids.push(emitStyledPara(api, plainTextLocal(amount), {
+                align: AlignmentType.CENTER, bold: true, size: 48, color: '0B1223', spacing: { after: 60 }
+            }));
+            if (words) boxKids.push(emitStyledPara(api, plainTextLocal(words), {
+                align: AlignmentType.CENTER, italics: true, size: 20, color: '222222', spacing: { after: 40 }
+            }));
+            if (!boxKids.length) boxKids.push(new Paragraph({ children: [new TextRun({ text: ' ' })] }));
+            children.push(new Table({
+                width: { size: 100, type: WidthType.PERCENTAGE },
+                rows: [new TableRow({
+                    cantSplit: true,
+                    children: [new TableCell({
+                        width: { size: 100, type: WidthType.PERCENTAGE },
+                        shading: ShadingType ? { type: ShadingType.CLEAR, fill: 'F7F4EB' } : undefined,
+                        borders: { top: goldTop, bottom: soft, left: soft, right: soft },
+                        margins: { top: 100, bottom: 100, left: 120, right: 120 },
+                        children: boxKids
+                    })]
+                })]
+            }));
+            children.push(new Paragraph({ children: [new TextRun({ text: ' ' })], spacing: { after: 120 } }));
+            return true;
+        }
+        if (node.classList.contains('gr-goldbar') || node.classList.contains('gr-rules')) {
+            children.push(new Paragraph({
+                border: { bottom: { color: '0B1223', space: 1, style: 'single', size: 8 } },
+                children: [new TextRun({ text: ' ' })],
+                spacing: { after: 20 }
+            }));
+            children.push(new Paragraph({
+                border: { bottom: { color: 'C9A84C', space: 1, style: 'single', size: 18 } },
+                children: [new TextRun({ text: ' ' })],
+                spacing: { after: 200 }
+            }));
+            return true;
+        }
+        if (node.classList.contains('gr-section-label')) {
+            children.push(emitStyledPara(api, plainTextLocal(node).toUpperCase(), {
+                bold: true, size: 15, color: '8F7328', spacing: { before: 160, after: 80 }
+            }));
+            return true;
+        }
+        if (node.classList.contains('gr-totals-wrap')) {
+            var tot = node.querySelector('table.gr-totals') || node.querySelector('table');
+            if (tot) {
+                emitTotalsRight(tot, children, api);
+                children.push(new Paragraph({ children: [new TextRun({ text: ' ' })], spacing: { after: 80 } }));
+                return true;
+            }
+        }
+        if (node.classList.contains('gr-sign-block') || node.classList.contains('gr-brand-text') ||
+            node.classList.contains('gr-party-cell') || node.classList.contains('abene-keep-together')) {
+            Array.from(node.childNodes || []).forEach(function (ch) {
+                if (typeof root.docxPushBlock === 'function') root.docxPushBlock(ch, children, api);
+            });
+            return true;
+        }
+        if (node.classList.contains('gr-doc-foot')) {
+            return emitDocxFoot(node, children, api);
+        }
+        if (node.classList.contains('gr-pay') || node.classList.contains('gr-note')) {
+            return emitNoteBlock(node, children, api, 'note');
+        }
+        if (node.classList.contains('gr-iva-note')) {
+            return emitNoteBlock(node, children, api, 'iva');
+        }
+        return false;
+    }
+
     function wrapPushBlock() {
         if (typeof root.docxPushBlock !== 'function' || root.docxPushBlock._abeneExport) return;
         var orig = root.docxPushBlock;
         root.docxPushBlock = function (node, children, api) {
-            if (useEngine && node && node.classList) {
+            if (useEngine && node && node.nodeType === 1 && node.classList) {
                 if (node.classList.contains('abene-notes-source') || node.classList.contains('abene-obj-resize')) return;
+                if (node.classList.contains('page-break-marker') ||
+                    node.classList.contains('abene-page-break') ||
+                    (node.getAttribute && node.getAttribute('data-abene-break') === 'page')) {
+                    emitDocxPageBreak(children, api);
+                    return;
+                }
                 if (node.classList.contains('abene-section-break')) {
                     children.push({ _abeneSection: node.getAttribute('data-abene-section-role') || 'body' });
+                    return;
+                }
+                if (node.classList.contains('abene-break-before') || node.classList.contains('abene-pagebreak-before')) {
+                    emitDocxPageBreak(children, api);
+                    /* continue to emit the node body below */
+                }
+                if (emitCommercialChrome(node, children, api)) return;
+                if (node.tagName === 'TABLE') {
+                    emitDocxTable(node, children, api);
+                    return;
+                }
+                if (node.classList.contains('devis-container') || node.classList.contains('receipt-container') ||
+                    node.classList.contains('gr-sign-block') || node.classList.contains('gr-totals-wrap') ||
+                    node.classList.contains('abene-keep-together') ||
+                    (node.getAttribute && (node.getAttribute('data-abene-block') === 'devis' || node.getAttribute('data-abene-block') === 'receipt'))) {
+                    /* gr-totals-wrap: prefer commercial chrome (right-aligned totals) */
+                    if (node.classList.contains('gr-totals-wrap') && emitCommercialChrome(node, children, api)) return;
+                    Array.from(node.childNodes).forEach(function (ch) {
+                        root.docxPushBlock(ch, children, api);
+                    });
                     return;
                 }
                 if (node.classList.contains('abene-caption') || node.getAttribute('data-caption-for')) {
@@ -416,6 +1238,7 @@
             return orig.apply(this, arguments);
         };
         root.docxPushBlock._abeneExport = true;
+        root.docxPushBlock._abeneExportOrig = orig;
     }
 
     function splitDocxChildren(children) {
@@ -437,16 +1260,20 @@
     }
     function reportHeader(api, ctx, role) {
         if (role === 'front') return new api.Header({ children: [emptyHfPara(api)] });
-        var fields = ctx.headerFields || {};
+        var modelo = readModeloHf();
+        var fields = (ctx && ctx.headerFields) || modelo.headerFields || {};
+        var headerTpl = (ctx && ctx.headerTpl) || modelo.headerTpl || 'blank';
+        var headerText = (ctx && ctx.headerText) || modelo.headerText || '';
+        var companyName = (ctx && ctx.companyName) || modelo.companyName || 'Genius Raros';
         var left = [];
-        if (ctx.logoRun) left.push(new api.Paragraph({ children: [ctx.logoRun] }));
+        if (ctx && ctx.logoRun) left.push(new api.Paragraph({ children: [ctx.logoRun] }));
         left.push(new api.Paragraph({
-            children: [new api.TextRun({ text: ctx.companyName || 'Genius Raros', bold: true, font: 'Calibri', size: 22 })]
+            children: [new api.TextRun({ text: companyName, bold: true, font: 'Calibri', size: 22 })]
         }));
         var right = [
             new api.Paragraph({
                 alignment: api.AlignmentType.RIGHT,
-                children: [new api.TextRun({ text: fields.title || ctx.headerText || '', bold: true, font: 'Calibri', size: 28 })]
+                children: [new api.TextRun({ text: fields.title || headerText || '', bold: true, font: 'Calibri', size: 28 })]
             }),
             fields.ref
                 ? new api.Paragraph({ alignment: api.AlignmentType.RIGHT, children: [new api.TextRun({ text: fields.ref, font: 'Calibri', size: 18, color: '5B7AA8' })] })
@@ -455,7 +1282,7 @@
                 ? new api.Paragraph({ alignment: api.AlignmentType.RIGHT, children: [new api.TextRun({ text: fields.date, font: 'Calibri', size: 18, color: '5B7AA8' })] })
                 : emptyHfPara(api)
         ];
-        if (ctx.headerTpl === 'gr-report' || ctx.headerTpl === 'gr-letter' || ctx.headerTpl === 'triple') {
+        if (headerTpl === 'gr-report' || headerTpl === 'gr-letter' || headerTpl === 'triple') {
             return new api.Header({
                 children: [new api.Table({
                     width: { size: 100, type: api.WidthType.PERCENTAGE },
@@ -468,11 +1295,11 @@
                 })]
             });
         }
-        if (ctx.headerText) {
+        if (headerText || modelo.liveHeader) {
             return new api.Header({
                 children: [new api.Paragraph({
                     alignment: api.AlignmentType.CENTER,
-                    children: [new api.TextRun({ text: ctx.headerText, font: 'Calibri', size: 20 })]
+                    children: [new api.TextRun({ text: headerText || modelo.liveHeader, font: 'Calibri', size: 20 })]
                 })]
             });
         }
@@ -480,10 +1307,12 @@
     }
     function reportFooter(api, ctx, role) {
         if (role === 'front') return new api.Footer({ children: [emptyHfPara(api)] });
+        var modelo = readModeloHf();
+        var footerText = (ctx && ctx.footerText != null) ? ctx.footerText : modelo.footerText;
         var runs = [];
         var annex = role === 'annex' ? ((typeof root.t === 'function' ? root.t('secAnnexNum') : '') || 'Anexo') + ' ' : '';
         if (annex) runs.push(new api.TextRun({ text: annex, font: 'Calibri', size: 18 }));
-        String(ctx.footerText || '').split(/(\{PAGE\}|\{NUMPAGES\})/i).forEach(function (part) {
+        String(footerText || '').split(/(\{PAGE\}|\{NUMPAGES\})/i).forEach(function (part) {
             if (!part) return;
             if (/^\{PAGE\}$/i.test(part)) runs.push(new api.TextRun({ children: [api.PageNumber.CURRENT], font: 'Calibri', size: 18 }));
             else if (/^\{NUMPAGES\}$/i.test(part)) runs.push(new api.TextRun({ children: [api.PageNumber.TOTAL_PAGES], font: 'Calibri', size: 18 }));
@@ -498,21 +1327,54 @@
     }
     function buildDocxSections(ctx) {
         if (!useEngine || !ctx || !ctx.Document || !ctx.Packer) return null;
+        var paper = docxPaperProps();
+        var pxToTwip = paper.pxToTwip || ctx.pxToTwip;
+        var portrait = paper.portrait;
+        var orientation = paper.orientation;
+        var margins = paper.margins;
+        /* Fix #6: prefer live PageGeometry (docxPaperProps). ctx.page* only fills gaps. */
+        if ((!portrait || !portrait.w || !portrait.h) && ctx.pageSize && ctx.pageSize.w && ctx.pageSize.h) {
+            portrait = { w: ctx.pageSize.w, h: ctx.pageSize.h };
+        }
+        if (!orientation && ctx.pageOrientation) {
+            orientation = ctx.pageOrientation === 'landscape' ? 'landscape' : 'portrait';
+        }
+        if (ctx.pageMargins) {
+            margins = {
+                top: margins.top != null ? margins.top : ctx.pageMargins.top,
+                right: margins.right != null ? margins.right : ctx.pageMargins.right,
+                bottom: margins.bottom != null ? margins.bottom : ctx.pageMargins.bottom,
+                left: margins.left != null ? margins.left : ctx.pageMargins.left
+            };
+        }
+        var modelo = readModeloHf();
+        if (!ctx.headerTpl) ctx.headerTpl = modelo.headerTpl;
+        if (!ctx.headerFields) ctx.headerFields = modelo.headerFields;
+        if (!ctx.headerText) ctx.headerText = modelo.headerText;
+        if (ctx.footerText == null) ctx.footerText = modelo.footerText;
+        if (!ctx.companyName) ctx.companyName = modelo.companyName;
+
         var parts = splitDocxChildren(ctx.children);
-        if (!parts || parts.length < 2) return null;
+        if (!parts || parts.length < 2) {
+            var flat = (ctx.children || []).filter(function (c) { return !(c && c._abeneSection); });
+            parts = [{ role: 'body', items: flat.length ? flat : [] }];
+        }
         var D = root.docx || {};
+        var PageOrientation = ctx.PageOrientation || D.PageOrientation || {};
         var sections = parts.map(function (part, i) {
             var page = {
                 size: {
-                    width: ctx.pxToTwip(ctx.pageSize.w),
-                    height: ctx.pxToTwip(ctx.pageSize.h),
-                    orientation: ctx.pageOrientation === 'landscape' ? ctx.PageOrientation.LANDSCAPE : ctx.PageOrientation.PORTRAIT
+                    width: pxToTwip(portrait.w),
+                    height: pxToTwip(portrait.h),
+                    orientation: orientation === 'landscape'
+                        ? (PageOrientation.LANDSCAPE || 'landscape')
+                        : (PageOrientation.PORTRAIT || 'portrait')
                 },
                 margin: {
-                    top: ctx.pxToTwip(ctx.pageMargins.top),
-                    right: ctx.pxToTwip(ctx.pageMargins.right),
-                    bottom: ctx.pxToTwip(ctx.pageMargins.bottom),
-                    left: ctx.pxToTwip(ctx.pageMargins.left)
+                    top: pxToTwip(margins.top),
+                    right: pxToTwip(margins.right),
+                    bottom: pxToTwip(margins.bottom),
+                    left: pxToTwip(margins.left)
                 }
             };
             if (part.role === 'body' || part.role === 'annex') page.pageNumbers = { start: 1 };
@@ -534,6 +1396,23 @@
             };
         });
         return ctx.Packer.toBlob(new ctx.Document({ sections: sections }));
+    }
+
+    function notifyDocxLimitsOnce() {
+        if (root._abeneDocxLimitToast) return;
+        root._abeneDocxLimitToast = true;
+        try {
+            if (typeof root.showToast !== 'function') return;
+            var editor = ed();
+            var commercial = !!(editor && editor.querySelector && editor.querySelector(
+                '.gr-letterhead, .devis-container, .receipt-container, [data-abene-block="devis"], [data-abene-block="receipt"]'
+            ));
+            if (commercial) {
+                root.showToast('DOCX comercial : cabeçalho, partes, totais e assinaturas mapeados; alguns detalhes CSS (flex exacto / carimbo pixel) podem diferir. PDF permanece a via de alta fidelidade.');
+            } else {
+                root.showToast('DOCX approximatif : mises en page complexes / flottants / CSS avancé peuvent différer. PDF reste fidèle à l’écran.');
+            }
+        } catch (eT) {}
     }
 
     function pdfOptions(g, filename) {
@@ -981,6 +1860,8 @@
         set useEngine(v) { useEngine = !!v; },
         prepare: prepare,
         geo: geo,
+        docxPaperProps: docxPaperProps,
+        readModeloHf: readModeloHf,
         bodyHtml: bodyHtml,
         sanitize: sanitizeExportRoot,
         flatten: flattenExportDom,
@@ -995,7 +1876,8 @@
         pageImagesToBlob: pageImagesToBlob,
         htmlToPagedBlob: htmlToPagedBlob,
         htmlElementToPdfBlob: htmlElementToPdfBlob,
-        buildDocxSections: buildDocxSections
+        buildDocxSections: buildDocxSections,
+        notifyDocxLimitsOnce: notifyDocxLimitsOnce
     };
     root.ABENE.Export = ExportApi;
 
@@ -1097,10 +1979,14 @@
             var origClean = root.abeneGetCleanHtml;
             root.abeneGetCleanHtml = function () { return html; };
             try {
-                return await origFn.apply(this, arguments);
+                var blob = await origFn.apply(this, arguments);
+                notifyDocxLimitsOnce();
+                return blob;
             } catch (e) {
                 root.abeneGetCleanHtml = origClean;
-                return await origFn.apply(this, arguments);
+                var blob2 = await origFn.apply(this, arguments);
+                notifyDocxLimitsOnce();
+                return blob2;
             } finally {
                 root.abeneGetCleanHtml = origClean;
             }
