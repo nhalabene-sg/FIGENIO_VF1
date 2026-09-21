@@ -2,7 +2,8 @@
    Não altera Guardar / autosave / versões / modelos existentes.
    Cópia só de leitura: o documento em curso não é tocado ao consultar.
    Fix #7 (mobile nav): back path preview→files→folders, tools collapse,
-   44px targets, reachable panes without crushing desktop layout. */
+   44px targets, reachable panes without crushing desktop layout.
+   Fix #7b: injectCss @media aligned with isMobileArchive (pointer:coarse). */
 (function () {
     var STORE = 'abeneArquivoV1';
     var FOLDERS_STORE = 'abeneArquivoFoldersV1';
@@ -1429,7 +1430,7 @@
             '.arq-pdf-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:4px 0;border-top:1px solid #eee;font-size:12px;}' +
             '.arq-pdf-row.on{background:#fff;}' +
             '@media(max-width:900px){.arq-body{grid-template-columns:1fr;}.arq-archive-panel{grid-template-columns:1fr;}}' +
-            '@media(max-width:820px),(max-width:960px) and (max-height:480px) and (orientation:landscape){' +
+            '@media(max-width:820px),(max-width:960px) and (pointer:coarse),(max-width:960px) and (max-height:480px) and (orientation:landscape){' +
             '#arqOverlay{height:100dvh;max-height:100dvh;overflow:hidden;}' +
             '.arq-top{flex-wrap:wrap;gap:8px;padding:8px 12px;padding-top:max(8px,env(safe-area-inset-top,0px));flex-shrink:0;}' +
             '.arq-top>div:nth-child(2){min-width:0;flex:1;}' +
