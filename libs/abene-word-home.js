@@ -2800,7 +2800,13 @@
     };
 
     window.abeneSchedulePageFlow = function (immediate) {
-        if (window._abeneLayingOut) return;
+        /* Fix #3 audit: never drop a layout request mid-pass — queue a rerun
+           so Ctrl+Enter / Quebra during _abeneLayingOut still paginates. */
+        if (window._abeneLayingOut) {
+            window._abeneFlowNeedsRerun = true;
+            if (immediate) window._abeneFlowNeedsImmediate = true;
+            return;
+        }
         clearTimeout(window._abeneFlowT);
         var run = function () {
             if (typeof refreshPagination === 'function') refreshPagination();
@@ -3131,8 +3137,36 @@
             try { window.abeneLayoutWatermarks(editor); } catch (errWm) {}
         }
         window._abeneChromeSig = '';
-        restoreCaretBookmark(editor, saved);
+        /* Prefer an explicit page-break caret mark over a bookmark saved
+           before Ctrl+Enter landed during an overlapping layout pass. */
+        var breakCaret = null;
+        try { breakCaret = editor.querySelector('[data-abene-break-caret="1"]'); } catch (eBc) { breakCaret = null; }
+        if (breakCaret && breakCaret.isConnected) {
+            try {
+                editor.focus({ preventScroll: true });
+            } catch (eF0) {
+                try { editor.focus(); } catch (eF1) {}
+            }
+            try {
+                var selBc = window.getSelection();
+                var rBc = document.createRange();
+                rBc.selectNodeContents(breakCaret);
+                rBc.collapse(true);
+                selBc.removeAllRanges();
+                selBc.addRange(rBc);
+            } catch (eCaretBc) {
+                restoreCaretBookmark(editor, saved);
+            }
+        } else {
+            restoreCaretBookmark(editor, saved);
+        }
         window._abeneLayingOut = false;
+        if (window._abeneFlowNeedsRerun) {
+            var forceImm = !!window._abeneFlowNeedsImmediate;
+            window._abeneFlowNeedsRerun = false;
+            window._abeneFlowNeedsImmediate = false;
+            window.abeneSchedulePageFlow(forceImm);
+        }
     };
 
     function insertFlowSpacer(editor, beforeEl, heightPx) {
