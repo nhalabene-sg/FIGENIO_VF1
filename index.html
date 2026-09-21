@@ -10350,6 +10350,10 @@
             if (typeof refreshCommentsPane === 'function') refreshCommentsPane();
             if (typeof updateNavigation === 'function') updateNavigation();
             initRuler();
+            // audit5: New/Import clears archiveEntryId — rebind Drive sync away from previous entry.
+            try {
+                if (typeof window.abeneDocumentSyncOnDocChange === 'function') window.abeneDocumentSyncOnDocChange();
+            } catch (eSyncReset) {}
         }
 
         function finishOpenedDocument(fileName, toastMsg) {
@@ -10374,6 +10378,10 @@
                 localStorage.setItem('abeneDocName', documentState.name);
                 localStorage.setItem('abeneProjectSettings', projectSettings());
             } catch (e) {}
+            // audit5: import may restore archiveEntryId via settings — rebind sync to that entry (or current).
+            try {
+                if (typeof window.abeneDocumentSyncOnDocChange === 'function') window.abeneDocumentSyncOnDocChange();
+            } catch (eSyncOpen) {}
             showToast(toastMsg || t('toastOpen'));
         }
 
@@ -13184,7 +13192,7 @@ table { border-collapse: collapse; }
     <script src="libs/abene-excel-engine.js?v=20260914-essential-1"></script>
     <script src="libs/abene-excel.js?v=20260920-excel-export-1"></script>
     <script src="libs/abene-sheets.js?v=20260921-audit2-1"></script>
-    <script src="libs/abene-document-sync.js?v=20260920-sync-7"></script>
+    <script src="libs/abene-document-sync.js?v=20260921-audit5-1"></script>
     <script src="libs/abene-collab.js?v=20260915-share-1"></script>
     <script src="libs/abene-gdocs.js?v=20260921-audit1-1"></script>
     <script src="libs/abene-pickers.js?v=20260915-modo-2"></script>

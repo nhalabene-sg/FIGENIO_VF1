@@ -3,7 +3,8 @@
  * safeDocumentSync; multi-id needs multiDocumentSync (emaildrive 2.8+).
  *
  * Additive: offline SYNC_DOCUMENT queue + flush on online; scoped abeneBeforeCloudReplace
- * with restore-on-fail; never overwrite protected docs. No OT merge. */
+ * with restore-on-fail; never overwrite protected docs. No OT merge.
+ * audit5: rebind sync on New/Import (index) + ignore stale base.documentId. */
 (function () {
     'use strict';
     var busy = false, ready = false, conflict = null, timer, scope = '', base = null;
@@ -244,7 +245,7 @@
     }
     async function sync(explicit) {
         if (busy) return;
-        if (scope !== key()) { conflict = null; ready = false; multiOk = false; }
+        if (scope !== key()) { conflict = null; ready = false; multiOk = false; base = null; scope = ''; }
         if (conflict) {
             if (explicit) status(tt('docSyncConflict', 'Conflito entre dispositivos — clique para escolher'), 'conflict');
             return;
@@ -276,6 +277,8 @@
             if (scope !== key()) {
                 scope = key(); ready = false; multiOk = false;
                 base = JSON.parse(localStorage.getItem(scope) || 'null');
+                // Multi-device / multi-entry: never reuse a base remembered for another archiveEntryId.
+                if (base && base.documentId && base.documentId !== docId()) base = null;
             }
             var id = docId();
             if (!ready) {
