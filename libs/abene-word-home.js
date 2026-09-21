@@ -2822,11 +2822,21 @@
         window._abeneFlowT = setTimeout(run, 70);
     };
 
-    /* Fix #3: after Ctrl+Enter / Quebra de pagina, caret + #editorArea follow
+﻿    /* Fix #3: after Ctrl+Enter / Quebra de pagina, caret + #editorArea follow
        the new page once layout (abeneSchedulePageFlow / bookmarks) finishes.
        Align the ENTIRE new page sheet to #editorArea (top), wait for layout,
-       fit sheets / phone sizer / zoom margin, then retry scroll after paint. */
+       fit sheets / phone sizer / zoom margin, then retry scroll after paint.
+       Audit 2026-09-21: wait for queued reruns too; keep break-caret mark until
+       layout is stable; re-reveal from layout end; verify caret is on-screen. */
     function abeneRevealPageBreakTarget(target) {
+        window._abeneBreakRevealGen = (window._abeneBreakRevealGen || 0) + 1;
+        var myGen = window._abeneBreakRevealGen;
+        function stale() {
+            return myGen !== window._abeneBreakRevealGen;
+        }
+        function layoutBusy() {
+            return !!(window._abeneLayingOut || window._abeneFlowNeedsRerun);
+        }
         function resolve() {
             if (target && target.isConnected) return target;
             var root = ed();
@@ -2948,15 +2958,27 @@
                 if (typeof window.abeneLayoutPhoneZoom === 'function') window.abeneLayoutPhoneZoom();
             } catch (eP) {}
         }
+        function caretInView(el, area, inset) {
+            if (!el || !area) return false;
+            try {
+                var a = area.getBoundingClientRect();
+                var b = el.getBoundingClientRect();
+                var topPad = inset + 8;
+                var viewBottom = a.top + Math.max(80, area.clientHeight) - 8;
+                return b.top >= a.top + topPad - 12 && b.top <= viewBottom;
+            } catch (eIn) {
+                return false;
+            }
+        }
         function scrollReveal(el) {
-            if (!el || !el.isConnected) return;
+            if (!el || !el.isConnected) return false;
             var area = document.getElementById('editorArea');
             var editor = ed();
             if (!area) {
                 try {
                     if (el.scrollIntoView) el.scrollIntoView({ block: 'start', inline: 'nearest' });
                 } catch (errView0) {}
-                return;
+                return true;
             }
             try {
                 var ph = pageH();
@@ -2996,6 +3018,7 @@
                         : scaleY;
                     if (!isFinite(scaleY) || scaleY <= 0) scaleY = z;
                     pageHView = Math.max(1, ph * scaleY);
+                    pageIndex = pageIndexFor(el, editor, ph);
                     var topView = sheetTopView(el, editor, pageIndex, ph, scaleY);
                     var delta = topView - alignTop;
                     /* Visual delta maps 1:1 to scrollTop (phone sizer + zoom marginBottom). */
@@ -3036,6 +3059,27 @@
                 applyAlign();
                 applyAlign();
 
+                /* Hard fallback if caret still off-screen (race before spacer landed). */
+                inset = stickyTopInset(area);
+                if (!caretInView(el, area, inset)) {
+                    pageIndex = pageIndexFor(el, editor, ph);
+                    var forceTop = pageIndex * ph;
+                    try {
+                        ensureSheetRoom(editor, pageIndex, ph);
+                        a = area.getBoundingClientRect();
+                        er = editor ? editor.getBoundingClientRect() : er;
+                        scaleY = (er && er.height && editor && editor.offsetHeight)
+                            ? (er.height / editor.offsetHeight)
+                            : z;
+                        if (!isFinite(scaleY) || scaleY <= 0) scaleY = z;
+                        var tv = sheetTopView(el, editor, pageIndex, ph, scaleY);
+                        area.scrollTop = Math.max(0, area.scrollTop + (tv - (a.top + inset)));
+                    } catch (eForce) {
+                        area.scrollTop = Math.max(0, forceTop);
+                    }
+                    applyAlign();
+                }
+
                 var cur = document.getElementById('pageNum');
                 if (cur) {
                     var page = Math.max(1, pageIndex + 1);
@@ -3046,31 +3090,36 @@
                     var pages = totEl ? (parseInt(totEl.textContent, 10) || page) : page;
                     cur.textContent = String(Math.min(pages, Math.max(page, pageIndex + 1)));
                 }
-                return;
+                return caretInView(el, area, stickyTopInset(area));
             } catch (errScroll) {}
             try {
                 if (el.scrollIntoView) el.scrollIntoView({ block: 'start', inline: 'nearest' });
             } catch (errView) {}
+            return false;
         }
         function run() {
-            if (window._abeneLayingOut) return false;
+            if (stale()) return false;
+            if (layoutBusy()) return false;
             var el = resolve();
             if (!el) return false;
             placeCaret(el);
-            scrollReveal(el);
-            return true;
+            return scrollReveal(el);
         }
         function clearMark() {
+            if (stale()) return;
+            if (window._abeneLayingOut || window._abeneFlowNeedsRerun) return;
             var el = resolve();
             if (el) {
                 try { el.removeAttribute('data-abene-break-caret'); } catch (eClear) {}
             }
+            window._abeneBreakRevealHold = false;
         }
         var tries = 0;
-        var maxTries = 36;
+        var maxTries = 48;
         function attempt() {
+            if (stale()) return;
             tries += 1;
-            if (window._abeneLayingOut && tries < maxTries) {
+            if (layoutBusy() && tries < maxTries) {
                 setTimeout(attempt, 50);
                 return;
             }
@@ -3087,22 +3136,24 @@
                 if (typeof window.abeneLayoutPhoneZoom === 'function') window.abeneLayoutPhoneZoom();
             } catch (eP2) {}
             var ok = run();
-            if (!ok && tries < maxTries) {
+            if ((!ok || layoutBusy()) && tries < maxTries) {
                 setTimeout(attempt, 50);
                 return;
             }
             /* Post-paint retries so the full new sheet stays in view after chrome/sizer. */
             if (ok) {
-                var delays = [50, 100, 150];
+                var delays = [50, 100, 160, 240];
                 var di = 0;
                 function retryPaint() {
+                    if (stale()) return;
                     if (di >= delays.length) {
                         clearMark();
                         return;
                     }
                     var wait = delays[di++];
                     setTimeout(function () {
-                        if (window._abeneLayingOut && tries < maxTries) {
+                        if (stale()) return;
+                        if (layoutBusy() && tries < maxTries) {
                             attempt();
                             return;
                         }
@@ -3125,14 +3176,18 @@
             });
         });
     }
+    window.abeneRevealPageBreakTarget = abeneRevealPageBreakTarget;
 
     window.abeneInsertPageBreak = function () {
         if (window._abeneBreakLock) return;
         window._abeneBreakLock = true;
+        window._abeneBreakRevealHold = true;
         setTimeout(function () { window._abeneBreakLock = false; }, 40);
         var editor = ed();
         if (!editor) return;
-        editor.focus();
+        try { editor.focus({ preventScroll: true }); } catch (eFIns) {
+            try { editor.focus(); } catch (eFIns2) {}
+        }
         var block = getBlock();
         var cls = 'abene-normal';
         var extra = '';
@@ -3368,11 +3423,16 @@
             restoreCaretBookmark(editor, saved);
         }
         window._abeneLayingOut = false;
+        var pendingReveal = !!(breakCaret && breakCaret.isConnected);
         if (window._abeneFlowNeedsRerun) {
-            var forceImm = !!window._abeneFlowNeedsImmediate;
+            var forceImm = !!window._abeneFlowNeedsImmediate || pendingReveal || !!window._abeneBreakRevealHold;
             window._abeneFlowNeedsRerun = false;
             window._abeneFlowNeedsImmediate = false;
             window.abeneSchedulePageFlow(forceImm);
+            /* Keep mark; reveal waits for rerun via layoutBusy(). */
+        } else if (pendingReveal && typeof abeneRevealPageBreakTarget === 'function') {
+            /* Layout stable: scroll #editorArea onto the new sheet now. */
+            abeneRevealPageBreakTarget(breakCaret);
         }
     };
 
