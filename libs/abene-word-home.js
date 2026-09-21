@@ -4650,12 +4650,12 @@
     window.abeneDispatchShortcut = function (e) {
         if (document.body.classList.contains('abene-excel-mode')) return false;
         if (isTypingField(e.target)) return false;
+        if (!(e.ctrlKey || e.metaKey) || e.altKey) return false;
         var lang = localStorage.getItem('abeneLanguage') || 'pt-PT';
         var map = SHORTCUTS[lang] || SHORTCUTS['pt-PT'];
         var k = e.key.toLowerCase();
         if (e.key === 'Enter') {
             // Ctrl+Enter / Cmd+Enter only — never hijack plain Enter.
-            if (!(e.ctrlKey || e.metaKey) || e.altKey) return false;
             var edEl = ed();
             if (edEl && edEl.classList.contains('editing-header-footer')) return false;
             e.preventDefault();
@@ -4667,8 +4667,19 @@
             if (k === 'd') { e.preventDefault(); runExec('justifyRight'); return true; }
         }
         if (e.shiftKey) return false;
+        // Clipboard: never steal the keydown — browser native copy/cut/paste (+ our
+        // copy/paste event listeners) must run. execCommand after preventDefault fails.
+        if (k === 'c' || k === 'x' || k === 'v') return false;
+        // Ctrl/Cmd+A = Selecionar tudo (OS/Word standard), even when locale maps A to Abrir.
+        if (k === 'a') {
+            e.preventDefault();
+            e.stopPropagation();
+            return runShortcutAction('selectAll');
+        }
         var action = map[k];
         if (!action) return false;
+        // Locale may still map T→selectAll (pt/es); skip redundant clipboard actions.
+        if (action === 'copy' || action === 'cut' || action === 'paste') return false;
         e.preventDefault();
         e.stopPropagation();
         return runShortcutAction(action);
