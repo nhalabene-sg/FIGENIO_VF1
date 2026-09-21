@@ -960,12 +960,18 @@
         var anchorParagraph = parent.closest('p, h1, h2, h3, h4, h5, h6');
         var beforeNode = null;
         if (inPlace) {
-            beforeNode = inPlace.nextSibling;
+            /* Audit #4: modelo TOC is followed by data-abene-break="model", which
+               removeIndexBlocks also deletes. Anchoring on nextSibling then left
+               parentNode=null and appendChild sent the índice to the document end.
+               Pin a comment marker before the block so replace stays in place. */
+            var placeMarker = document.createComment('abene-index-anchor');
+            try {
+                if (inPlace.parentNode) inPlace.parentNode.insertBefore(placeMarker, inPlace);
+            } catch (eMark) { placeMarker = null; }
             removeIndexBlocks(editor, selector);
-            if (beforeNode && beforeNode.parentNode === editor) {
-                editor.insertBefore(inserted, beforeNode);
-            } else if (beforeNode && beforeNode.parentNode) {
-                beforeNode.parentNode.insertBefore(inserted, beforeNode);
+            if (placeMarker && placeMarker.parentNode) {
+                placeMarker.parentNode.insertBefore(inserted, placeMarker);
+                placeMarker.parentNode.removeChild(placeMarker);
             } else {
                 editor.appendChild(inserted);
             }
@@ -1006,7 +1012,16 @@
                     next.appendChild(tail.extractContents());
                     paragraph.after(inserted, next);
                     if (!String(paragraph.textContent || '').trim() && !paragraph.querySelector('img,video,canvas,svg')) paragraph.remove();
-                    if (!next.hasChildNodes()) next.innerHTML = '<br>';
+                    /* Audit #4: empty landing pad after caret-at-end insert can be
+                       pushed by page-flow onto an extra near-blank sheet (ghost page).
+                       Keep next only when the split carried real content. */
+                    var nextHasContent = !!(String(next.textContent || '').replace(/[\u200b\u00a0]/g, '').trim() ||
+                        (next.querySelector && next.querySelector('img, video, canvas, svg, table')));
+                    if (!nextHasContent) {
+                        if (next.parentNode) next.parentNode.removeChild(next);
+                    } else if (!next.hasChildNodes()) {
+                        next.innerHTML = '<br>';
+                    }
                 } catch (eSplit) {
                     paragraph.after(inserted);
                 }
