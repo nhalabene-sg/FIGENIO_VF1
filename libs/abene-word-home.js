@@ -2823,7 +2823,9 @@
     };
 
     /* Fix #3: after Ctrl+Enter / Quebra de pagina, caret + #editorArea follow
-       the new page once layout (abeneSchedulePageFlow / bookmarks) finishes. */
+       the new page once layout (abeneSchedulePageFlow / bookmarks) finishes.
+       Align the ENTIRE new page sheet to #editorArea (top), wait for layout,
+       fit sheets / phone sizer / zoom margin, then retry scroll after paint. */
     function abeneRevealPageBreakTarget(target) {
         function resolve() {
             if (target && target.isConnected) return target;
@@ -2845,43 +2847,209 @@
                 sel.addRange(r);
             } catch (errCaret) {}
         }
+        function stickyTopInset(area) {
+            var inset = 0;
+            if (!area) return 0;
+            try {
+                inset = Math.max(inset, parseFloat(window.getComputedStyle(area).paddingTop) || 0);
+            } catch (ePad) {}
+            try {
+                var a = area.getBoundingClientRect();
+                var nodes = document.querySelectorAll(
+                    '.ribbon, .menu-bar, .title-bar, .abene-phone-word-bar, .ruler-area, [data-abene-sticky]'
+                );
+                var i;
+                for (i = 0; i < nodes.length; i++) {
+                    var el = nodes[i];
+                    if (!el || el === area || (area.contains && area.contains(el))) continue;
+                    var st = window.getComputedStyle(el);
+                    var pos = st.position || '';
+                    if (pos !== 'sticky' && pos !== 'fixed') continue;
+                    if (st.display === 'none' || st.visibility === 'hidden') continue;
+                    var r = el.getBoundingClientRect();
+                    if (r.height < 4 || r.width < 4) continue;
+                    /* Only count bars that visually intrude into the editor viewport top. */
+                    if (r.bottom <= a.top + 1 || r.top >= a.top + 96) continue;
+                    if (r.right < a.left + 8 || r.left > a.right - 8) continue;
+                    inset = Math.max(inset, Math.ceil(r.bottom - a.top));
+                }
+            } catch (eSticky) {}
+            return inset;
+        }
+        function pageIndexFor(el, editor, ph) {
+            if (!el || !editor) return 0;
+            try {
+                var yCss = yInEditor(el, editor);
+                return Math.max(0, Math.floor((yCss + 1) / Math.max(1, ph)));
+            } catch (eY) {
+                return 0;
+            }
+        }
+        function sheetTopView(el, editor, pageIndex, ph, scaleY) {
+            /* Prefer page chrome header for that page, else preceding flow spacer bottom, else math. */
+            try {
+                var chrome = document.getElementById('pageChrome');
+                if (chrome) {
+                    var zone = chrome.querySelector('.page-header-zone[data-page="' + (pageIndex + 1) + '"]');
+                    if (zone && zone.isConnected) return zone.getBoundingClientRect().top;
+                    var gap = chrome.querySelector('.page-gap-band[data-page="' + pageIndex + '"]');
+                    if (gap && gap.isConnected) return gap.getBoundingClientRect().bottom;
+                }
+            } catch (eChrome) {}
+            try {
+                if (el && el.isConnected) {
+                    var prev = el.previousElementSibling;
+                    while (prev && prev.classList && prev.classList.contains('abene-page-flow')) {
+                        return prev.getBoundingClientRect().bottom;
+                    }
+                    /* Walk up to editor child then look for preceding flow. */
+                    var host = el;
+                    while (host && host.parentNode && host.parentNode !== editor) host = host.parentNode;
+                    if (host && host.parentNode === editor) {
+                        prev = host.previousElementSibling;
+                        while (prev) {
+                            if (prev.classList && prev.classList.contains('abene-page-flow')) {
+                                return prev.getBoundingClientRect().bottom;
+                            }
+                            if (prev.classList && prev.classList.contains('page-break-marker')) {
+                                prev = prev.previousElementSibling;
+                                continue;
+                            }
+                            break;
+                        }
+                    }
+                }
+            } catch (eFlow) {}
+            var er = editor ? editor.getBoundingClientRect() : null;
+            if (er) return er.top + (pageIndex * ph) * scaleY;
+            return el.getBoundingClientRect().top;
+        }
+        function ensureSheetRoom(editor, pageIndex, ph) {
+            if (!editor) return;
+            try {
+                if (typeof window.abeneFitEditorSheets === 'function') {
+                    window.abeneFitEditorSheets(editor);
+                }
+            } catch (eFit) {}
+            try {
+                var needPages = Math.max(1, pageIndex + 1);
+                var minH = needPages * Math.max(1, ph);
+                var cur = parseFloat(editor.style.minHeight) || 0;
+                if (cur < minH) editor.style.minHeight = minH + 'px';
+                /* Keep scrollHeight from clipping the last sheet under zoom/phone sizer. */
+                if ((editor.scrollHeight || 0) < minH) {
+                    editor.style.minHeight = (minH + 8) + 'px';
+                }
+            } catch (eMin) {}
+            try {
+                if (typeof window.abeneSyncZoomLayout === 'function') window.abeneSyncZoomLayout();
+            } catch (eZ) {}
+            try {
+                if (typeof window.abeneLayoutPhoneZoom === 'function') window.abeneLayoutPhoneZoom();
+            } catch (eP) {}
+        }
         function scrollReveal(el) {
             if (!el || !el.isConnected) return;
             var area = document.getElementById('editorArea');
-            if (area) {
+            var editor = ed();
+            if (!area) {
                 try {
-                    var a = area.getBoundingClientRect();
-                    var b = el.getBoundingClientRect();
-                    var mid = b.top + (b.height ? b.height / 2 : 0);
-                    /* Phone: keep target in the visible viewport above the virtual keyboard */
-                    var viewH = area.clientHeight;
-                    try {
-                        if (document.body.classList.contains('abene-phone') && window.visualViewport) {
-                            var vv = window.visualViewport;
-                            viewH = Math.max(80, Math.min(viewH, (vv.offsetTop + vv.height) - a.top - 8));
-                        }
-                    } catch (eVvPhone) {}
-                    var viewMid = a.top + viewH / 2;
-                    var delta = mid - viewMid;
-                    if (Math.abs(delta) > 4) {
-                        area.scrollTop = Math.max(0, area.scrollTop + delta);
-                    }
-                    var ph = pageH();
-                    var z = 1;
-                    try { z = ((window.abene && window.abene.currentZoom) || 100) / 100; } catch (eZ) { z = 1; }
-                    if (!isFinite(z) || z <= 0) z = 1;
-                    var cur = document.getElementById('pageNum');
-                    if (cur) {
-                        var page = Math.max(1, Math.floor(area.scrollTop / Math.max(1, ph * z)) + 1);
-                        var totEl = document.getElementById('totalPages');
-                        var pages = totEl ? (parseInt(totEl.textContent, 10) || page) : page;
-                        cur.textContent = String(Math.min(pages, page));
-                    }
-                    return;
-                } catch (errScroll) {}
+                    if (el.scrollIntoView) el.scrollIntoView({ block: 'start', inline: 'nearest' });
+                } catch (errView0) {}
+                return;
             }
             try {
-                if (el.scrollIntoView) el.scrollIntoView({ block: 'center', inline: 'nearest' });
+                var ph = pageH();
+                var z = 1;
+                try { z = ((window.abene && window.abene.currentZoom) || 100) / 100; } catch (eZ0) { z = 1; }
+                if (!isFinite(z) || z <= 0) z = 1;
+
+                var pageIndex = pageIndexFor(el, editor, ph);
+                ensureSheetRoom(editor, pageIndex, ph);
+
+                var er = editor ? editor.getBoundingClientRect() : null;
+                var scaleY = (er && er.height && editor && editor.offsetHeight)
+                    ? (er.height / editor.offsetHeight)
+                    : z;
+                if (!isFinite(scaleY) || scaleY <= 0) scaleY = z;
+
+                var a = area.getBoundingClientRect();
+                var viewH = area.clientHeight;
+                try {
+                    if (document.body.classList.contains('abene-phone') && window.visualViewport) {
+                        var vv = window.visualViewport;
+                        viewH = Math.max(80, Math.min(viewH, (vv.offsetTop + vv.height) - a.top - 8));
+                    }
+                } catch (eVvPhone) {}
+
+                var inset = stickyTopInset(area);
+                var alignTop = a.top + inset;
+                var pageHView = Math.max(1, ph * scaleY);
+
+                function applyAlign() {
+                    a = area.getBoundingClientRect();
+                    inset = stickyTopInset(area);
+                    alignTop = a.top + inset;
+                    er = editor ? editor.getBoundingClientRect() : er;
+                    scaleY = (er && er.height && editor && editor.offsetHeight)
+                        ? (er.height / editor.offsetHeight)
+                        : scaleY;
+                    if (!isFinite(scaleY) || scaleY <= 0) scaleY = z;
+                    pageHView = Math.max(1, ph * scaleY);
+                    var topView = sheetTopView(el, editor, pageIndex, ph, scaleY);
+                    var delta = topView - alignTop;
+                    /* Visual delta maps 1:1 to scrollTop (phone sizer + zoom marginBottom). */
+                    if (Math.abs(delta) > 2) {
+                        area.scrollTop = Math.max(0, area.scrollTop + delta);
+                    }
+                    /* If the viewport can fit a full sheet, keep the whole page in view. */
+                    a = area.getBoundingClientRect();
+                    inset = stickyTopInset(area);
+                    alignTop = a.top + inset;
+                    topView = sheetTopView(el, editor, pageIndex, ph, scaleY);
+                    var bottomView = topView + pageHView;
+                    var viewBottom = a.top + Math.min(viewH, area.clientHeight) - 4;
+                    if (viewH + 4 >= pageHView) {
+                        if (bottomView > viewBottom + 2) {
+                            area.scrollTop = Math.max(0, area.scrollTop + (bottomView - viewBottom));
+                            /* Re-pin top after bottom correction when possible. */
+                            topView = sheetTopView(el, editor, pageIndex, ph, scaleY);
+                            if (topView < alignTop - 2) {
+                                area.scrollTop = Math.max(0, area.scrollTop + (topView - alignTop));
+                            }
+                        } else if (Math.abs(topView - alignTop) > 2) {
+                            area.scrollTop = Math.max(0, area.scrollTop + (topView - alignTop));
+                        }
+                    } else {
+                        /* Short viewport: keep page top (and caret) near the visible top. */
+                        var b = el.getBoundingClientRect();
+                        var topPad = inset + 6;
+                        if (b.top < a.top + topPad - 2 || b.top > a.top + Math.min(viewH * 0.35, 140)) {
+                            var deltaCaret = b.top - (a.top + topPad);
+                            if (Math.abs(deltaCaret) > 2) {
+                                area.scrollTop = Math.max(0, area.scrollTop + deltaCaret);
+                            }
+                        }
+                    }
+                }
+
+                applyAlign();
+                applyAlign();
+
+                var cur = document.getElementById('pageNum');
+                if (cur) {
+                    var page = Math.max(1, pageIndex + 1);
+                    try {
+                        page = Math.max(1, Math.floor(area.scrollTop / Math.max(1, ph * z)) + 1);
+                    } catch (ePg) {}
+                    var totEl = document.getElementById('totalPages');
+                    var pages = totEl ? (parseInt(totEl.textContent, 10) || page) : page;
+                    cur.textContent = String(Math.min(pages, Math.max(page, pageIndex + 1)));
+                }
+                return;
+            } catch (errScroll) {}
+            try {
+                if (el.scrollIntoView) el.scrollIntoView({ block: 'start', inline: 'nearest' });
             } catch (errView) {}
         }
         function run() {
@@ -2899,15 +3067,54 @@
             }
         }
         var tries = 0;
+        var maxTries = 36;
         function attempt() {
             tries += 1;
-            if (window._abeneLayingOut && tries < 25) {
-                setTimeout(attempt, 40);
+            if (window._abeneLayingOut && tries < maxTries) {
+                setTimeout(attempt, 50);
                 return;
             }
+            var editor = ed();
+            try {
+                if (editor && typeof window.abeneFitEditorSheets === 'function') {
+                    window.abeneFitEditorSheets(editor);
+                }
+            } catch (eFit2) {}
+            try {
+                if (typeof window.abeneSyncZoomLayout === 'function') window.abeneSyncZoomLayout();
+            } catch (eZ2) {}
+            try {
+                if (typeof window.abeneLayoutPhoneZoom === 'function') window.abeneLayoutPhoneZoom();
+            } catch (eP2) {}
             var ok = run();
-            if (!ok && tries < 25) {
-                setTimeout(attempt, 40);
+            if (!ok && tries < maxTries) {
+                setTimeout(attempt, 50);
+                return;
+            }
+            /* Post-paint retries so the full new sheet stays in view after chrome/sizer. */
+            if (ok) {
+                var delays = [50, 100, 150];
+                var di = 0;
+                function retryPaint() {
+                    if (di >= delays.length) {
+                        clearMark();
+                        return;
+                    }
+                    var wait = delays[di++];
+                    setTimeout(function () {
+                        if (window._abeneLayingOut && tries < maxTries) {
+                            attempt();
+                            return;
+                        }
+                        var el2 = resolve();
+                        if (el2) {
+                            placeCaret(el2);
+                            scrollReveal(el2);
+                        }
+                        retryPaint();
+                    }, wait);
+                }
+                retryPaint();
                 return;
             }
             clearMark();
