@@ -7,6 +7,7 @@
    Commercial DOCX (additive): letterhead brand+title, dual goldbar,
    parties boxes, totals (grand navy), signatures/stamp, condições notes.
    PDF (html2pdf / paged capture) path is intentionally untouched.
+   Audit #6 (2026-09-21): rasterize clamp = content width (not 54px); DOCX left += pageGutter.
    Remaining DOCX limits: absolute float z-order, complex nested HTML in cells,
    full CSS layout, watermarks, and pixel-perfect commercial chrome. */
 (function (root) {
@@ -15,6 +16,25 @@
     try {
         if (root.localStorage && root.localStorage.getItem('abeneExportEngine') === '0') useEngine = false;
     } catch (e0) {}
+
+    var _docxImgSkipCount = 0;
+
+    function resetDocxImgSkips() { _docxImgSkipCount = 0; }
+
+    function noteDocxImgSkip() {
+        _docxImgSkipCount = (_docxImgSkipCount || 0) + 1;
+    }
+
+    function countDocxImgSkips(rootEl) {
+        var n = _docxImgSkipCount || 0;
+        try {
+            if (rootEl && rootEl.querySelectorAll) {
+                var marked = rootEl.querySelectorAll('[data-abene-docx-img="skipped"]');
+                if (marked && marked.length > n) n = marked.length;
+            }
+        } catch (eC) {}
+        return n;
+    }
 
     function A() { return root.abene || {}; }
     function ed() { return (A().editor) || document.getElementById('editor'); }
@@ -59,6 +79,12 @@
             bottom: pg.marginBottom != null ? pg.marginBottom : ((a.pageMargins && a.pageMargins.bottom) || 96),
             left: pg.marginLeft != null ? pg.marginLeft : ((a.pageMargins && a.pageMargins.left) || 96)
         };
+        /* Match on-screen left pad: margins.left + pageGutter (Modelo / duplex). */
+        try {
+            var gut = Number(a.pageGutter);
+            if (!isFinite(gut) || gut < 0) gut = 0;
+            if (gut) m.left = (Number(m.left) || 0) + gut;
+        } catch (eGut) {}
         var dpi = pg.dpi || 96;
         var pxToTwip = function (px) { return Math.round((Number(px) || 0) * 1440 / dpi); };
         return {
@@ -279,8 +305,10 @@
     function markImageCorsSkip(img, reason) {
         if (!img || !img.setAttribute) return;
         try {
+            var already = img.getAttribute && img.getAttribute('data-abene-docx-img') === 'skipped';
             img.setAttribute('data-abene-docx-img', 'skipped');
             if (reason) img.setAttribute('data-abene-docx-img-reason', String(reason).slice(0, 80));
+            if (!already) noteDocxImgSkip();
         } catch (e0) {}
     }
 
@@ -296,10 +324,16 @@
                     var boxH = img.offsetHeight || parseFloat(img.getAttribute('height')) || 0;
                     if (boxW < 4) boxW = el.naturalWidth || 54;
                     if (boxH < 4) boxH = el.naturalHeight || 54;
-                    if (boxW > 800) {
-                        var ratio = boxH / boxW;
-                        boxW = 54;
-                        boxH = Math.max(1, Math.round(54 * ratio));
+                    /* Cap to page content width — never crush to logo-sized 54px (audit #6). */
+                    var maxW = 700;
+                    try {
+                        var gCap = geo();
+                        maxW = Math.max(200, (gCap.w || 794) - (gCap.margins.left || 96) - (gCap.margins.right || 96));
+                    } catch (eCap) {}
+                    if (boxW > maxW) {
+                        var ratio = boxH / Math.max(1, boxW);
+                        boxW = maxW;
+                        boxH = Math.max(1, Math.round(maxW * ratio));
                     }
                     var url = canvasFromImage(el);
                     if (url && url.indexOf('data:image/png') === 0) {
@@ -1398,7 +1432,7 @@
         return ctx.Packer.toBlob(new ctx.Document({ sections: sections }));
     }
 
-    function notifyDocxLimitsOnce() {
+        function notifyDocxLimitsOnce(opts) {
         if (root._abeneDocxLimitToast) return;
         root._abeneDocxLimitToast = true;
         try {
@@ -1407,15 +1441,24 @@
             var commercial = !!(editor && editor.querySelector && editor.querySelector(
                 '.gr-letterhead, .devis-container, .receipt-container, [data-abene-block="devis"], [data-abene-block="receipt"]'
             ));
-            if (commercial) {
-                root.showToast('DOCX comercial : cabeçalho, partes, totais e assinaturas mapeados; alguns detalhes CSS (flex exacto / carimbo pixel) podem diferir. PDF permanece a via de alta fidelidade.');
+            var skipped = 0;
+            try {
+                skipped = (opts && opts.skippedImages != null)
+                    ? Number(opts.skippedImages) || 0
+                    : countDocxImgSkips(editor);
+            } catch (eS) { skipped = _docxImgSkipCount || 0; }
+            var msg;
+            if (skipped > 0) {
+                msg = 'DOCX parcial: ' + skipped + ' imagem(ns) omitida(s) (CORS / falha de carga). O resto do documento foi exportado; use PDF para fidelidade visual completa.';
+            } else if (commercial) {
+                msg = 'DOCX comercial: cabeçalho, partes, totais e assinaturas mapeados; alguns detalhes CSS (flex exacto / carimbo pixel) podem diferir. PDF permanece a via de alta fidelidade.';
             } else {
-                root.showToast('DOCX approximatif : mises en page complexes / flottants / CSS avancé peuvent différer. PDF reste fidèle à l’écran.');
+                msg = 'DOCX aproximado: layouts complexos / flutuantes / CSS avançado podem diferir. PDF permanece fiel ao ecrã.';
             }
+            root.showToast(msg);
         } catch (eT) {}
     }
-
-    function pdfOptions(g, filename) {
+function pdfOptions(g, filename) {
         return {
             margin: 0,
             filename: filename,
@@ -1964,6 +2007,8 @@
             wrapImageRun();
             wrapPushBlock();
             prepare();
+            resetDocxImgSkips();
+            root._abeneDocxLimitToast = false;
             var box = document.createElement('div');
             box.innerHTML = bodyHtml();
             if (typeof flattenExportDom === 'function') flattenExportDom(box);
@@ -1980,12 +2025,12 @@
             root.abeneGetCleanHtml = function () { return html; };
             try {
                 var blob = await origFn.apply(this, arguments);
-                notifyDocxLimitsOnce();
+                notifyDocxLimitsOnce({ skippedImages: countDocxImgSkips(null) });
                 return blob;
             } catch (e) {
                 root.abeneGetCleanHtml = origClean;
                 var blob2 = await origFn.apply(this, arguments);
-                notifyDocxLimitsOnce();
+                notifyDocxLimitsOnce({ skippedImages: countDocxImgSkips(null) });
                 return blob2;
             } finally {
                 root.abeneGetCleanHtml = origClean;
