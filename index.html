@@ -1574,6 +1574,165 @@
             pointer-events: auto;
         }
 
+        #genericModalContent.abene-arquivo-guide-modal {
+            width: min(980px, calc(100vw - 32px));
+            max-width: 980px;
+            height: min(88vh, 900px);
+            max-height: 88vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        #genericModalContent.abene-arquivo-guide-modal .modal-body {
+            flex: 1 1 auto;
+            min-height: 0;
+            overflow-y: auto;
+            padding: 0;
+        }
+
+        .abene-arquivo-guide {
+            color: #1f2937;
+            line-height: 1.55;
+        }
+
+        .abene-arquivo-guide-toolbar {
+            position: sticky;
+            top: 0;
+            z-index: 2;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 12px 20px;
+            background: #eef2f7;
+            border-bottom: 1px solid #cbd5e1;
+        }
+
+        .abene-arquivo-guide-toolbar label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        .abene-arquivo-guide-toolbar select {
+            min-height: 38px;
+            border: 1px solid #94a3b8;
+            border-radius: 4px;
+            background: #fff;
+            padding: 6px 10px;
+            font: inherit;
+        }
+
+        .abene-arquivo-guide-content {
+            padding: 18px 22px 28px;
+        }
+
+        .abene-arquivo-guide-intro,
+        .abene-arquivo-guide-warning {
+            margin: 0 0 16px;
+            padding: 12px 14px;
+            border-left: 4px solid #2b579a;
+            background: #eff6ff;
+            border-radius: 3px;
+        }
+
+        .abene-arquivo-guide-warning {
+            border-left-color: #c9a84c;
+            background: #fff8e8;
+        }
+
+        .abene-arquivo-guide section {
+            margin: 0 0 20px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        .abene-arquivo-guide section:last-child {
+            border-bottom: 0;
+        }
+
+        .abene-arquivo-guide h4 {
+            margin: 0 0 9px;
+            color: #0b1223;
+            font-size: 16px;
+        }
+
+        .abene-arquivo-guide h5 {
+            margin: 14px 0 6px;
+            color: #2b579a;
+            font-size: 14px;
+        }
+
+        .abene-arquivo-guide p,
+        .abene-arquivo-guide ol,
+        .abene-arquivo-guide ul {
+            margin-top: 7px;
+            margin-bottom: 9px;
+        }
+
+        .abene-arquivo-guide li {
+            margin-bottom: 5px;
+        }
+
+        .abene-arquivo-guide code {
+            border: 1px solid #d8dee9;
+            border-radius: 3px;
+            background: #f8fafc;
+            color: #0b1223;
+            padding: 1px 4px;
+            font-family: Consolas, "SFMono-Regular", monospace;
+            font-size: .94em;
+        }
+
+        body.dark-mode .abene-arquivo-guide {
+            color: #e5e7eb;
+        }
+
+        body.dark-mode .abene-arquivo-guide-toolbar,
+        body.dark-mode .abene-arquivo-guide-intro,
+        body.dark-mode .abene-arquivo-guide-warning {
+            background: #1f2937;
+            color: #e5e7eb;
+        }
+
+        body.dark-mode .abene-arquivo-guide section {
+            border-bottom-color: #475569;
+        }
+
+        body.dark-mode .abene-arquivo-guide h4,
+        body.dark-mode .abene-arquivo-guide h5 {
+            color: #f8fafc;
+        }
+
+        body.dark-mode .abene-arquivo-guide code {
+            border-color: #475569;
+            background: #111827;
+            color: #f8fafc;
+        }
+
+        @media (max-width: 640px) {
+            #genericModalContent.abene-arquivo-guide-modal {
+                width: calc(100vw - 16px);
+                min-width: 0;
+                height: calc(100vh - 24px);
+                max-height: calc(100vh - 24px);
+            }
+            .abene-arquivo-guide-toolbar {
+                align-items: stretch;
+                flex-direction: column;
+                padding: 10px 12px;
+            }
+            .abene-arquivo-guide-toolbar label {
+                justify-content: space-between;
+            }
+            .abene-arquivo-guide-content {
+                padding: 14px 14px 24px;
+            }
+        }
+
         .modal-header {
             padding: 15px 20px;
             border-bottom: 1px solid #e0e0e0;
@@ -4414,7 +4573,7 @@
             .paper-preview-toolbar { flex-wrap: wrap; }
             #arqOverlay { padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right); }
             /* Fix #7 — Arquivo mobile: keep chrome usable, content reachable */
-            body.abene-arq-open { overscroll-behavior: none; }
+            body.abene-arq-open { overflow: hidden !important; overscroll-behavior: none; }
             body.abene-phone #arqOverlay.open {
                 height: 100dvh;
                 max-height: 100dvh;
@@ -4615,368 +4774,6 @@
                 max-height: 44px;
                 padding-bottom: max(2px, env(safe-area-inset-bottom, 0px));
             }
-        }
-
-        /* Excel workspace */
-        #excelWorkspace {
-            display: none;
-            flex: 1 1 0;
-            flex-direction: column;
-            min-width: 0;
-            min-height: 0;
-            overflow: hidden;
-            background: #fff;
-            border: 1px solid #c6c6c6;
-        }
-        body.abene-excel-mode #pageContainer,
-        body.abene-excel-mode #rulerArea { display: none !important; }
-        body.abene-excel-mode #excelWorkspace { display: flex; }
-        body.abene-excel-mode .ribbon {
-            height: auto;
-            min-height: 95px;
-            max-height: 168px;
-        }
-        #tab-excel.ribbon-content {
-            align-items: stretch;
-            overflow-y: auto;
-        }
-        #tab-excel .ribbon-group-content {
-            flex-wrap: wrap;
-            align-content: center;
-            gap: 4px 8px;
-        }
-        #tab-excel .btn-col { justify-content: center; }
-        body.abene-excel-mode .main-area {
-            min-height: 0;
-            overflow: hidden;
-        }
-        body.abene-excel-mode .editor-area {
-            padding: 0;
-            background: #e6e6e6;
-            justify-content: stretch;
-            flex-direction: column;
-            align-items: stretch;
-            overflow: hidden;
-            min-height: 0;
-            display: flex;
-        }
-        body.abene-excel-mode #excelWorkspace {
-            display: flex;
-            flex-direction: column;
-            flex: 1 1 0;
-            min-height: 0;
-            width: 100%;
-            height: auto;
-            max-height: 100%;
-            overflow: hidden;
-        }
-        body.abene-excel-mode #abenePhoneSizer {
-            display: none !important;
-            height: 0 !important;
-            width: 0 !important;
-            min-height: 0 !important;
-            flex: 0 0 0 !important;
-            overflow: hidden !important;
-            pointer-events: none !important;
-        }
-        body.abene-excel-hidden [data-tab="excel"],
-        body.abene-excel-hidden #tab-excel,
-        body.abene-excel-hidden .abene-excel-only,
-        body.abene-excel-hidden #excelWorkspace,
-        body.abene-excel-hidden #excelStatusAgg {
-            display: none !important;
-        }
-        .excel-formula-row {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            padding: 4px 8px;
-            background: #f3f2f1;
-            border-bottom: 1px solid #c8c6c4;
-            flex-shrink: 0;
-        }
-        .excel-formula-row .fx {
-            font-weight: 700; font-style: italic; font-family: Georgia, 'Times New Roman', serif;
-            color: #2b579a; padding: 0 8px; height: 26px; border: 1px solid #c8c6c4;
-            background: #fff; border-radius: 3px; cursor: pointer; flex-shrink: 0;
-        }
-        .excel-formula-row .fx:hover { background: #e6f0fa; }
-        .xl-fn-lib .ribbon-btn { min-width: 68px; max-width: 92px; }
-        .ribbon-btn .icon.xl-fn-ico { height: 30px; font-size: inherit; }
-        .xl-fn-ico {
-            width: 28px; height: 30px; border-radius: 2px 7px 7px 2px;
-            display: flex; align-items: center; justify-content: center;
-            color: #fff; font-weight: 800; font-size: 13px; line-height: 1;
-            box-shadow: inset -4px 0 0 rgba(0,0,0,.14), 1px 1px 2px rgba(0,0,0,.16);
-            margin: 0 auto 2px;
-        }
-        .xl-fn-ico.fx { background: linear-gradient(180deg, #5b9bd5, #2b579a); font-style: italic; font-family: Georgia, serif; border-radius: 4px; box-shadow: 1px 1px 2px rgba(0,0,0,.16); }
-        .xl-fn-ico.sum { background: linear-gradient(180deg, #43a047, #2e7d32); border-radius: 4px; font-size: 16px; }
-        .xl-fn-ico.rec { background: #1976d2; }
-        .xl-fn-ico.fin { background: #2e7d32; }
-        .xl-fn-ico.log { background: #6a1b9a; }
-        .xl-fn-ico.txt { background: #f9a825; color: #3e2723; }
-        .xl-fn-ico.dt { background: #c62828; font-size: 12px; }
-        .xl-fn-ico.look { background: #1565c0; font-size: 12px; }
-        .xl-fn-ico.math { background: #00897b; }
-        .xl-fn-ico.more { background: #ef6c00; }
-        .xl-autosum-split { flex-direction: row; align-items: stretch; gap: 0; }
-        .xl-autosum-split .ribbon-btn { border-top-right-radius: 0; border-bottom-right-radius: 0; }
-        .xl-split-arrow {
-            min-width: 18px; width: 18px; padding: 0; align-self: stretch;
-            border-top-left-radius: 0; border-bottom-left-radius: 0; border-left: 0;
-        }
-        .ribbon-flyout.xl-fn-fly { min-width: 220px; max-height: min(70vh, 420px); overflow: auto; }
-        .ribbon-flyout .xl-fn-head { font-weight: 700; color: #2b579a; font-size: 11px; cursor: default; }
-        .ribbon-flyout .xl-fn-en { float: right; color: #888; font-size: 10px; margin-left: 12px; }
-        .xl-fn-dlg .xl-fn-list {
-            max-height: 220px; overflow: auto; border: 1px solid #c8c6c4; background: #fff; margin: 6px 0;
-        }
-        .xl-fn-list button {
-            display: block; width: 100%; text-align: left; border: 0; background: #fff;
-            padding: 6px 8px; font-size: 12px; cursor: pointer;
-        }
-        .xl-fn-list button:hover, .xl-fn-list button.on { background: #cfe4f7; }
-        .xl-fn-syntax { font-family: Consolas, 'Courier New', monospace; font-size: 12px; color: #2b579a; margin-top: 8px; }
-        .xl-fn-desc { font-size: 12px; color: #555; margin-top: 4px; line-height: 1.4; }
-        .xl-fx-btn {
-            width: 28px; height: 26px; border: 1px solid #c8c6c4; background: #fff;
-            border-radius: 3px; cursor: pointer; font-size: 13px; flex-shrink: 0;
-        }
-        .xl-fx-btn:hover { background: #e6f0fa; }
-        #excelNameBox { width: 88px; height: 26px; border: 1px solid #c8c6c4; padding: 0 6px; font-size: 12px; }
-        #excelFormula { flex: 1; height: 26px; border: 1px solid #c8c6c4; padding: 0 8px; font-size: 13px; }
-        #excelBookName { font-size: 12px; color: #666; padding-right: 8px; white-space: nowrap; }
-        #excelZoomLbl { font-size: 11px; color: #666; min-width: 36px; }
-        #excelGrid { flex: 1 1 0; overflow: auto; background: #fff; position: relative; min-height: 0; min-width: 0; }
-        .excel-scroll { font-family: Calibri, 'Segoe UI', sans-serif; font-size: 12px; }
-        .excel-corner {
-            position: absolute; left: 0; top: 0; z-index: 6;
-            background: #f3f2f1; border: 1px solid #d0d0d0; box-sizing: border-box;
-        }
-        .xl-colh, .xl-rowh {
-            position: absolute; background: #f3f2f1; border: 1px solid #d0d0d0;
-            box-sizing: border-box; text-align: center; line-height: 20px; color: #616161; font-weight: 600;
-            user-select: none; z-index: 4;
-        }
-        .xl-colh { z-index: 5; }
-        .xl-colh.on, .xl-rowh.on { background: #d0e3f7; }
-        .xl-resz-c, .xl-resz-r {
-            position: absolute; background: transparent;
-        }
-        .xl-resz-c { right: 0; top: 0; width: 6px; height: 100%; cursor: col-resize; }
-        .xl-resz-r { left: 0; bottom: 0; height: 6px; width: 100%; cursor: row-resize; }
-        .xl-cell {
-            position: absolute; box-sizing: border-box; border: 1px solid #d0d0d0;
-            padding: 0 4px; overflow: hidden; white-space: nowrap; cursor: cell;
-            display: flex; align-items: center; background: #fff;
-        }
-        .xl-cell.on { background: #c5ddf6; }
-        .xl-cell.active { outline: 2px solid #2b579a; outline-offset: -2px; background: #fff; z-index: 2; }
-        .xl-cell.b { font-weight: 700; }
-        .xl-cell.i { font-style: italic; }
-        .xl-cell.u { text-decoration: underline; }
-        .xl-cell.wrap { white-space: normal; align-items: flex-start; }
-        .xl-handle {
-            position: absolute; width: 7px; height: 7px; background: #2b579a; z-index: 7; cursor: crosshair;
-        }
-        .xl-inedit {
-            position: absolute; z-index: 8; border: 2px solid #2b579a; font: 12px Calibri, sans-serif; padding: 0 4px;
-        }
-        .xl-fbtn { position: absolute; right: 0; top: 0; border: 0; background: transparent; cursor: pointer; font-size: 10px; }
-        .xl-note { position: absolute; top: 0; right: 0; color: #c00; font-size: 9px; }
-        .xl-chart {
-            position: absolute; background: #fff; border: 1px solid #8a8a8a; box-shadow: 0 2px 8px rgba(0,0,0,.15);
-            z-index: 5; resize: both; overflow: hidden;
-        }
-        .xl-chart-bar { display: flex; justify-content: space-between; padding: 2px 6px; background: #f3f2f1; font-size: 11px; cursor: move; }
-        .xl-ctx button { display: block; width: 100%; text-align: left; padding: 6px 8px; border: 0; background: #fff; cursor: pointer; }
-        .xl-ctx button:hover { background: #e6f0fa; }
-        .excel-sheets {
-            display: flex;
-            align-items: stretch;
-            gap: 2px;
-            padding: 0 4px 0 8px;
-            background: #f3f2f1;
-            border-top: 1px solid #c8c6c4;
-            overflow-x: auto;
-            overflow-y: hidden;
-            flex: 0 0 32px;
-            min-height: 32px;
-            max-height: 32px;
-            width: 100%;
-            z-index: 40;
-            position: relative;
-            scrollbar-width: thin;
-            scrollbar-color: #8a96a6 #e2e5e9;
-            -webkit-overflow-scrolling: touch;
-            touch-action: pan-x;
-            overscroll-behavior-x: contain;
-        }
-        .excel-sheets::-webkit-scrollbar { height: 7px; }
-        .excel-sheets::-webkit-scrollbar-track { background: #e2e5e9; }
-        .excel-sheets::-webkit-scrollbar-thumb { background: #7c8999; border-radius: 6px; }
-        .excel-sheet-scroll {
-            position: sticky;
-            z-index: 5;
-            flex: 0 0 34px;
-            min-width: 34px;
-            height: 28px;
-            margin-top: 4px;
-            border: 1px solid #aeb6c0;
-            background: #f8f9fb;
-            color: #243247;
-            font-size: 22px;
-            line-height: 1;
-            cursor: pointer;
-            touch-action: manipulation;
-        }
-        .excel-sheet-scroll.prev { left: 0; border-radius: 4px 0 0 4px; }
-        .excel-sheet-scroll.next { right: 0; border-radius: 0 4px 4px 0; }
-        .excel-sht {
-            border: 1px solid #c8c6c4;
-            border-bottom: none;
-            background: #eaeaea;
-            padding: 0 14px;
-            font-size: 12px;
-            cursor: pointer;
-            flex-shrink: 0;
-            height: 28px;
-            margin-top: 4px;
-            border-radius: 3px 3px 0 0;
-            white-space: nowrap;
-            max-width: 160px;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-        .excel-sht.on { background: #fff; font-weight: 700; color: #2b579a; box-shadow: 0 -1px 0 #fff; }
-        .excel-sht.add {
-            min-width: 28px;
-            width: 28px;
-            padding: 0;
-            font-weight: 700;
-            margin-left: 4px;
-            position: relative;
-            z-index: 2;
-            background: #f3f2f1;
-            max-width: none;
-        }
-        .xl-task-form .form-group { margin-bottom: 10px; }
-        .xl-task-form label { display: block; font-size: 12px; margin-bottom: 4px; }
-        .xl-task-form input[type="text"],
-        .xl-task-form input[type="number"],
-        .xl-task-form select,
-        .xl-task-form textarea {
-            width: 100%;
-            box-sizing: border-box;
-            min-height: 36px;
-            padding: 6px 8px;
-            border: 1px solid #c8c6c4;
-            border-radius: 4px;
-        }
-        .xl-task-list { display: flex; flex-direction: column; gap: 6px; }
-        .xl-task-list .btn-secondary { width: 100%; text-align: left; min-height: 40px; }
-        .xl-paste-bar {
-            position: absolute;
-            z-index: 12;
-            display: flex;
-            gap: 2px;
-            background: #fff;
-            border: 1px solid #8a8a8a;
-            box-shadow: 0 2px 8px rgba(0,0,0,.18);
-            padding: 4px;
-            border-radius: 4px;
-        }
-        .xl-paste-bar button {
-            min-width: 36px;
-            min-height: 32px;
-            border: 1px solid transparent;
-            background: #fff;
-            cursor: pointer;
-            font-size: 12px;
-            border-radius: 3px;
-        }
-        .xl-paste-bar button:hover,
-        .xl-paste-bar button.on { background: #e6f0fa; border-color: #2b579a; }
-        .xl-filter-list label { display: flex; align-items: center; gap: 8px; min-height: 36px; }
-        #excelStatusAgg { font-size: 11px; color: #e8e8e8; margin-left: 12px; }
-
-        /* Les règles Excel sont déclarées tard : réappliquer ici les dimensions tactiles. */
-        @media screen and (max-width: 820px), screen and (max-width: 960px) and (pointer: coarse), screen and (max-width: 960px) and (max-height: 480px) and (orientation: landscape) {
-            body.abene-excel-mode .ribbon {
-                overflow: hidden;
-            }
-            body.abene-excel-mode #tab-excel {
-                height: 100%;
-                overflow-x: auto;
-                overflow-y: auto;
-            }
-            .excel-formula-row {
-                flex-wrap: wrap;
-                gap: 6px 8px;
-                padding: 6px 8px;
-            }
-            #excelBookName {
-                max-width: 42vw;
-                overflow: hidden;
-                text-overflow: ellipsis;
-            }
-            #excelNameBox,
-            #excelFormula {
-                min-height: 40px;
-                height: 40px;
-                font-size: 16px;
-            }
-            #excelFormula { flex: 1 1 100%; min-width: 0; }
-            .excel-formula-row .ribbon-btn-sm,
-            .excel-formula-row .xl-fx-btn,
-            .excel-formula-row .fx {
-                min-width: 40px;
-                min-height: 40px;
-                height: 40px;
-            }
-            #excelGrid {
-                -webkit-overflow-scrolling: touch;
-                touch-action: pan-x pan-y;
-            }
-            .xl-handle { width: 16px; height: 16px; }
-            .excel-sheets {
-                flex: 0 0 44px;
-                min-height: 44px;
-                max-height: 44px;
-                padding: 0 4px 0 8px;
-            }
-            .excel-sht,
-            .excel-sht.add {
-                min-height: 40px;
-                height: 40px;
-                margin-top: 4px;
-                padding: 0 14px;
-                font-size: 13px;
-                flex-shrink: 0;
-            }
-            .excel-sheet-scroll {
-                flex-basis: 44px;
-                min-width: 44px;
-                min-height: 40px;
-                height: 40px;
-                margin-top: 4px;
-                font-size: 26px;
-            }
-        }
-        @media screen and (max-width: 960px) and (max-height: 480px) and (orientation: landscape) {
-            body.abene-excel-mode .ribbon {
-                height: 104px;
-                min-height: 80px;
-                max-height: 104px;
-            }
-            .excel-formula-row {
-                flex-wrap: nowrap;
-                min-height: 48px;
-                padding-top: 4px;
-                padding-bottom: 4px;
-            }
-            #excelFormula { flex: 1 1 auto; }
         }
 
         /* Microsoft 365 — Dark gray Fluent (chrome foncé, feuille A4 / cellules inchangées) */
@@ -5817,7 +5614,6 @@
             <button type="button" role="tab" aria-selected="false" data-tab="view" onclick="switchTab('view')" data-i18n="tabView">Ver</button>
             <button type="button" role="tab" aria-selected="false" data-tab="modelo" onclick="switchTab('modelo')" data-i18n="tabModelo">Modelo</button>
             <button type="button" role="tab" aria-selected="false" data-tab="devis" onclick="switchTab('devis')" data-i18n="tabDevis">Relatório/Orçamento</button>
-            <button type="button" role="tab" aria-selected="false" data-tab="excel" onclick="switchTab('excel')" data-i18n="tabExcel">Excel</button>
         </div>
         <button type="button" class="ribbon-collapse-btn" id="btnRibbonCollapse" onclick="toggleRibbonCollapse()" data-i18n-title="ribbonCollapse" data-i18n-label="ribbonCollapse" title="Mostrar/ocultar o friso">⌃</button>
     </div>
@@ -6615,10 +6411,6 @@
                         <span class="icon">🪟</span>
                         <span data-i18n="previewBeforeReceipt">Antes de confirmar recibo</span>
                     </button>
-                    <button class="ribbon-btn abene-excel-only" onclick="abeneExcelFromQuote()">
-                        <span class="icon">📊</span>
-                        <span data-i18n="xlFromQuote">Orçamento → Excel</span>
-                    </button>
                     <button class="ribbon-btn" onclick="insertQuoteTable()">
                         <span class="icon">▦</span>
                         <span data-i18n="insertQuoteTbl">Tabela orçamento</span>
@@ -6685,211 +6477,15 @@
                         <span class="icon">📁</span>
                         <span data-i18n="fileArquivo">Arquivo</span>
                     </button>
+                    <button class="ribbon-btn" onclick="openArquivoGuide()">
+                        <span class="icon">❔</span>
+                        <span data-abene-arquivo-guide-label>Guia do Arquivo</span>
+                    </button>
                 </div>
                 <div class="ribbon-group-label" data-i18n="groupArquivo">Arquivo</div>
             </div>
         </div>
 
-        <!-- EXCEL TAB -->
-        <div class="ribbon-content ribbon-tab-content" id="tab-excel">
-            <div class="ribbon-group">
-                <div class="ribbon-group-content">
-                    <div class="btn-col">
-                        <button class="ribbon-btn" onclick="abeneExcelPasteMenu(event)" data-i18n-title="pasteTitle" title="Colar — opções">
-                            <span class="icon">📋</span>
-                            <span data-i18n="paste">Colar ▾</span>
-                        </button>
-                    </div>
-                    <div class="btn-col">
-                        <button class="ribbon-btn-sm" onclick="abeneExcelCut()" data-i18n-title="cut" title="Cortar">✂️</button>
-                        <button class="ribbon-btn-sm" onclick="abeneExcelCopy()" data-i18n-title="copy" title="Copiar">📄</button>
-                    </div>
-                </div>
-                <div class="ribbon-group-label" data-i18n="groupClipboard">Área de Transferência</div>
-            </div>
-            <div class="ribbon-group">
-                <div class="ribbon-group-content">
-                    <div class="btn-row">
-                        <button class="ribbon-btn" onclick="abeneExcelNew()"><span class="icon">📄</span><span data-i18n="xlNew">Novo livro</span></button>
-                        <button class="ribbon-btn" onclick="abeneExcelXlsxIn()"><span class="icon">📂</span><span data-i18n="xlOpen">Abrir XLSX</span></button>
-                        <button class="ribbon-btn" onclick="abeneExcelXlsxOut()"><span class="icon">💾</span><span data-i18n="xlSaveXlsx">Guardar XLSX</span></button>
-                    </div>
-                    <div class="btn-row">
-                        <button class="ribbon-btn-sm" onclick="abeneExcelCsvIn()" data-i18n-title="xlCsvIn" title="Importar CSV">📥</button>
-                        <button class="ribbon-btn-sm" onclick="abeneExcelCsvOut()" data-i18n-title="xlCsvOut" title="Exportar CSV">📤</button>
-                        <button class="ribbon-btn-sm" onclick="abeneExcelOdsOut()" data-i18n-title="xlOds" title="ODS">📗</button>
-                        <button class="ribbon-btn-sm" onclick="abeneExcelPdf()" data-i18n-title="xlPdf" title="PDF">📥</button>
-                        <button class="ribbon-btn-sm" onclick="abeneExcelPrint()" data-i18n-title="xlPrint" title="Imprimir">🖨</button>
-                    </div>
-                </div>
-                <div class="ribbon-group-label" data-i18n="xlGroupFile">Ficheiro</div>
-            </div>
-            <div class="ribbon-group">
-                <div class="ribbon-group-content">
-                    <div class="btn-col">
-                        <div class="btn-row">
-                            <button class="ribbon-btn-sm" onclick="abeneExcelFmt('bold')" data-i18n-title="bold" title="Negrito"><b>N</b></button>
-                            <button class="ribbon-btn-sm" onclick="abeneExcelFmt('italic')" data-i18n-title="italic" title="Itálico"><i>I</i></button>
-                            <button class="ribbon-btn-sm" onclick="abeneExcelFmt('under')" data-i18n-title="underline" title="Sublinhado"><u>S</u></button>
-                            <button class="ribbon-btn-sm" onclick="abeneExcelFmt('wrap')" data-i18n-title="xlWrap" title="Quebra">↩</button>
-                            <button class="ribbon-btn-sm" onclick="abeneExcelFmt('border')" data-i18n-title="xlBorder" title="Limites">▢</button>
-                        </div>
-                        <div class="btn-row">
-                            <button class="ribbon-btn-sm" onclick="abeneExcelFmt('left')" data-i18n-title="alignLeft" title="Alinhar à esquerda">≡◁</button>
-                            <button class="ribbon-btn-sm" onclick="abeneExcelFmt('center')" data-i18n-title="alignCenter" title="Centrar">≡≡</button>
-                            <button class="ribbon-btn-sm" onclick="abeneExcelFmt('right')" data-i18n-title="alignRight" title="Alinhar à direita">▷≡</button>
-                            <button class="ribbon-btn-sm" onclick="abeneExcelMerge()" data-i18n-title="xlMerge" title="Unir">⧉</button>
-                            <button class="ribbon-btn-sm" onclick="abeneExcelPainter()" data-i18n-title="painter" title="Pincel">🖌️</button>
-                        </div>
-                    </div>
-                    <div class="btn-col">
-                        <div class="btn-row">
-                            <button class="ribbon-btn-sm" onclick="abeneExcelFmt('n')" data-i18n="xlDec">0,00</button>
-                            <button class="ribbon-btn-sm" onclick="abeneExcelFmt('eur')" data-i18n="xlEur">€</button>
-                            <button class="ribbon-btn-sm" onclick="abeneExcelFmt('pct')" data-i18n="xlPct">%</button>
-                            <button class="ribbon-btn-sm" onclick="abeneExcelFmt('date')" data-i18n="xlDate">Data</button>
-                        </div>
-                        <div class="btn-row">
-                            <input type="color" class="color-input" value="#ffff99" onchange="abeneExcelFill(this.value)" data-i18n-title="xlFill" title="Cor de fundo da célula">
-                            <input type="color" class="color-input" value="#000000" onchange="abeneExcelFontColor(this.value)" data-i18n-title="fontColor" title="Cor do texto">
-                            <select class="ribbon-select" id="xlFontSize" onchange="abeneExcelFontSize(this.value)" data-i18n-title="fontSizeTitle" title="Tamanho" style="width:58px;">
-                                <option value="10">10</option>
-                                <option value="11" selected>11</option>
-                                <option value="12">12</option>
-                                <option value="14">14</option>
-                                <option value="16">16</option>
-                                <option value="18">18</option>
-                                <option value="24">24</option>
-                            </select>
-                        </div>
-                    </div>
-                </div>
-                <div class="ribbon-group-label" data-i18n="xlGroupFmt">Formato</div>
-            </div>
-            <div class="ribbon-group xl-fn-lib">
-                <div class="ribbon-group-content">
-                    <button type="button" class="ribbon-btn" onclick="abeneExcelInsertFnDlg()" data-i18n-title="xlInsertFn" title="Inserir Função">
-                        <span class="icon xl-fn-ico fx">fx</span>
-                        <span data-i18n="xlInsertFn">Inserir Função</span>
-                    </button>
-                    <div class="btn-col xl-autosum-split">
-                        <button type="button" class="ribbon-btn" onclick="abeneExcelSum()" data-i18n-title="xlAutoSum" title="Soma Automática">
-                            <span class="icon xl-fn-ico sum">Σ</span>
-                            <span data-i18n="xlAutoSum">Soma Automática</span>
-                        </button>
-                        <button type="button" class="ribbon-btn-sm xl-split-arrow" onclick="abeneExcelAutoSumMenu(event)" data-i18n-title="xlAutoSumMore" title="Mais">▾</button>
-                    </div>
-                    <button type="button" class="ribbon-btn" onclick="abeneExcelRecentFn(event)" data-i18n-title="xlFnRecent" title="Recentemente utilizados">
-                        <span class="icon xl-fn-ico rec">★</span>
-                        <span data-i18n="xlFnRecent">Recentes</span>
-                    </button>
-                    <button type="button" class="ribbon-btn" onclick="abeneExcelFnCat(event,'financial')" data-i18n-title="xlFnFin" title="Financeiras">
-                        <span class="icon xl-fn-ico fin">€</span>
-                        <span data-i18n="xlFnFin">Financeiras</span>
-                    </button>
-                    <button type="button" class="ribbon-btn" onclick="abeneExcelFnCat(event,'logical')" data-i18n-title="xlFnLog" title="Lógica">
-                        <span class="icon xl-fn-ico log">?</span>
-                        <span data-i18n="xlFnLog">Lógica</span>
-                    </button>
-                    <button type="button" class="ribbon-btn" onclick="abeneExcelFnCat(event,'text')" data-i18n-title="xlFnText" title="Texto">
-                        <span class="icon xl-fn-ico txt">A</span>
-                        <span data-i18n="xlFnText">Texto</span>
-                    </button>
-                    <button type="button" class="ribbon-btn" onclick="abeneExcelFnCat(event,'datetime')" data-i18n-title="xlFnDate" title="Data e Hora">
-                        <span class="icon xl-fn-ico dt">📅</span>
-                        <span data-i18n="xlFnDate">Data e Hora</span>
-                    </button>
-                    <button type="button" class="ribbon-btn" onclick="abeneExcelFnCat(event,'lookup')" data-i18n-title="xlFnLook" title="Consulta e Referência">
-                        <span class="icon xl-fn-ico look">🔎</span>
-                        <span data-i18n="xlFnLook">Consulta</span>
-                    </button>
-                    <button type="button" class="ribbon-btn" onclick="abeneExcelFnCat(event,'math')" data-i18n-title="xlFnMath" title="Matemática e Trigonometria">
-                        <span class="icon xl-fn-ico math">θ</span>
-                        <span data-i18n="xlFnMath">Matemática</span>
-                    </button>
-                    <button type="button" class="ribbon-btn" onclick="abeneExcelFnCat(event,'more')" data-i18n-title="xlFnMore" title="Mais Funções">
-                        <span class="icon xl-fn-ico more">…</span>
-                        <span data-i18n="xlFnMore">Mais Funções</span>
-                    </button>
-                </div>
-                <div class="ribbon-group-label" data-i18n="xlFnLib">Biblioteca de Funções</div>
-            </div>
-            <div class="ribbon-group">
-                <div class="ribbon-group-content">
-                    <div class="btn-col">
-                        <div class="btn-row">
-                            <button class="ribbon-btn-sm" onclick="abeneExcelInsRow()" data-i18n-title="xlInsRow" title="Inserir linha">+─</button>
-                            <button class="ribbon-btn-sm" onclick="abeneExcelInsCol()" data-i18n-title="xlInsCol" title="Inserir coluna">+│</button>
-                            <button class="ribbon-btn-sm" onclick="abeneExcelDelRow()" data-i18n-title="xlDelRow" title="Eliminar linha">−─</button>
-                            <button class="ribbon-btn-sm" onclick="abeneExcelDelCol()" data-i18n-title="xlDelCol" title="Eliminar coluna">−│</button>
-                        </div>
-                        <div class="btn-row">
-                            <button class="ribbon-btn-sm" onclick="abeneExcelHideR()" data-i18n-title="xlHideR" title="Ocultar linhas">▬</button>
-                            <button class="ribbon-btn-sm" onclick="abeneExcelHideC()" data-i18n-title="xlHideC" title="Ocultar colunas">▮</button>
-                            <button class="ribbon-btn-sm" onclick="abeneExcelUnhide()" data-i18n-title="xlUnhide" title="Mostrar">◎</button>
-                            <button class="ribbon-btn-sm" onclick="abeneExcelFreeze()" data-i18n-title="xlFreeze" title="Fixar painéis">📌</button>
-                        </div>
-                    </div>
-                    <div class="btn-col">
-                        <button class="ribbon-btn" onclick="abeneExcelSum()"><span class="icon">Σ</span><span data-i18n="xlSum">Soma</span></button>
-                        <div class="btn-row">
-                            <button class="ribbon-btn-sm" onclick="abeneExcelMoreRows()" data-i18n-title="xlMoreRows" title="+ linhas">+100</button>
-                            <button class="ribbon-btn-sm" onclick="abeneExcelMoreCols()" data-i18n-title="xlMoreCols" title="+ colunas">+col</button>
-                        </div>
-                    </div>
-                </div>
-                <div class="ribbon-group-label" data-i18n="xlGroupCells">Células</div>
-            </div>
-            <div class="ribbon-group">
-                <div class="ribbon-group-content">
-                    <div class="btn-row">
-                        <button class="ribbon-btn" onclick="abeneExcelSort('asc')"><span class="icon">A↓</span><span data-i18n="xlSortAz">Ordenar A-Z</span></button>
-                        <button class="ribbon-btn" onclick="abeneExcelSort('desc')"><span class="icon">Z↑</span><span data-i18n="xlSortZa">Ordenar Z-A</span></button>
-                        <button class="ribbon-btn" onclick="abeneExcelAutoFilter()"><span class="icon">⏷</span><span data-i18n="xlFilter">Filtrar</span></button>
-                    </div>
-                    <div class="btn-row">
-                        <button class="ribbon-btn-sm" onclick="abeneExcelDedup()" data-i18n-title="xlDedup" title="Duplicados">⊖</button>
-                        <button class="ribbon-btn-sm" onclick="abeneExcelFind()" data-i18n-title="xlFind" title="Procurar">🔎</button>
-                        <button class="ribbon-btn-sm" onclick="abeneExcelReplace()" data-i18n-title="xlReplace" title="Substituir">🔁</button>
-                        <button class="ribbon-btn-sm" onclick="abeneExcelValid()" data-i18n-title="xlValid" title="Validação">☑</button>
-                        <button class="ribbon-btn-sm" onclick="abeneExcelCf()" data-i18n-title="xlCf" title="Condicional">🎨</button>
-                        <button class="ribbon-btn-sm" onclick="abeneExcelTable()" data-i18n-title="xlTable" title="Tabela">▤</button>
-                        <button class="ribbon-btn-sm" onclick="abeneExcelPivot()" data-i18n-title="xlPivot" title="TCD">⊞</button>
-                    </div>
-                </div>
-                <div class="ribbon-group-label" data-i18n="xlGroupData">Dados</div>
-            </div>
-            <div class="ribbon-group">
-                <div class="ribbon-group-content">
-                    <div class="btn-row">
-                        <button class="ribbon-btn" onclick="abeneExcelChart('col')"><span class="icon">📊</span><span data-i18n="xlChartCol">Colunas</span></button>
-                        <button class="ribbon-btn" onclick="abeneExcelChart('bar')"><span class="icon">📶</span><span data-i18n="xlChartBar">Barras</span></button>
-                        <button class="ribbon-btn" onclick="abeneExcelChart('line')"><span class="icon">📈</span><span data-i18n="xlChartLine">Linhas</span></button>
-                        <button class="ribbon-btn" onclick="abeneExcelChart('pie')"><span class="icon">◔</span><span data-i18n="xlChartPie">Setores</span></button>
-                    </div>
-                    <div class="btn-row">
-                        <button class="ribbon-btn-sm" onclick="abeneExcelComment()" data-i18n-title="xlComment" title="Comentário">💬</button>
-                    </div>
-                </div>
-                <div class="ribbon-group-label" data-i18n="xlGroupChart">Gráficos</div>
-            </div>
-            <div class="ribbon-group">
-                <div class="ribbon-group-content">
-                    <div class="btn-row">
-                        <button class="ribbon-btn" onclick="abeneExcelBusiness()"><span class="icon">🏢</span><span data-i18n="xlBizTpl">Modelo de negócio</span></button>
-                        <button class="ribbon-btn" onclick="abeneExcelFromQuote()"><span class="icon">⇆</span><span data-i18n="xlFromQuote">Orçamento → Excel</span></button>
-                        <button class="ribbon-btn" onclick="abeneExcelToQuote()"><span class="icon">↩</span><span data-i18n="xlToQuote">Excel → Orçamento</span></button>
-                    </div>
-                    <div class="btn-row">
-                        <button class="ribbon-btn-sm" onclick="abeneExcelToWord()" data-i18n-title="xlToWord" title="Excel → Word">→W</button>
-                        <button class="ribbon-btn-sm" onclick="abeneWordToExcel()" data-i18n-title="xlFromWord" title="Word → Excel">←W</button>
-                        <button class="ribbon-btn-sm" onclick="abeneExcelTests()" data-i18n-title="xlTests" title="Testes">✔</button>
-                        <button class="ribbon-btn-sm" onclick="abeneExcelHelp()" data-i18n-title="xlHelp" title="Ajuda">?</button>
-                    </div>
-                </div>
-                <div class="ribbon-group-label" data-i18n="xlGroupBiz">Negócio / Interoperabilidade</div>
-            </div>
-        </div>
     </div>
 
     <!-- Ruler -->
@@ -6947,28 +6543,12 @@
                 </div>
                 <div class="page-chrome" id="pageChrome"></div>
             </div>
-            <div id="excelWorkspace" aria-label="Excel" data-i18n-label="xlWorkspace">
-                <div class="excel-formula-row">
-                    <span id="excelBookName">Livro1</span>
-                    <input id="excelNameBox" value="A1" aria-label="Nome" data-i18n-label="xlNameAria">
-                    <button type="button" class="xl-fx-btn" id="xlFxOk" onclick="abeneExcelCommitFx()" data-i18n-title="ok" title="Confirmar">✓</button>
-                    <button type="button" class="xl-fx-btn" id="xlFxCancel" onclick="abeneExcelCancelFx()" data-i18n-title="cancel" title="Cancelar">✕</button>
-                    <button type="button" class="fx" id="xlFxInsert" onclick="abeneExcelInsertFnDlg()" data-i18n-title="xlInsertFn" title="Inserir Função">fx</button>
-                    <input id="excelFormula" type="text" aria-label="Fórmula" placeholder="=" data-i18n-label="xlFormulaAria">
-                    <button type="button" class="ribbon-btn-sm" onclick="abeneExcelZoom(-0.1)" data-i18n-title="zoomOut" title="Reduzir o zoom da folha">−</button>
-                    <span id="excelZoomLbl">100%</span>
-                    <button type="button" class="ribbon-btn-sm" onclick="abeneExcelZoom(0.1)" data-i18n-title="zoomIn" title="Ampliar o zoom da folha">+</button>
-                </div>
-                <div id="excelGrid"></div>
-                <div class="excel-sheets" id="excelSheetTabs"></div>
-            </div>
         </div>
     </div>
 
     <!-- Status Bar -->
     <div class="status-bar">
         <div class="left">
-            <span id="excelStatusAgg"></span>
             <span class="status-page-jump" onclick="jumpToPageFromStatus()" data-i18n-title="gotoPage" title="Ir para a página"><span data-i18n="statusPage">Página</span> <span id="pageNum">1</span> <span data-i18n="statusOf">de</span> <span id="totalPages">1</span></span>
             <span id="sheetsSyncStatus" onclick="openCompanySettings()" style="cursor:pointer;font-size:11px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>
             <span id="gmailMailStatus" onclick="openCompanySettings()" style="cursor:pointer;font-size:11px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-left:6px;"></span>
@@ -7014,7 +6594,7 @@
         <div class="dropdown-item" onclick="openFile()">📂 <span data-i18n="fileOpen">Abrir</span> <span class="shortcut" data-i18n-shortcut="scOpen">Ctrl+A</span></div>
         <div class="dropdown-divider"></div>
         <div class="dropdown-item" onclick="openSaveChooser()">💾 <span data-i18n="fileSave">Guardar</span> <span class="shortcut" data-i18n-shortcut="scSave">Ctrl+B</span></div>
-        <div class="dropdown-item" onclick="abeneSheetsPush && abeneSheetsPush('manual').then(function(){ if(typeof showToast==='function') showToast(typeof t==='function'?t('sheetsPushed'):'Sincronizado.'); }).catch(function(){})">☁ <span data-i18n="sheetsPush">Sincronizar Google Sheets</span></div>
+        <div class="dropdown-item" onclick="abeneSheetsPush && abeneSheetsPush('manual').then(function(result){ if(typeof showToast==='function') showToast(result && result.blocked ? (typeof t==='function'?t('sheetsWaitDocuments'):'Sincronização em espera.') : (typeof t==='function'?t('sheetsPushed'):'Sincronizado.')); }).catch(function(){})">☁ <span data-i18n="sheetsPush">Sincronizar Google Sheets</span></div>
         <div class="dropdown-item" onclick="abeneSheetsPull && abeneSheetsPull().catch(function(){})">☁ <span data-i18n="sheetsPull">Restaurar do Google Sheets</span></div>
         <div class="dropdown-item" onclick="abeneSheetsRefresh && abeneSheetsRefresh().catch(function(){})">↻ <span data-i18n="sheetsRefresh">Atualizar da folha</span></div>
         <div class="dropdown-item" onclick="abeneCollabShare && abeneCollabShare()">🔗 <span data-i18n="collabShare">Partilhar</span></div>
@@ -7022,6 +6602,7 @@
         <div class="dropdown-item" onclick="exportMarkdown()">📑 <span data-i18n="fileMd">Exportar Markdown (.md)</span></div>
         <div class="dropdown-item" onclick="openTemplatesModal()">📦 <span data-i18n="fileTpl">Modelos de documento</span></div>
         <div class="dropdown-item" onclick="openArquivoWindow()">📁 <span data-i18n="fileArquivo">Arquivo</span></div>
+        <div class="dropdown-item" onclick="openArquivoGuide()">❔ <span data-abene-arquivo-guide-label>Guia do Arquivo</span></div>
         <div class="dropdown-divider"></div>
         <div class="dropdown-item" onclick="openExportModal()">💾 <span data-i18n="exportDoc">Exportar documento</span></div>
         <div class="dropdown-item" onclick="exportPDF()">📥 <span data-i18n="filePdf">Exportar PDF</span></div>
@@ -7029,8 +6610,6 @@
         <div class="dropdown-item" onclick="abeneOpenInGoogleDocs && abeneOpenInGoogleDocs()">☁ <span data-i18n="fileGdocs">Abrir no Google Docs</span></div>
         <div class="dropdown-item" onclick="abenePullFromGoogleDocs && abenePullFromGoogleDocs()">↻ <span data-i18n="gdocsPull">Atualizar desde Google Docs</span></div>
         <div class="dropdown-item" onclick="exportWord()">📥 <span data-i18n="fileDoc">Exportar Word (.doc)</span></div>
-        <div class="dropdown-item abene-excel-only" onclick="abeneExcelXlsxOut()">📗 <span data-i18n="xlSaveXlsx">Exportar Excel (.xlsx)</span></div>
-        <div class="dropdown-item abene-excel-only" onclick="abeneExcelXlsxIn()">📂 <span data-i18n="xlOpen">Abrir Excel (.xlsx)</span></div>
         <div class="dropdown-item" onclick="openStatsModal()">📊 <span data-i18n="fileStats">Estatísticas</span></div>
         <div class="dropdown-divider"></div>
         <div class="dropdown-item" onclick="printDocument()">🖨️ <span data-i18n="filePrint">Imprimir</span> <span class="shortcut" data-i18n-shortcut="scPrint">Ctrl+P</span></div>
@@ -7780,11 +7359,10 @@
     </div>
 
     <!-- Hidden file input -->
-    <input type="file" id="fileInput" style="display:none" accept=".html,.htm,.txt,.docx,.xlsx,.xlsm,.ods,.csv,.json" onchange="loadFile(event)">
+    <input type="file" id="fileInput" style="display:none" accept=".html,.htm,.txt,.docx,.json" onchange="loadFile(event)">
     <input type="file" id="imageInput" style="display:none" accept="image/*" multiple onchange="handleImageUpload(event)">
-    <input type="file" id="excelFileInput" style="display:none" accept=".xlsx,.csv,.txt">
 
-    <script src="libs/abene-i18n.js?v=20260920-pack-email-split-1"></script>
+    <script src="libs/abene-i18n.js?v=20260922-period-1"></script>
     <script src="libs/abene-tips.js?v=20260915-cite-1"></script>
     <script src="libs/abene-page-geometry.js?v=20260914-review-1"></script>
     <script>
@@ -7816,6 +7394,8 @@
         let savedPainterRange = null;
         let footnoteCounter = 0;
         let documentState = { name: 'Document1', dirty: true, protected: false, tracking: false, pagination: true, gdocsFileId: '', gdocsUrl: '', sentToClient: false, pdfOwnerId: '' };
+        let originalDocxState = { blob: null, snapshot: '', fileName: '' };
+        let originalDocxClearPromise = Promise.resolve();
         let documentVersions = JSON.parse(localStorage.getItem('abeneVersions') || '[]');
         let lastEditorHTML = '';
         let imageResize = null;
@@ -7854,20 +7434,14 @@
             installerEmail: (typeof ACCOUNT_EMAIL === 'string' && ACCOUNT_EMAIL) ? ACCOUNT_EMAIL : '',
             googleOwnerEmail: (typeof ACCOUNT_EMAIL === 'string' && ACCOUNT_EMAIL) ? ACCOUNT_EMAIL : '',
             databaseEnabled: true,
-            excelEnabled: true,
+            excelEnabled: false,
             tocDiario: 'VEN',
             tocTipoDoc: 'RG'
         };
         let companyData = { ...defaultCompanyData, ...JSON.parse(localStorage.getItem('abeneCompanyData') || '{}') };
         delete companyData.brandName;
         // Saved company settings belong to the user, including legacy names and emails.
-        if (!localStorage.getItem('abeneExcelCompleteOn')) {
-            companyData.excelEnabled = true;
-            try {
-                localStorage.setItem('abeneCompanyData', JSON.stringify(companyData));
-                localStorage.setItem('abeneExcelCompleteOn', '1');
-            } catch (e) {}
-        }
+        companyData.excelEnabled = false;
         if (!companyData.appsScriptUrl && typeof API_URL === 'string' && API_URL) {
             companyData.appsScriptUrl = API_URL;
             if (companyData.databaseEnabled !== false) companyData.databaseEnabled = true;
@@ -8038,6 +7612,7 @@
             updateSaveStatus();
             updateNavigation();
             applyLanguage(localStorage.getItem('abeneLanguage') || 'pt-PT');
+            setTimeout(restoreOriginalDocxIfCurrent, 900);
             if (typeof setAppearance === 'function') setAppearance(localStorage.getItem('abeneAppearance') || 'light');
             try { if (localStorage.getItem('abeneRibbonCollapsed') === '1') document.body.classList.add('abene-ribbon-collapsed'); } catch (e) {}
             applyCompanyDefaults();
@@ -8480,6 +8055,7 @@
             if (typeof applyUiLanguage === 'function') applyUiLanguage(normalized);
             if (typeof updateSaveStatus === 'function') updateSaveStatus();
             applyBrandChrome();
+            if (typeof syncArquivoGuideLabels === 'function') syncArquivoGuideLabels(normalized);
             window.dispatchEvent(new CustomEvent('abene:languagechange', { detail: { language: normalized } }));
         }
 
@@ -10295,6 +9871,7 @@
         /** Remet l’éditeur à l’état d’origine (sans mélange avec le document précédent). */
         function resetEditorToOriginal(options) {
             documentState.archiveEntryId = '';
+            clearOriginalDocx();
             const opts = options || {};
             undoStack = [];
             redoStack = [];
@@ -10631,8 +10208,8 @@
             if (!file) return false;
             const name = String(file.name || '');
             const type = String(file.type || '');
-            return /\.(docx|xlsx|xlsm|ods|csv|html|htm|txt)$/i.test(name) ||
-                /wordprocessingml|spreadsheetml|opendocument\.spreadsheet|text\/(html|plain|csv)/i.test(type);
+            return /\.(docx|html|htm|txt)$/i.test(name) ||
+                /wordprocessingml|text\/(html|plain)/i.test(type);
         }
 
         function openImportedFile(file, opts) {
@@ -10644,10 +10221,6 @@
                 if (!opts.skipConfirm && !confirmReplaceDocument()) return false;
                 if (typeof switchTab === 'function') switchTab('home');
                 importDocx(file);
-                return true;
-            }
-            if ((/\.(xlsx|xlsm|ods|csv)$/i.test(name) || /spreadsheetml|opendocument\.spreadsheet|text\/csv/i.test(type)) && typeof window.abeneExcelImportFile === 'function') {
-                window.abeneExcelImportFile(file);
                 return true;
             }
             if (/\.(html|htm|txt)$/i.test(name) || /text\/(html|plain)/i.test(type)) {
@@ -10689,6 +10262,93 @@
             const clone = editor.cloneNode(true);
             clone.querySelectorAll('.abene-page-flow, .page-decoration, .page-header-zone, .page-footer-zone').forEach(function (n) { n.remove(); });
             return clone.innerHTML;
+        }
+
+        /* Keep the exact imported DOCX beside the editable representation.
+           When the editable content/layout is unchanged, downloading Word returns
+           the original binary, so unsupported Word details are never rebuilt. */
+        function originalDocxSnapshot() {
+            return JSON.stringify({
+                html: persistableEditorHtml(),
+                pageSize: pageSize,
+                pageSizeId: pageSizeId,
+                orientation: pageOrientation,
+                margins: pageMargins,
+                gutter: pageGutter,
+                columns: pageColumns,
+                columnRule: pageColRule,
+                border: pageBorder,
+                header: pageHeaderText,
+                headerTemplate: pageHeaderTemplate,
+                headerFields: pageHeaderFields,
+                differentFirst: pageHeaderDifferentFirst,
+                footer: pageFooterText,
+                editorFont: editor.style.fontFamily || ''
+            });
+        }
+
+        function openOriginalDocxDb() {
+            return new Promise(function(resolve, reject) {
+                if (!window.indexedDB) { reject(new Error('indexedDB')); return; }
+                var req = indexedDB.open('abene-original-documents', 1);
+                req.onupgradeneeded = function() {
+                    if (!req.result.objectStoreNames.contains('documents')) {
+                        req.result.createObjectStore('documents', { keyPath: 'id' });
+                    }
+                };
+                req.onsuccess = function() { resolve(req.result); };
+                req.onerror = function() { reject(req.error); };
+            });
+        }
+
+        function originalDocxDbOperation(mode, action) {
+            return openOriginalDocxDb().then(function(db) {
+                return new Promise(function(resolve, reject) {
+                    var tx = db.transaction('documents', mode);
+                    var store = tx.objectStore('documents');
+                    action(store, resolve, reject);
+                    tx.oncomplete = function() { try { db.close(); } catch (e) {} };
+                    tx.onerror = function() { reject(tx.error); };
+                });
+            });
+        }
+
+        function rememberOriginalDocx(file) {
+            var rec = {
+                id: 'current',
+                blob: file.slice(0, file.size, file.type || 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'),
+                snapshot: originalDocxSnapshot(),
+                fileName: file.name || 'document.docx',
+                savedAt: new Date().toISOString()
+            };
+            originalDocxState = { blob: rec.blob, snapshot: rec.snapshot, fileName: rec.fileName };
+            Promise.resolve(originalDocxClearPromise).then(function() {
+                return originalDocxDbOperation('readwrite', function(store, resolve, reject) {
+                    var req = store.put(rec);
+                    req.onsuccess = function() { resolve(rec); };
+                    req.onerror = function() { reject(req.error); };
+                });
+            }).catch(function() {});
+        }
+
+        function restoreOriginalDocxIfCurrent() {
+            originalDocxDbOperation('readonly', function(store, resolve, reject) {
+                var req = store.get('current');
+                req.onsuccess = function() { resolve(req.result || null); };
+                req.onerror = function() { reject(req.error); };
+            }).then(function(rec) {
+                if (!rec || !rec.blob || rec.snapshot !== originalDocxSnapshot()) return;
+                originalDocxState = { blob: rec.blob, snapshot: rec.snapshot, fileName: rec.fileName || '' };
+            }).catch(function() {});
+        }
+
+        function clearOriginalDocx() {
+            originalDocxState = { blob: null, snapshot: '', fileName: '' };
+            originalDocxClearPromise = originalDocxDbOperation('readwrite', function(store, resolve, reject) {
+                var req = store.delete('current');
+                req.onsuccess = function() { resolve(true); };
+                req.onerror = function() { reject(req.error); };
+            }).catch(function() {});
         }
 
         function persistLocalDraft() {
@@ -11635,9 +11295,16 @@ table { border-collapse: collapse; }
         window.buildDocxBlob = buildDocxBlob;
 
         async function exportDocx() {
+            if (originalDocxState.blob && originalDocxState.snapshot === originalDocxSnapshot()) {
+                downloadFile(originalDocxState.blob, `${documentState.name || 'document'}.docx`, originalDocxState.blob.type || 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+                showToast(t('docxOriginalExported') || 'DOCX original descarregado sem alteração.');
+                closeAllDropdowns();
+                return;
+            }
             var blob = await buildDocxBlob();
             if (!blob) return;
             downloadFile(blob, `${documentState.name || 'document'}.docx`, blob.type);
+            if (originalDocxState.blob) showToast(t('docxRebuiltExported') || 'DOCX recriado com as alterações; layouts Word muito complexos podem variar.');
             closeAllDropdowns();
         }
 
@@ -12350,6 +12017,7 @@ table { border-collapse: collapse; }
                 editor.innerHTML = importedHtml || '<p></p>';
                 if (typeof switchTab === 'function') switchTab('home');
                 finishOpenedDocument(file.name, t('docxImportOk') || 'DOCX aberto com formatação original');
+                rememberOriginalDocx(file);
 
                 // Post-import analysis: detect tables with numbers → offer quote
                 setTimeout(function() { showImportAnalysis(file.name); }, 350);
@@ -12390,6 +12058,10 @@ table { border-collapse: collapse; }
             }
             body += '<div style="border-top:1px solid #e0e0e0;padding-top:10px;margin-top:8px;">';
             body += '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" id="impArchive" checked> ' + (t('impArchive') || 'Guardar uma cópia no Arquivo') + '</label>';
+            body += '<div class="form-group" style="display:grid;grid-template-columns:minmax(120px,.7fr) minmax(150px,1fr) auto;gap:8px;align-items:end;margin-top:10px;">';
+            body += '<label>' + (t('impPeriod') || 'Período do documento') + '<select id="impPeriodKind" onchange="setImportPeriodKind(this.value)"><option value="day">' + (t('impPeriodDay') || 'Dia') + '</option><option value="month">' + (t('impPeriodMonth') || 'Mês') + '</option><option value="year">' + (t('impPeriodYear') || 'Ano') + '</option></select></label>';
+            body += '<label>' + (t('impPeriod') || 'Período do documento') + '<input id="impPeriodValue" type="date"></label>';
+            body += '<button type="button" class="btn-secondary" onclick="setImportPeriodToday()">' + (t('impPeriodToday') || 'Hoje') + '</button></div>';
             body += '</div>';
 
             const footer = '<button class="btn-secondary" onclick="closeModal(\'genericModal\')">' + (t('impSkip') || 'Ignorar') + '</button>'
@@ -12397,14 +12069,40 @@ table { border-collapse: collapse; }
 
             if (typeof openGenericModal === 'function') {
                 openGenericModal(t('impTitle') || 'Ficheiro importado', body, footer);
+                setImportPeriodToday();
             }
         }
+
+        window.setImportPeriodKind = function(kind, value) {
+            const kindEl = document.getElementById('impPeriodKind');
+            const valueEl = document.getElementById('impPeriodValue');
+            kind = kind === 'month' || kind === 'year' ? kind : 'day';
+            if (kindEl) kindEl.value = kind;
+            if (!valueEl) return;
+            const oldValue = value != null ? String(value) : String(valueEl.value || '');
+            valueEl.type = kind === 'year' ? 'number' : kind;
+            if (kind === 'year') {
+                valueEl.min = '1900'; valueEl.max = '2200'; valueEl.step = '1';
+                valueEl.value = (oldValue.match(/^\d{4}/) || [''])[0];
+            } else {
+                valueEl.removeAttribute('min'); valueEl.removeAttribute('max'); valueEl.removeAttribute('step');
+                valueEl.value = kind === 'month' ? oldValue.slice(0, 7) : oldValue.slice(0, 10);
+            }
+        };
+
+        window.setImportPeriodToday = function() {
+            const now = new Date();
+            const today = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
+            window.setImportPeriodKind('day', today);
+        };
 
         window.commitImportAnalysis = function() {
             const numInput = document.getElementById('impRegNumber');
             const regNumber = numInput ? numInput.value.trim() : '';
             const createQuote = document.getElementById('impCreateQuote') && document.getElementById('impCreateQuote').checked;
             const archive = document.getElementById('impArchive') && document.getElementById('impArchive').checked;
+            const periodKind = (document.getElementById('impPeriodKind') || {}).value || 'day';
+            const periodValue = (document.getElementById('impPeriodValue') || {}).value || '';
 
             // Set the document name to the registration number if provided
             if (regNumber) {
@@ -12420,7 +12118,7 @@ table { border-collapse: collapse; }
 
             // Archive the document
             if (archive && typeof window.abeneArquivoArchive === 'function') {
-                try { window.abeneArquivoArchive(); } catch (e) {}
+                try { window.abeneArquivoArchive({ silent: true, periodKind: periodKind, periodValue: periodValue }); } catch (e) {}
             } else if (archive) {
                 // Fallback: just save
                 try { saveDocument(); } catch (e) {}
@@ -12775,11 +12473,127 @@ table { border-collapse: collapse; }
         }
 
         function openGenericModal(title, bodyHTML, footerHTML) {
+            document.getElementById('genericModalContent').classList.remove('abene-arquivo-guide-modal');
             document.getElementById('genericModalTitle').textContent = title;
             document.getElementById('genericModalBody').innerHTML = bodyHTML;
             document.getElementById('genericModalFooter').innerHTML = footerHTML || '';
             document.getElementById('genericModal').classList.add('visible');
         }
+
+        const ARQUIVO_GUIDE_UI = {
+            'pt-PT': { title: 'Guia prático — Arquivo', menu: 'Guia do Arquivo', language: 'Idioma do guia', close: 'Fechar' },
+            'fr-FR': { title: 'Guide pratique — Arquivo', menu: 'Guide d’Arquivo', language: 'Langue du guide', close: 'Fermer' },
+            'en-US': { title: 'Practical guide — Arquivo', menu: 'Arquivo guide', language: 'Guide language', close: 'Close' },
+            'es-ES': { title: 'Guía práctica — Arquivo', menu: 'Guía de Arquivo', language: 'Idioma de la guía', close: 'Cerrar' }
+        };
+
+        const ARQUIVO_GUIDE_HTML = {
+            'pt-PT': `
+                <p class="abene-arquivo-guide-intro"><strong>Regra principal:</strong> <code>Guardar</code> grava o documento de trabalho; <code>Arquivar</code> cria ou liga uma ficha no <code>Arquivo</code>, organizada por cliente e pasta/obra. Consultar a pré-visualização não altera o documento aberto.</p>
+                <p class="abene-arquivo-guide-warning"><strong>Limite conhecido:</strong> o código prevê sincronização Drive/Sheets e exportações, mas a sincronização completa entre vários dispositivos e a fidelidade visual de cada exportação devem ser testadas com cópias antes de uso definitivo.</p>
+                <p><strong>Google Docs por documento:</strong> no Arquivo, use o ícone <code>G✓</code> para abrir o Google Docs já ligado ou <code>G+</code> para criar um. Num documento concluído/protegido, <code>G+</code> cria uma cópia editável e conserva o original intacto.</p>
+                <p><strong>Período do documento:</strong> ao importar ou arquivar, escolha <code>Dia</code>, <code>Mês</code> ou <code>Ano</code>; <code>Hoje</code> preenche a data imediatamente. Este período é diferente da data técnica de arquivo e é usado na pesquisa, na organização por ano/mês e no pack do contabilista.</p>
+                <section><h4>1. Abrir o Arquivo</h4><ol><li>No friso, clique em <code>Arquivo</code>; em alternativa, use <code>Ficheiro</code> → <code>Arquivo</code> ou o botão da barra inferior.</li><li>A janela apresenta <code>Pastas</code>, <code>Ficheiros</code> e <code>Pré-visualização</code>.</li><li>Selecionar um ficheiro mostra apenas uma cópia de consulta; o Word em curso permanece intacto.</li></ol></section>
+                <section><h4>2. Procurar por cliente, trabalho ou documento</h4><ol><li>Abra <code>Por cliente</code>.</li><li>Em <code>Procurar cliente ou trabalho…</code>, escreva parte do cliente, pasta/obra, nome do documento ou número. A pesquisa ignora diferenças de acentos.</li><li>Abra o cliente e escolha <code>Ver documentos e trabalhos</code> para ver tudo, ou escolha uma pasta/obra específica.</li><li>Selecione o documento em <code>Ficheiros</code>.</li></ol><p>A pesquisa geral <code>Pesquisar nome, cliente, pasta…</code> pode ser combinada com tipo, <code>Só concluídos</code>, <code>Data desde</code>, <code>Data até</code>, ano e pasta.</p></section>
+                <section><h4>3. Pré-visualizar e abrir</h4><ul><li>O separador <code>Documento</code> mostra o conteúdo arquivado.</li><li><code>Versões finais (PDF)</code> mostra relatório, orçamento e recibo por versão. <code>Ver</code> abre a versão; <code>Descarregar</code> transfere-a.</li><li><code>Drive ✓</code> indica que essa versão PDF tem um identificador Drive guardado.</li><li>Num rascunho não protegido, <code>Abrir para modificar</code> tenta primeiro guardar o documento atual e depois abre a ficha para edição.</li><li>Um documento concluído ou protegido usa <code>Abrir para consultar</code> e fica em leitura.</li></ul></section>
+                <section><h4>4. Guardar e Arquivar</h4><h5><code>Guardar</code></h5><ul><li>Guarda localmente neste navegador.</li><li>Cria uma versão local em <code>Versões locais (menu Guardar) — só leitura</code>; são conservadas até 20 versões.</li><li>Atualiza a mesma ficha do Arquivo quando o documento está ligado a um rascunho arquivado.</li><li>Pede sincronização Google se a ligação estiver configurada. Não descarrega automaticamente Word ou PDF.</li></ul><h5><code>Arquivar documento atual</code></h5><ol><li>Abra <code>Arquivo</code> e clique em <code>Arquivar documento atual</code>.</li><li>Preencha <code>Cliente</code> e <code>Pasta / obra</code>.</li><li>Escolha se deve <code>Marcar concluído</code>.</li><li>Clique em <code>Arquivar agora</code>. O editor continua aberto e a ficha passa a receber as próximas gravações.</li></ol></section>
+                <section><h4>5. Rascunho, proteção e final</h4><ul><li><code>Em curso</code>: rascunho editável e atualizável com <code>Guardar</code>.</li><li><code>Proteger documento</code>: bloqueia apenas esse rascunho contra alterações e envio para o Lixo. Abre em leitura e pode voltar a ser editável com <code>Retirar proteção</code>.</li><li><code>Marcar concluído</code>: cria os PDFs finais das partes existentes e marca a ficha como <code>Concluído</code>.</li><li><code>Gravar relatório</code>, <code>Gravar orçamento</code> e <code>Gravar recibo</code> criam versões PDF numeradas sem apagar as anteriores.</li><li><code>Criar finais (PDF)</code> aplica a finalização aos documentos arquivados selecionados.</li></ul><p>Proteção e versão final não são a mesma coisa: a proteção do rascunho é reversível; a ficha concluída abre em consulta e a interface observada não propõe voltar a rascunho.</p></section>
+                <section><h4>6. Alterar uma versão final com segurança</h4><ol><li>Selecione a versão final.</li><li>Clique em <code>Copiar como novo</code>.</li><li>A cópia abre como novo rascunho editável; os blocos finais são repostos em estado de rascunho.</li><li>Dê-lhe um nome claro, altere, use <code>Guardar</code> e depois <code>Arquivar documento atual</code>.</li></ol><p>O original e os PDFs finais permanecem intactos. Também existem <code>Copiar só o relatório</code>, <code>Copiar só o orçamento</code> e <code>Copiar só o recibo</code>.</p></section>
+                <section><h4>7. Utilizar no telefone</h4><ol><li>Abra <code>📁 Ficheiro</code> → <code>Arquivo</code>.</li><li>Siga <code>Pastas</code> → <code>Ficheiros</code> → <code>Pré-visualização</code>.</li><li>Use <code>← Ficheiros</code> e <code>← Pastas</code>, ou o botão Voltar do telefone.</li><li>Abra <code>Filtros e ações</code> para mostrar pesquisa, filtros e comandos.</li></ol><p>A aplicação precisa já estar acessível no navegador do telefone. Teste edição, PDFs e descargas nos modelos realmente utilizados.</p></section>
+                <section><h4>8. Trabalhar em vários computadores</h4><ol><li>Configure em cada computador o mesmo <code>URL da API</code> terminado em <code>/exec</code> e a mesma <code>Chave de acesso da API</code>. Nunca publique esta chave.</li><li>Use <code>Testar ligação</code>.</li><li>No PC A: <code>Guardar</code>, arquivar se necessário, depois <code>Sincronizar Google Sheets</code> ou <code>Enviar agora</code>. Aguarde <code>Sheets · hora</code> e a confirmação de documento sincronizado.</li><li>No PC B, sem alterações locais pendentes: use <code>Atualizar da folha</code>, confirme a ficha no Arquivo e só depois abra para modificar.</li><li>Antes de mudar novamente de computador, guarde e envie.</li></ol><p>Não edite o mesmo rascunho ao mesmo tempo em dois dispositivos. Se aparecer fila offline, falha ou sincronização pendente, não restaure nem atualize por cima desses dados.</p></section>
+                <section><h4>9. Restaurar e resolver conflitos</h4><p><code>Restaurar da folha</code> é uma operação ampla: pode substituir o documento visível e dados locais pelo estado Drive/Sheets. Use apenas depois de guardar uma cópia local e quando pretende realmente adotar o estado da nuvem. Mesmo <code>Atualizar da folha</code> pode recarregar Arquivo e pastas, por isso não o use sobre alterações locais ainda não enviadas.</p><p>Se aparecer <code>Conflito entre dispositivos — clique para escolher</code>, pare de editar nos dois aparelhos. O sistema não faz fusão automática. Em caso de dúvida, cancele os dois pedidos para manter as versões sem substituição, compare-as e faça uma cópia. Depois escolha conscientemente <code>Carregar a versão do Drive?</code> ou <code>Enviar a versão deste dispositivo para o Drive?</code>.</p></section>
+                <section><h4>10. Testes recomendados</h4><ul><li>Pesquisa por cliente, obra, documento e número.</li><li>Guardar, fechar e reabrir no mesmo aparelho.</li><li>Abrir um rascunho do Arquivo, modificar e guardar na mesma ficha.</li><li>Criar, ver e descarregar PDF; confirmar <code>Drive ✓</code>.</li><li><code>Copiar como novo</code> a partir de um final.</li><li>Passagem controlada PC A → PC B → PC A, modo offline e conflito de ensaio.</li><li>Comparar exportações HTML, PDF e DOCX com tabelas, imagens, logótipos, quebras de página e acentos.</li></ul></section>`,
+            'fr-FR': `
+                <p class="abene-arquivo-guide-intro"><strong>Règle principale :</strong> <code>Guardar</code> enregistre le document de travail ; <code>Arquivar</code> crée ou relie une fiche dans <code>Arquivo</code>, classée par client et dossier/chantier. Consulter l’aperçu ne modifie pas le document ouvert.</p>
+                <p class="abene-arquivo-guide-warning"><strong>Limite connue :</strong> le code prévoit la synchronisation Drive/Sheets et les exports, mais la synchronisation complète entre plusieurs appareils et la fidélité visuelle de chaque export doivent être testées sur des copies avant un usage définitif.</p>
+                <p><strong>Google Docs par document :</strong> dans Arquivo, utilisez l’icône <code>G✓</code> pour ouvrir le Google Docs déjà lié ou <code>G+</code> pour en créer un. Pour un document final/protégé, <code>G+</code> crée une copie modifiable et conserve l’original intact.</p>
+                <p><strong>Période du document :</strong> lors de l’importation ou de l’archivage, choisissez <code>Jour</code>, <code>Mois</code> ou <code>Année</code> ; <code>Aujourd’hui</code> remplit immédiatement la date. Cette période est distincte de la date technique d’archivage et sert à la recherche, au classement annuel/mensuel et au pack comptable.</p>
+                <section><h4>1. Ouvrir Arquivo</h4><ol><li>Dans le ruban, cliquez sur <code>Arquivo</code> ; sinon utilisez <code>Ficheiro</code> → <code>Arquivo</code> ou le bouton de la barre inférieure.</li><li>La fenêtre présente <code>Pastas</code>, <code>Ficheiros</code> et <code>Pré-visualização</code>.</li><li>Sélectionner un fichier affiche seulement une copie de consultation ; le document en cours reste intact.</li></ol></section>
+                <section><h4>2. Rechercher un client, un travail ou un document</h4><ol><li>Ouvrez <code>Por cliente</code>.</li><li>Dans <code>Procurar cliente ou trabalho…</code>, saisissez une partie du client, du dossier/chantier, du nom du document ou du numéro. La recherche tolère les différences d’accents.</li><li>Ouvrez le client et choisissez <code>Ver documentos e trabalhos</code> pour tout voir, ou choisissez un chantier précis.</li><li>Sélectionnez le document dans <code>Ficheiros</code>.</li></ol><p>La recherche générale <code>Pesquisar nome, cliente, pasta…</code> se combine avec le type, <code>Só concluídos</code>, <code>Data desde</code>, <code>Data até</code>, l’année et le dossier.</p></section>
+                <section><h4>3. Aperçu et ouverture</h4><ul><li>L’onglet <code>Documento</code> montre le contenu archivé.</li><li><code>Versões finais (PDF)</code> liste les rapports, devis et reçus par version. <code>Ver</code> affiche une version ; <code>Descarregar</code> la télécharge.</li><li><code>Drive ✓</code> indique que cette version PDF possède un identifiant Drive enregistré.</li><li>Pour un brouillon non protégé, <code>Abrir para modificar</code> tente d’abord d’enregistrer le document actuel, puis ouvre la fiche en modification.</li><li>Un document conclu ou protégé utilise <code>Abrir para consultar</code> et reste en lecture seule.</li></ul></section>
+                <section><h4>4. Enregistrer et archiver</h4><h5><code>Guardar</code></h5><ul><li>Enregistre localement dans ce navigateur.</li><li>Crée une version locale dans <code>Versões locais (menu Guardar) — só leitura</code> ; jusqu’à 20 versions sont conservées.</li><li>Met à jour la même fiche d’Arquivo lorsque le document est lié à un brouillon archivé.</li><li>Demande la synchronisation Google si elle est configurée. Aucun Word ou PDF n’est téléchargé automatiquement.</li></ul><h5><code>Arquivar documento atual</code></h5><ol><li>Ouvrez <code>Arquivo</code> puis cliquez sur <code>Arquivar documento atual</code>.</li><li>Renseignez <code>Cliente</code> et <code>Pasta / obra</code>.</li><li>Choisissez éventuellement <code>Marcar concluído</code>.</li><li>Cliquez sur <code>Arquivar agora</code>. L’éditeur reste ouvert et la fiche recevra les prochains enregistrements.</li></ol></section>
+                <section><h4>5. Brouillon, protection et final</h4><ul><li><code>Em curso</code> : brouillon modifiable et actualisé par <code>Guardar</code>.</li><li><code>Proteger documento</code> : verrouille uniquement ce brouillon contre les modifications et la mise à la corbeille. Il s’ouvre en lecture et peut être déverrouillé avec <code>Retirar proteção</code>.</li><li><code>Marcar concluído</code> : crée les PDF finaux des parties présentes et marque la fiche <code>Concluído</code>.</li><li><code>Gravar relatório</code>, <code>Gravar orçamento</code> et <code>Gravar recibo</code> créent des PDF numérotés sans supprimer les précédents.</li><li><code>Criar finais (PDF)</code> finalise les documents archivés sélectionnés.</li></ul><p>Protection et version finale sont différentes : la protection d’un brouillon est réversible ; une fiche conclue s’ouvre en consultation et l’interface observée ne propose pas de retour au brouillon.</p></section>
+                <section><h4>6. Modifier une version finale sans toucher à l’original</h4><ol><li>Sélectionnez la version finale.</li><li>Cliquez sur <code>Copiar como novo</code>.</li><li>La copie s’ouvre comme nouveau brouillon éditable et les blocs finaux redeviennent des brouillons.</li><li>Nommez-la clairement, modifiez-la, utilisez <code>Guardar</code>, puis <code>Arquivar documento atual</code>.</li></ol><p>L’original et ses PDF restent intacts. Vous pouvez aussi choisir <code>Copiar só o relatório</code>, <code>Copiar só o orçamento</code> ou <code>Copiar só o recibo</code>.</p></section>
+                <section><h4>7. Utiliser Arquivo sur téléphone</h4><ol><li>Ouvrez <code>📁 Ficheiro</code> → <code>Arquivo</code>.</li><li>Suivez <code>Pastas</code> → <code>Ficheiros</code> → <code>Pré-visualização</code>.</li><li>Utilisez <code>← Ficheiros</code> puis <code>← Pastas</code>, ou le bouton Retour du téléphone.</li><li>Ouvrez <code>Filtros e ações</code> pour afficher la recherche, les filtres et les commandes.</li></ol><p>ABENE doit déjà être accessible dans le navigateur du téléphone. Testez l’édition, les PDF et les téléchargements sur les modèles réellement utilisés.</p></section>
+                <section><h4>8. Travailler sur plusieurs ordinateurs</h4><ol><li>Configurez sur chaque ordinateur le même <code>URL da API</code> terminé par <code>/exec</code> et la même <code>Chave de acesso da API</code>. Ne publiez jamais cette clé.</li><li>Utilisez <code>Testar ligação</code>.</li><li>Sur le PC A : <code>Guardar</code>, archiver si nécessaire, puis <code>Sincronizar Google Sheets</code> ou <code>Enviar agora</code>. Attendez <code>Sheets · heure</code> et la confirmation de synchronisation du document.</li><li>Sur le PC B, sans modification locale en attente : utilisez <code>Atualizar da folha</code>, contrôlez la fiche dans Arquivo, puis ouvrez-la pour modification.</li><li>Avant de changer à nouveau d’ordinateur, enregistrez et envoyez.</li></ol><p>Ne modifiez jamais le même brouillon simultanément sur deux appareils. En cas de file hors ligne, d’échec ou de synchronisation en attente, ne restaurez ni n’actualisez par-dessus ces données.</p></section>
+                <section><h4>9. Restaurer et résoudre les conflits</h4><p><code>Restaurar da folha</code> est une restauration large : elle peut remplacer le document visible et des données locales par l’état Drive/Sheets. Utilisez-la seulement après une copie locale et si vous voulez réellement reprendre l’état du cloud. Même <code>Atualizar da folha</code> peut recharger Arquivo et les dossiers ; ne l’utilisez pas sur des ajouts locaux non envoyés.</p><p>Si <code>Conflito entre dispositivos — clique para escolher</code> apparaît, arrêtez les modifications sur les deux appareils. Le système ne fusionne rien automatiquement. En cas de doute, annulez les deux demandes pour ne remplacer aucune version, comparez-les et faites une copie. Choisissez ensuite consciemment <code>Carregar a versão do Drive?</code> ou <code>Enviar a versão deste dispositivo para o Drive?</code>.</p></section>
+                <section><h4>10. Tests recommandés</h4><ul><li>Recherche par client, chantier, document et numéro.</li><li>Enregistrement, fermeture et réouverture sur le même appareil.</li><li>Ouverture d’un brouillon d’Arquivo, modification et mise à jour de la même fiche.</li><li>Création, aperçu et téléchargement d’un PDF ; contrôle de <code>Drive ✓</code>.</li><li><code>Copiar como novo</code> depuis une version finale.</li><li>Passage contrôlé PC A → PC B → PC A, mode hors ligne et conflit d’essai.</li><li>Comparaison des exports HTML, PDF et DOCX contenant tableaux, images, logos, sauts de page et accents.</li></ul></section>`,
+            'en-US': `
+                <p class="abene-arquivo-guide-intro"><strong>Main rule:</strong> <code>Guardar</code> saves the working document; <code>Arquivar</code> creates or links a record in <code>Arquivo</code>, organized by client and job folder. Viewing a preview does not change the open document.</p>
+                <p class="abene-arquivo-guide-warning"><strong>Known limitation:</strong> the code provides Drive/Sheets synchronization and exports, but complete multi-device synchronization and the visual fidelity of every export must be tested on copies before production use.</p>
+                <p><strong>Google Docs per document:</strong> in Arquivo, use <code>G✓</code> to open the already linked Google Doc or <code>G+</code> to create one. For a final/protected document, <code>G+</code> creates an editable copy and keeps the original unchanged.</p>
+                <p><strong>Document period:</strong> when importing or archiving, choose <code>Day</code>, <code>Month</code>, or <code>Year</code>; <code>Today</code> fills the date immediately. This is separate from the technical archive date and is used for search, year/month filing, and the accountant pack.</p>
+                <section><h4>1. Open Arquivo</h4><ol><li>On the ribbon, click <code>Arquivo</code>; alternatively use <code>Ficheiro</code> → <code>Arquivo</code> or the bottom status-bar button.</li><li>The window contains <code>Pastas</code>, <code>Ficheiros</code>, and <code>Pré-visualização</code>.</li><li>Selecting a file only displays a viewing copy; the current document remains unchanged.</li></ol></section>
+                <section><h4>2. Find a client, job, or document</h4><ol><li>Open <code>Por cliente</code>.</li><li>In <code>Procurar cliente ou trabalho…</code>, enter part of the client, job folder, document name, or number. Accent differences are ignored.</li><li>Open the client and choose <code>Ver documentos e trabalhos</code> to see everything, or choose a specific job folder.</li><li>Select the document under <code>Ficheiros</code>.</li></ol><p>The general search <code>Pesquisar nome, cliente, pasta…</code> can be combined with document type, <code>Só concluídos</code>, <code>Data desde</code>, <code>Data até</code>, year, and folder.</p></section>
+                <section><h4>3. Preview and open</h4><ul><li>The <code>Documento</code> tab displays the archived content.</li><li><code>Versões finais (PDF)</code> lists report, quote, and receipt versions. <code>Ver</code> opens a version; <code>Descarregar</code> downloads it.</li><li><code>Drive ✓</code> means that the PDF version has a stored Drive identifier.</li><li>For an unprotected draft, <code>Abrir para modificar</code> first attempts to save the current document, then opens the record for editing.</li><li>A completed or protected document uses <code>Abrir para consultar</code> and remains read-only.</li></ul></section>
+                <section><h4>4. Save and archive</h4><h5><code>Guardar</code></h5><ul><li>Saves locally in this browser.</li><li>Creates a local version under <code>Versões locais (menu Guardar) — só leitura</code>; up to 20 versions are retained.</li><li>Updates the same Arquivo record when the document is linked to an archived draft.</li><li>Requests Google synchronization when configured. It does not automatically download Word or PDF files.</li></ul><h5><code>Arquivar documento atual</code></h5><ol><li>Open <code>Arquivo</code> and click <code>Arquivar documento atual</code>.</li><li>Fill in <code>Cliente</code> and <code>Pasta / obra</code>.</li><li>Choose whether to use <code>Marcar concluído</code>.</li><li>Click <code>Arquivar agora</code>. The editor remains open and future saves update the linked record.</li></ol></section>
+                <section><h4>5. Draft, protection, and final version</h4><ul><li><code>Em curso</code>: editable draft updated by <code>Guardar</code>.</li><li><code>Proteger documento</code>: locks only that draft against changes and moving to Trash. It opens read-only and can be unlocked with <code>Retirar proteção</code>.</li><li><code>Marcar concluído</code>: creates final PDFs for the available sections and marks the record <code>Concluído</code>.</li><li><code>Gravar relatório</code>, <code>Gravar orçamento</code>, and <code>Gravar recibo</code> create numbered PDF versions without removing earlier ones.</li><li><code>Criar finais (PDF)</code> finalizes selected archived documents.</li></ul><p>Protection is not the same as a final version: draft protection is reversible; a completed record opens for viewing and the observed interface does not offer a return to draft.</p></section>
+                <section><h4>6. Change a final version safely</h4><ol><li>Select the final version.</li><li>Click <code>Copiar como novo</code>.</li><li>The copy opens as a new editable draft, and final blocks are changed back to draft state.</li><li>Give it a clear name, edit it, use <code>Guardar</code>, and then <code>Arquivar documento atual</code>.</li></ol><p>The original and its final PDFs remain intact. You can also use <code>Copiar só o relatório</code>, <code>Copiar só o orçamento</code>, or <code>Copiar só o recibo</code>.</p></section>
+                <section><h4>7. Use Arquivo on a phone</h4><ol><li>Open <code>📁 Ficheiro</code> → <code>Arquivo</code>.</li><li>Follow <code>Pastas</code> → <code>Ficheiros</code> → <code>Pré-visualização</code>.</li><li>Use <code>← Ficheiros</code>, then <code>← Pastas</code>, or the phone Back button.</li><li>Open <code>Filtros e ações</code> to reveal search, filters, and commands.</li></ol><p>ABENE must already be accessible in the phone browser. Test editing, PDFs, and downloads on the actual target devices.</p></section>
+                <section><h4>8. Work across several computers</h4><ol><li>On each computer, configure the same <code>URL da API</code> ending in <code>/exec</code> and the same <code>Chave de acesso da API</code>. Never publish this key.</li><li>Use <code>Testar ligação</code>.</li><li>On PC A: <code>Guardar</code>, archive if needed, then use <code>Sincronizar Google Sheets</code> or <code>Enviar agora</code>. Wait for <code>Sheets · time</code> and the document synchronization confirmation.</li><li>On PC B, with no pending local changes: use <code>Atualizar da folha</code>, verify the Arquivo record, and only then open it for editing.</li><li>Before switching computers again, save and upload.</li></ol><p>Never edit the same draft at the same time on two devices. If there is an offline queue, failure, or pending synchronization, do not restore or refresh over those changes.</p></section>
+                <section><h4>9. Restore and resolve conflicts</h4><p><code>Restaurar da folha</code> is a broad restore operation: it can replace the visible document and local data with the Drive/Sheets state. Use it only after making a local copy and when you truly intend to adopt the cloud state. Even <code>Atualizar da folha</code> can reload Arquivo and folders, so do not use it over unsent local archive changes.</p><p>If <code>Conflito entre dispositivos — clique para escolher</code> appears, stop editing on both devices. There is no automatic merge. When uncertain, cancel both prompts so neither version is replaced, compare them, and make a copy. Then deliberately choose <code>Carregar a versão do Drive?</code> or <code>Enviar a versão deste dispositivo para o Drive?</code>.</p></section>
+                <section><h4>10. Recommended tests</h4><ul><li>Search by client, job, document, and number.</li><li>Save, close, and reopen on the same device.</li><li>Open an Arquivo draft, edit it, and update the same record.</li><li>Create, view, and download a PDF; check for <code>Drive ✓</code>.</li><li>Use <code>Copiar como novo</code> from a final version.</li><li>Run a controlled PC A → PC B → PC A cycle, an offline test, and a test conflict.</li><li>Compare HTML, PDF, and DOCX exports containing tables, images, logos, page breaks, and accented characters.</li></ul></section>`,
+            'es-ES': `
+                <p class="abene-arquivo-guide-intro"><strong>Regla principal:</strong> <code>Guardar</code> guarda el documento de trabajo; <code>Arquivar</code> crea o vincula una ficha en <code>Arquivo</code>, organizada por cliente y carpeta/obra. Consultar la vista previa no modifica el documento abierto.</p>
+                <p class="abene-arquivo-guide-warning"><strong>Límite conocido:</strong> el código prevé sincronización Drive/Sheets y exportaciones, pero la sincronización completa entre varios dispositivos y la fidelidad visual de cada exportación deben probarse con copias antes del uso definitivo.</p>
+                <p><strong>Google Docs por documento:</strong> en Arquivo, use <code>G✓</code> para abrir el Google Docs ya vinculado o <code>G+</code> para crear uno. En un documento final/protegido, <code>G+</code> crea una copia editable y conserva el original intacto.</p>
+                <p><strong>Período del documento:</strong> al importar o archivar, elija <code>Día</code>, <code>Mes</code> o <code>Año</code>; <code>Hoy</code> completa la fecha inmediatamente. Este período es independiente de la fecha técnica de archivo y se usa para buscar, organizar por año/mes y preparar el paquete contable.</p>
+                <section><h4>1. Abrir Arquivo</h4><ol><li>En la cinta, pulse <code>Arquivo</code>; también puede usar <code>Ficheiro</code> → <code>Arquivo</code> o el botón de la barra inferior.</li><li>La ventana contiene <code>Pastas</code>, <code>Ficheiros</code> y <code>Pré-visualização</code>.</li><li>Seleccionar un archivo solo muestra una copia de consulta; el documento actual permanece intacto.</li></ol></section>
+                <section><h4>2. Buscar un cliente, trabajo o documento</h4><ol><li>Abra <code>Por cliente</code>.</li><li>En <code>Procurar cliente ou trabalho…</code>, escriba parte del cliente, carpeta/obra, nombre del documento o número. La búsqueda ignora diferencias de acentos.</li><li>Abra el cliente y elija <code>Ver documentos e trabalhos</code> para ver todo, o elija una obra concreta.</li><li>Seleccione el documento en <code>Ficheiros</code>.</li></ol><p>La búsqueda general <code>Pesquisar nome, cliente, pasta…</code> se combina con el tipo, <code>Só concluídos</code>, <code>Data desde</code>, <code>Data até</code>, el año y la carpeta.</p></section>
+                <section><h4>3. Vista previa y apertura</h4><ul><li>La pestaña <code>Documento</code> muestra el contenido archivado.</li><li><code>Versões finais (PDF)</code> lista informes, presupuestos y recibos por versión. <code>Ver</code> abre una versión; <code>Descarregar</code> la descarga.</li><li><code>Drive ✓</code> indica que esa versión PDF tiene un identificador Drive guardado.</li><li>Para un borrador no protegido, <code>Abrir para modificar</code> intenta guardar primero el documento actual y después abre la ficha para editarla.</li><li>Un documento concluido o protegido usa <code>Abrir para consultar</code> y permanece en modo lectura.</li></ul></section>
+                <section><h4>4. Guardar y archivar</h4><h5><code>Guardar</code></h5><ul><li>Guarda localmente en este navegador.</li><li>Crea una versión local en <code>Versões locais (menu Guardar) — só leitura</code>; se conservan hasta 20 versiones.</li><li>Actualiza la misma ficha de Arquivo cuando el documento está vinculado a un borrador archivado.</li><li>Solicita la sincronización Google si está configurada. No descarga automáticamente Word ni PDF.</li></ul><h5><code>Arquivar documento atual</code></h5><ol><li>Abra <code>Arquivo</code> y pulse <code>Arquivar documento atual</code>.</li><li>Complete <code>Cliente</code> y <code>Pasta / obra</code>.</li><li>Decida si debe usar <code>Marcar concluído</code>.</li><li>Pulse <code>Arquivar agora</code>. El editor permanece abierto y los próximos guardados actualizan la ficha vinculada.</li></ol></section>
+                <section><h4>5. Borrador, protección y versión final</h4><ul><li><code>Em curso</code>: borrador editable y actualizado mediante <code>Guardar</code>.</li><li><code>Proteger documento</code>: bloquea solo ese borrador contra cambios y envío a la Papelera. Se abre en lectura y puede desbloquearse con <code>Retirar proteção</code>.</li><li><code>Marcar concluído</code>: crea los PDF finales de las partes disponibles y marca la ficha como <code>Concluído</code>.</li><li><code>Gravar relatório</code>, <code>Gravar orçamento</code> y <code>Gravar recibo</code> crean versiones PDF numeradas sin eliminar las anteriores.</li><li><code>Criar finais (PDF)</code> finaliza los documentos archivados seleccionados.</li></ul><p>La protección no es una versión final: la protección del borrador es reversible; una ficha concluida se abre para consulta y la interfaz observada no ofrece volver a borrador.</p></section>
+                <section><h4>6. Modificar una versión final con seguridad</h4><ol><li>Seleccione la versión final.</li><li>Pulse <code>Copiar como novo</code>.</li><li>La copia se abre como nuevo borrador editable y los bloques finales vuelven al estado de borrador.</li><li>Asigne un nombre claro, modifique, use <code>Guardar</code> y después <code>Arquivar documento atual</code>.</li></ol><p>El original y sus PDF finales permanecen intactos. También puede usar <code>Copiar só o relatório</code>, <code>Copiar só o orçamento</code> o <code>Copiar só o recibo</code>.</p></section>
+                <section><h4>7. Usar Arquivo en el teléfono</h4><ol><li>Abra <code>📁 Ficheiro</code> → <code>Arquivo</code>.</li><li>Siga <code>Pastas</code> → <code>Ficheiros</code> → <code>Pré-visualização</code>.</li><li>Use <code>← Ficheiros</code>, después <code>← Pastas</code>, o el botón Atrás del teléfono.</li><li>Abra <code>Filtros e ações</code> para mostrar búsqueda, filtros y comandos.</li></ol><p>ABENE debe estar ya accesible en el navegador del teléfono. Pruebe edición, PDF y descargas en los dispositivos realmente utilizados.</p></section>
+                <section><h4>8. Trabajar en varios ordenadores</h4><ol><li>Configure en cada ordenador el mismo <code>URL da API</code> terminado en <code>/exec</code> y la misma <code>Chave de acesso da API</code>. Nunca publique esta clave.</li><li>Use <code>Testar ligação</code>.</li><li>En el PC A: <code>Guardar</code>, archive si es necesario y use <code>Sincronizar Google Sheets</code> o <code>Enviar agora</code>. Espere <code>Sheets · hora</code> y la confirmación de sincronización del documento.</li><li>En el PC B, sin cambios locales pendientes: use <code>Atualizar da folha</code>, compruebe la ficha en Arquivo y solo entonces ábrala para modificar.</li><li>Antes de cambiar otra vez de ordenador, guarde y envíe.</li></ol><p>No edite el mismo borrador al mismo tiempo en dos dispositivos. Si hay cola sin conexión, fallo o sincronización pendiente, no restaure ni actualice encima de esos datos.</p></section>
+                <section><h4>9. Restaurar y resolver conflictos</h4><p><code>Restaurar da folha</code> es una restauración amplia: puede sustituir el documento visible y datos locales por el estado Drive/Sheets. Úsela solo después de crear una copia local y cuando realmente quiera adoptar el estado de la nube. Incluso <code>Atualizar da folha</code> puede recargar Arquivo y las carpetas; no lo use sobre cambios locales de archivo que aún no se hayan enviado.</p><p>Si aparece <code>Conflito entre dispositivos — clique para escolher</code>, deje de editar en ambos dispositivos. No hay fusión automática. Si duda, cancele las dos preguntas para no sustituir ninguna versión, compárelas y haga una copia. Después elija conscientemente <code>Carregar a versão do Drive?</code> o <code>Enviar a versão deste dispositivo para o Drive?</code>.</p></section>
+                <section><h4>10. Pruebas recomendadas</h4><ul><li>Búsqueda por cliente, obra, documento y número.</li><li>Guardar, cerrar y volver a abrir en el mismo dispositivo.</li><li>Abrir un borrador de Arquivo, modificarlo y actualizar la misma ficha.</li><li>Crear, ver y descargar un PDF; comprobar <code>Drive ✓</code>.</li><li>Usar <code>Copiar como novo</code> desde una versión final.</li><li>Realizar un ciclo controlado PC A → PC B → PC A, una prueba sin conexión y un conflicto de prueba.</li><li>Comparar exportaciones HTML, PDF y DOCX con tablas, imágenes, logotipos, saltos de página y caracteres acentuados.</li></ul></section>`
+        };
+
+        function normalizeArquivoGuideLanguage(language) {
+            return Object.prototype.hasOwnProperty.call(ARQUIVO_GUIDE_HTML, language) ? language : 'pt-PT';
+        }
+
+        function syncArquivoGuideLabels(language) {
+            var lang = normalizeArquivoGuideLanguage(language || localStorage.getItem('abeneLanguage') || 'pt-PT');
+            var label = ARQUIVO_GUIDE_UI[lang].menu;
+            document.querySelectorAll('[data-abene-arquivo-guide-label]').forEach(function (el) {
+                el.textContent = label;
+            });
+        }
+
+        function renderArquivoGuide(language) {
+            var lang = normalizeArquivoGuideLanguage(language || localStorage.getItem('abeneLanguage') || 'pt-PT');
+            var ui = ARQUIVO_GUIDE_UI[lang];
+            var options = [
+                ['pt-PT', 'Português (Portugal)'],
+                ['fr-FR', 'Français'],
+                ['en-US', 'English (US)'],
+                ['es-ES', 'Español']
+            ].map(function (item) {
+                return '<option value="' + item[0] + '"' + (item[0] === lang ? ' selected' : '') + '>' + item[1] + '</option>';
+            }).join('');
+            document.getElementById('genericModalTitle').textContent = ui.title;
+            document.getElementById('genericModalContent').classList.add('abene-arquivo-guide-modal');
+            document.getElementById('genericModalBody').innerHTML =
+                '<article class="abene-arquivo-guide" lang="' + lang + '">' +
+                    '<div class="abene-arquivo-guide-toolbar">' +
+                        '<strong>' + ui.title + '</strong>' +
+                        '<label>' + ui.language + '<select onchange="renderArquivoGuide(this.value)">' + options + '</select></label>' +
+                    '</div>' +
+                    '<div class="abene-arquivo-guide-content">' + ARQUIVO_GUIDE_HTML[lang] + '</div>' +
+                '</article>';
+            document.getElementById('genericModalFooter').innerHTML =
+                '<button type="button" class="btn-primary" onclick="closeModal(\'genericModal\')">' + ui.close + '</button>';
+            document.getElementById('genericModal').classList.add('visible');
+        }
+
+        function openArquivoGuide() {
+            renderArquivoGuide('pt-PT');
+        }
+
+        window.openArquivoGuide = openArquivoGuide;
+        window.renderArquivoGuide = renderArquivoGuide;
 
         function openCompanySettings() {
             const field = (id, label, value, type = 'text') => `<div class="form-group"><label for="${id}">${label}</label><input id="${id}" type="${type}" value="${String(value || '').replace(/"/g, '&quot;')}"></div>`;
@@ -12827,15 +12641,12 @@ table { border-collapse: collapse; }
                 <label style="display:block;margin-top:8px;"><input id="databaseEnabled" type="checkbox" ${(companyData.databaseEnabled !== false) ? 'checked' : ''}> ${t('dbEnable')}</label>
                 <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;">
                     <button type="button" class="btn-secondary" onclick="saveCompanySettings(true); if(window.abeneSheetsTest) abeneSheetsTest().catch(function(){})">${t('sheetsTest')}</button>
-                    <button type="button" class="btn-secondary" onclick="saveCompanySettings(true); if(window.abeneSheetsPush) abeneSheetsPush('manual').then(function(){alert(t('sheetsPushed'))}).catch(function(){alert(t('sheetsPingFail'))})">${t('sheetsPush')}</button>
+                    <button type="button" class="btn-secondary" onclick="saveCompanySettings(true); if(window.abeneSheetsPush) abeneSheetsPush('manual').then(function(result){alert(result && result.blocked ? t('sheetsWaitDocuments') : t('sheetsPushed'))}).catch(function(){alert(t('sheetsPingFail'))})">${t('sheetsPush')}</button>
                     <button type="button" class="btn-secondary" onclick="saveCompanySettings(true); if(window.abeneSheetsPull) abeneSheetsPull().catch(function(){})">${t('sheetsPull')}</button>
                     <button type="button" class="btn-primary" onclick="saveCompanySettings(true); if(window.abeneSheetsRefresh) abeneSheetsRefresh().catch(function(){})">${t('sheetsRefresh')}</button>
                     <button type="button" class="btn-secondary" onclick="saveCompanySettings(true); if(window.abeneSendTestEmail) abeneSendTestEmail().catch(function(){}); else if(typeof showToast==='function') showToast(t('mailTestHint')||t('mailNeedScriptUpdate'))">${t('mailTest')}</button>
                 </div>
                 <p style="font-size:11px;color:#666;margin-top:8px;">${companyData.sheetsLastSync ? (t('sheetsLast') + ' ' + companyData.sheetsLastSync) : t('sheetsNever')}</p>
-                <h4 style="color:#2b579a;margin-top:18px;">${t('xlModuleTitle')}</h4>
-                <p style="font-size:12px;color:#666;margin-bottom:8px;">${t('xlEnableHint')}</p>
-                <label style="display:block;"><input id="excelEnabled" type="checkbox" ${companyData.excelEnabled !== false ? 'checked' : ''}> ${t('xlEnable')}</label>
                 <h4 style="color:#2b579a;margin-top:18px;">${t('tocCodesTitle')}</h4>
                 <p style="font-size:12px;color:#666;line-height:1.45;margin-bottom:8px;">${t('tocCodesHint')}</p>
                 <div class="form-row">${field('tocDiario', t('tocDiario'), companyData.tocDiario || 'VEN')}${field('tocTipoDoc', t('tocTipoDoc'), companyData.tocTipoDoc || 'RG')}</div>`;
@@ -12870,7 +12681,7 @@ table { border-collapse: collapse; }
                 installerEmail: value('installerEmail') || companyData.installerEmail || '',
                 googleOwnerEmail: companyData.googleOwnerEmail || '',
                 databaseEnabled: dbOn,
-                excelEnabled: Boolean(document.getElementById('excelEnabled')?.checked),
+                excelEnabled: false,
                 tocDiario: (value('tocDiario') || 'VEN').toUpperCase(),
                 tocTipoDoc: (value('tocTipoDoc') || 'RG').toUpperCase()
             };
@@ -13172,10 +12983,10 @@ table { border-collapse: collapse; }
             }
         }, 12000);
     </script>
-    <script src="libs/abene-word-home.js?v=20260921-audit3-1"></script>
+    <script src="libs/abene-word-home.js?v=20260921-caret-follow-1"></script>
     <script src="libs/abene-pagination-engine.js?v=20260915-layout-1"></script>
     <script src="libs/abene-sections.js?v=20260915-hfdist-1"></script>
-    <script src="libs/abene-toolbar.js?v=20260921-audit4-1"></script>
+    <script src="libs/abene-toolbar.js?v=20260921-caret-recovery-1"></script>
     <script src="libs/abene-commands.js?v=20260915-fx-1"></script>
     <script src="libs/abene-notes.js?v=20260915-dark-1"></script>
     <script src="libs/abene-objects.js?v=20260915-date-1"></script>
@@ -13183,16 +12994,14 @@ table { border-collapse: collapse; }
     <script src="libs/abene-tables.js?v=20260915-sort-1"></script>
     <script src="libs/abene-document.js?v=20260915-vers-1"></script>
     <script src="libs/abene-history.js?v=20260915-outline-1"></script>
-    <script src="libs/abene-export.js?v=20260921-audit6-1"></script>
+    <script src="libs/abene-export.js?v=20260922-sync-format-1"></script>
     <script src="libs/abene-modelo.js?v=20260914-meta-1"></script>
     <script src="libs/abene-comercial.js?v=20260920-fix9-3"></script>
-    <script src="libs/abene-contabilidade.js?v=20260920-pack-email-split-1"></script>
-    <script src="libs/abene-arquivo.js?v=20260921-fix7-3"></script>
+    <script src="libs/abene-contabilidade.js?v=20260922-period-1"></script>
+    <script src="libs/abene-arquivo.js?v=20260922-period-1"></script>
     <script src="libs/abene-phone.js?v=20260920-wordphone-1"></script>
-    <script src="libs/abene-excel-engine.js?v=20260914-essential-1"></script>
-    <script src="libs/abene-excel.js?v=20260920-excel-export-1"></script>
-    <script src="libs/abene-sheets.js?v=20260921-audit2-1"></script>
-    <script src="libs/abene-document-sync.js?v=20260921-audit5-1"></script>
+    <script src="libs/abene-sheets.js?v=20260922-sync-format-1"></script>
+    <script src="libs/abene-document-sync.js?v=20260922-sync-format-1"></script>
     <script src="libs/abene-collab.js?v=20260915-share-1"></script>
     <script src="libs/abene-gdocs.js?v=20260921-audit1-1"></script>
     <script src="libs/abene-pickers.js?v=20260915-modo-2"></script>
