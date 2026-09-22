@@ -109,6 +109,25 @@
         var d = new Date(v);
         return isNaN(d.getTime()) ? new Date().toISOString().slice(0, 10) : d.toISOString().slice(0, 10);
     }
+    function entryPeriodInfo(entry) {
+        entry = entry || {};
+        if (window.abeneArquivoApi && typeof window.abeneArquivoApi.entryPeriod === 'function') {
+            return window.abeneArquivoApi.entryPeriod(entry);
+        }
+        var kind = entry.periodKind === 'month' || entry.periodKind === 'year' ? entry.periodKind : 'day';
+        var value = String(entry.periodValue || entry.documentDate || entry.archivedAt || '').trim();
+        if (kind === 'year') value = (value.match(/^\d{4}/) || [''])[0];
+        else if (kind === 'month') value = (value.match(/^\d{4}-\d{2}/) || [''])[0];
+        else value = (value.match(/^\d{4}-\d{2}-\d{2}/) || [''])[0];
+        if (!value) return { kind: kind, value: '', start: '', end: '' };
+        if (kind === 'year') return { kind: kind, value: value, start: value + '-01-01', end: value + '-12-31' };
+        if (kind === 'month') {
+            var parts = value.split('-');
+            var last = new Date(Number(parts[0]), Number(parts[1]), 0).getDate();
+            return { kind: kind, value: value, start: value + '-01', end: value + '-' + ('0' + last).slice(-2) };
+        }
+        return { kind: kind, value: value, start: value, end: value };
+    }
     function finish() {
         if (typeof saveUndoState === 'function') saveUndoState();
         if (typeof updateStats === 'function') updateStats();
@@ -558,6 +577,14 @@
                 hasPdf: false
             });
         });
+        var period = entryPeriodInfo(entry);
+        out.forEach(function (paper) {
+            paper.periodKind = period.kind;
+            paper.periodValue = period.value;
+            paper.periodStart = period.start;
+            paper.periodEnd = period.end;
+            paper.archivedAt = entry && entry.archivedAt || '';
+        });
         return out;
     }
     function collectPackSources(entriesOverride, forceAllArchive) {
@@ -995,6 +1022,9 @@
             '11_parametros_exportacao.json',
             '   Data da exportacao, filtros aplicados e quantidade de documentos selecionados.',
             '',
+            '12_periodos_documentos.csv',
+            '   Periodo atribuido a cada documento (dia, mes ou ano), separado da data de arquivo.',
+            '',
             'PDF/',
             '   Versoes finais gravadas no Arquivo e 00_indice_PDF.csv, se existirem.',
             '',
@@ -1033,6 +1063,21 @@
             '<p>Nao constitui fatura certificada AT.</p></body></html>';
     }
 
+    function buildPeriodosCsv(papers) {
+        var rows = [['Cliente', 'Pasta', 'Documento', 'TipoPeriodo', 'Periodo', 'DataInicio', 'DataFim', 'DataDocumento', 'ArquivadoEm']
+            .map(csvEsc).join(';')];
+        var seen = {};
+        (papers || []).forEach(function (p) {
+            var key = String(p.ownerId || [p.arquivoNome, p.cliente, p.pasta, p.numero].join('|'));
+            if (seen[key]) return;
+            seen[key] = true;
+            rows.push([p.cliente || '', p.pasta || '', p.arquivoNome || p.numero || '', p.periodKind || 'day',
+                p.periodValue || '', p.periodStart || '', p.periodEnd || '', p.data || '', p.archivedAt || '']
+                .map(csvEsc).join(';'));
+        });
+        return rows.join('\r\n') + '\r\n';
+    }
+
     function fillZipCore(zip, papers, exportMeta) {
         var excelPt = buildCsvPack(papers, true);
         var erp = buildCsvPack(papers, false);
@@ -1053,6 +1098,7 @@
             generatedAt: new Date().toISOString(),
             documentCount: papers.length
         }, null, 2));
+        zip.file('12_periodos_documentos.csv', '\uFEFF' + buildPeriodosCsv(papers));
     }
 
     function attachFinalPdfs(zip, entries, papers) {
@@ -1087,7 +1133,8 @@
                         return false;
                     })[0] || null;
                     var base = fileBase(e);
-                    var folder = ['PDF', san(e.client || 'Cliente'), base].join('/');
+                    var period = entryPeriodInfo(e);
+                    var folder = ['PDF', san(e.client || 'Cliente'), san(period.value || 'Sem_periodo'), base].join('/');
                     var path = folder + '/' + base + '_' + r.etape + '_v' + r.rev + '.pdf';
                     zip.file(path, r.blob);
                     attached += 1;
@@ -1241,10 +1288,11 @@
             return (base.papers || []).filter(function (p) {
                 if (!allowedTypes[p.tipo]) return false;
                 if (finalsOnly && !(p.final || p.status === 'final')) return false;
-                var d = isoDate(p.data);
-                if (!d) return includeUndated;
-                if (from && d < from) return false;
-                if (to && d > to) return false;
+                var start = p.periodStart || (p.data ? isoDate(p.data) : '');
+                var end = p.periodEnd || start;
+                if (!start || !end) return includeUndated;
+                if (from && end < from) return false;
+                if (to && start > to) return false;
                 return true;
             });
         }
@@ -1274,7 +1322,7 @@
                 Object.keys(tb.bases).forEach(function (rate) { one += Number(tb.bases[rate]) || 0; });
                 Object.keys(tb.ivas).forEach(function (rate) { one += Number(tb.ivas[rate]) || 0; });
                 return '<label class="pack-doc"><input type="checkbox" class="pack-doc-cb" data-key="' + esc(k) + '" data-i="' + i + '"' + (chosen[k] !== false ? ' checked' : '') + '>' +
-                    '<span>' + paperLabel(p, i) + '<small>' + esc((isoDate(p.data) || tt('packNoDate', 'Sem data')) + (p.objeto ? ' · ' + p.objeto : '')) + '</small></span>' +
+                    '<span>' + paperLabel(p, i) + '<small>' + esc(((p.periodValue ? tt('impPeriod', 'Período') + ': ' + p.periodValue : (isoDate(p.data) || tt('packNoDate', 'Sem data'))) + (p.objeto ? ' · ' + p.objeto : ''))) + '</small></span>' +
                     '<span class="pack-total">' + decPt(one || p.total || 0) + ' €</span></label>';
             }).join('') || ('<p style="padding:10px;font-size:12px;">' + esc(tt('packNoResults', 'Nenhum documento corresponde a estes filtros.')) + '</p>');
             var all = document.getElementById('packAllDocs');
@@ -1318,7 +1366,7 @@
                         return;
                     }
                     el.textContent = pf.ok
-                        ? tt('mailStatusReady', 'Gmail prêt')
+                        ? tt('mailStatusReady', 'Gmail pronto')
                         : (pf.message || tt('mailStatusSetup', 'Gmail: configurar'));
                     el.style.color = pf.ok ? '#1e6b3a' : '#a33';
                     if (pf.ok && window.abeneEmailCapabilities) {
@@ -1473,11 +1521,15 @@
         if (typeof window.abeneSheetsCall !== 'function') return Promise.reject(new Error(tt('packEmailNoLink', 'Ligação ao email indisponível.')));
         return window.abeneSheetsCall('SEND_EMAIL', payload);
     }
-    /** Build ordered list of valid subset zips that each fit under safeMax (never raw zip-split). */
-    function planPackEmailParts(src, opts, safeMax) {
+    /** Build ordered list of valid subset zips (never raw zip-split).
+     * hardMax = Gmail attachment limit; safeMax = hardMax − 512 KiB soft margin for multi-doc packs.
+     * A single document between safeMax and hardMax is still emailed alone (fix audit8). */
+    function planPackEmailParts(src, opts, maxBytes) {
         var papers = (src.papers || []).slice();
         var entries = src.entries || [];
         var MAX_PARTS = 15;
+        var hardMax = Math.max(1024 * 1024, Number(maxBytes) || (15 * 1024 * 1024));
+        var safeMax = Math.max(1024 * 1024, hardMax - 512 * 1024);
         if (!papers.length) return Promise.reject(new Error(tt('packSelectOne', 'Selecione pelo menos um documento.')));
 
         function buildSlice(from, to, partMeta) {
@@ -1491,12 +1543,30 @@
         function nextPart() {
             if (start >= papers.length) return Promise.resolve({ parts: parts });
             return buildSlice(start, start + 1).then(function (oneBlob) {
-                if (oneBlob.size > safeMax) {
+                if (oneBlob.size > hardMax) {
                     return {
                         error: 'single-too-large',
                         size: oneBlob.size,
                         parts: []
                     };
+                }
+                /* Fits hard limit but exceeds soft margin → own part (do not reject). */
+                if (oneBlob.size > safeMax) {
+                    parts.push({
+                        papers: papers.slice(start, start + 1),
+                        blob: oneBlob,
+                        from: start,
+                        to: start + 1
+                    });
+                    if (parts.length > MAX_PARTS) {
+                        return {
+                            error: 'too-many-parts',
+                            parts: parts,
+                            size: null
+                        };
+                    }
+                    start = start + 1;
+                    return nextPart();
                 }
                 var lo = start + 1;
                 var hi = papers.length;
@@ -1600,7 +1670,7 @@
                 .replace('{size}', sizeMb));
         }
 
-        return planPackEmailParts(src, opts, safeMax).then(function (plan) {
+        return planPackEmailParts(src, opts, maxBytes).then(function (plan) {
             if (plan.error === 'single-too-large') {
                 var oneMb = (Number(plan.size) / (1024 * 1024)).toFixed(1);
                 throw new Error(tt('packEmailSingleTooLarge', 'O pack foi descarregado ({size} MB), mas um único documento ({one} MB) excede o limite de {mb} MB para e-mail. Use a descarga local.')

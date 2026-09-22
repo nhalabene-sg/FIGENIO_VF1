@@ -4,7 +4,9 @@
  *
  * Additive: offline SYNC_DOCUMENT queue + flush on online; scoped abeneBeforeCloudReplace
  * with restore-on-fail; never overwrite protected docs. No OT merge.
- * audit5: rebind sync on New/Import (index) + ignore stale base.documentId. */
+ * audit5: rebind sync on New/Import (index) + ignore stale base.documentId.
+ * audit5-2: queue stores full document snapshot; online flush pushes other archiveEntryIds
+ * without waiting for reopening (no editor switch; conflicts stay queued). */
 (function () {
     'use strict';
     var busy = false, ready = false, conflict = null, timer, scope = '', base = null;
@@ -77,10 +79,31 @@
         else if (lastKind === 'warn') el.style.color = '#C9A84C';
         else el.style.color = '';
     }
+    function scopeKeyFor(id) {
+        return 'abeneDocumentSync:' + connRoot() + ':' + sanitizeId(id || 'current');
+    }
+    function rememberFor(id, revision, doc, applyToLive) {
+        var next = {
+            revision: revision || '',
+            fingerprint: fingerprint(doc),
+            documentId: sanitizeId(id || 'current')
+        };
+        localStorage.setItem(scopeKeyFor(next.documentId), JSON.stringify(next));
+        if (applyToLive) {
+            base = next;
+            scope = scopeKeyFor(next.documentId);
+        }
+        return next;
+    }
     function remember(revision, doc) {
-        var next = { revision: revision || '', fingerprint: fingerprint(doc), documentId: docId() };
-        localStorage.setItem(scope, JSON.stringify(next));
-        base = next;
+        return rememberFor(docId(), revision, doc, true);
+    }
+    function readBaseFor(id) {
+        try {
+            return JSON.parse(localStorage.getItem(scopeKeyFor(id)) || 'null');
+        } catch (e) {
+            return null;
+        }
     }
     function readQueue() {
         try {
@@ -98,13 +121,20 @@
         if (state().protected) return false;
         if (!window.abeneSheetsEnabled || !window.abeneSheetsEnabled()) return false;
         var id = docId();
+        var snap = snapshot();
         var q = readQueue();
+        // Keep any richer snapshot already queued for another reason if fingerprint matches.
+        var prev = q[id];
         q[id] = {
             documentId: id,
-            fingerprint: fingerprint(snapshot()),
+            fingerprint: fingerprint(snap),
+            document: snap,
             queuedAt: Date.now(),
             reason: reason || 'offline'
         };
+        if (prev && prev.document && prev.fingerprint === q[id].fingerprint && !snap.html) {
+            q[id].document = prev.document;
+        }
         writeQueue(q);
         status(tt('docSyncQueued', 'Fila de sincronização — aguarda ligação'), 'queued');
         return true;
@@ -119,6 +149,16 @@
     function hasQueued(id) {
         var q = readQueue();
         return !!q[id || docId()];
+    }
+    function queuedIds() {
+        var q = readQueue();
+        return Object.keys(q).filter(function (id) {
+            var item = q[id];
+            return !!(item && item.document);
+        });
+    }
+    function hasAnyQueued() {
+        return queuedIds().length > 0;
     }
     function localNeedsPush() {
         try {
@@ -169,6 +209,12 @@
         localStorage.setItem('abeneProjectSettings', projectSettings());
         return true;
     }
+    function persistRemoteInArquivo(doc) {
+        if (!doc || docId() === 'current') return;
+        var api = window.abeneArquivoApi;
+        if (!api || typeof api.saveOpenedDocument !== 'function') return;
+        api.saveOpenedDocument(doc.html || '', doc.name || state().name || 'Documento1');
+    }
     function applyRemote(remote) {
         if (state().protected) {
             throw new Error(tt('docSyncReplaceBlocked', 'Documento protegido — substituição a partir do Drive bloqueada'));
@@ -190,6 +236,9 @@
             window.abeneSheetsApplyDocument(clean);
             localStorage.setItem('abeneProjectSettings', projectSettings());
             state().dirty = false;
+            // Keep the local Arquivo record aligned with the Drive version before
+            // the general Sheets/Arquivo snapshot is allowed to upload again.
+            persistRemoteInArquivo(clean);
         } catch (e) {
             try {
                 restoreFromSnapshot(localBefore);
@@ -327,6 +376,8 @@
                     : tt('docSyncOkEntry', 'Documento do Arquivo sincronizado com o Drive'),
                 'ok'
             );
+            // Other archiveEntryIds queued offline: push stored snapshots without switching editor.
+            try { await flushBackgroundQueue(); } catch (eBg) { /* keep current ok */ }
         } catch (e) {
             if (isLikelyNetworkError(e)) {
                 enqueue('error');
@@ -341,6 +392,104 @@
         clearTimeout(timer);
         timer = setTimeout(function () { sync(false); }, 2500);
     }
+    async function flushBackgroundQueue() {
+        if (navigator.onLine === false) return;
+        if (!window.abeneSheetsEnabled || !window.abeneSheetsEnabled()) return;
+        var q = readQueue();
+        var current = docId();
+        var ids = Object.keys(q).filter(function (id) {
+            return id !== current && q[id] && q[id].document;
+        });
+        if (!ids.length) return;
+        if (!ready) {
+            try {
+                var ping = await window.abeneSheetsCall('PING');
+                if (!ping.safeDocumentSync) return;
+                multiOk = !!ping.multiDocumentSync;
+                ready = true;
+            } catch (ePing) {
+                return;
+            }
+        }
+        var pushed = 0;
+        for (var i = 0; i < ids.length; i++) {
+            var id = ids[i];
+            var entry = q[id];
+            if (id !== 'current' && !multiOk) continue;
+            try {
+                var remote = await window.abeneSheetsCall('SYNC_DOCUMENT', { documentId: id });
+                var local = entry.document;
+                var localPrint = fingerprint(local);
+                var remotePrint = fingerprint(remote.document);
+                var otherBase = readBaseFor(id);
+                if (localPrint === remotePrint) {
+                    rememberFor(id, remote.revision, local, false);
+                    dequeue(id);
+                    pushed++;
+                    continue;
+                }
+                if (otherBase && localPrint === otherBase.fingerprint && remote.document) {
+                    // Open editor still has another doc — leave remote adoption for reopen.
+                    continue;
+                }
+                if ((otherBase && otherBase.revision === remote.revision) || !remote.document) {
+                    var result = await window.abeneSheetsCall('SYNC_DOCUMENT', {
+                        documentId: id,
+                        baseRevision: remote.revision,
+                        document: local
+                    });
+                    if (result.conflict) continue;
+                    rememberFor(id, result.revision, local, false);
+                    dequeue(id);
+                    pushed++;
+                }
+                // Else: real conflict — keep queued until that archiveEntryId is reopened.
+            } catch (e) {
+                // Keep entry; next online/visibility pass retries.
+            }
+        }
+        if (pushed && !busy) {
+            status(tt('docSyncOkEntry', 'Documento do Arquivo sincronizado com o Drive'), 'ok');
+        }
+    }
+    function waitUntilIdle(timeoutMs) {
+        var started = Date.now();
+        return new Promise(function (resolve) {
+            function check() {
+                if (!busy) { resolve(true); return; }
+                if (Date.now() - started >= (timeoutMs || 30000)) { resolve(false); return; }
+                setTimeout(check, 80);
+            }
+            check();
+        });
+    }
+    async function beforeArchivePush() {
+        if (navigator.onLine === false) {
+            if (!state().protected && (localNeedsPush() || hasAnyQueued())) enqueue('offline');
+            return { ok: false, blocked: true, offline: true, conflict: !!conflict, queuedIds: queuedIds() };
+        }
+        var idle = await waitUntilIdle(30000);
+        if (!idle) {
+            return { ok: false, blocked: true, busy: true, conflict: !!conflict, queuedIds: queuedIds() };
+        }
+        await sync(false);
+        idle = await waitUntilIdle(30000);
+        if (!idle) {
+            return { ok: false, blocked: true, busy: true, conflict: !!conflict, queuedIds: queuedIds() };
+        }
+        await flushBackgroundQueue();
+        var pendingIds = queuedIds();
+        var blocked = !!conflict || pendingIds.length > 0;
+        if (blocked) {
+            status(
+                conflict
+                    ? tt('docSyncConflict', 'Conflito entre dispositivos — clique para escolher')
+                    : tt('docSyncQueued', 'Fila de sincronização — aguarda ligação'),
+                conflict ? 'conflict' : 'queued'
+            );
+        }
+        return { ok: !blocked, blocked: blocked, conflict: !!conflict, queuedIds: pendingIds };
+    }
     function flushQueueSoon() {
         clearTimeout(flushTimer);
         flushTimer = setTimeout(function () {
@@ -348,7 +497,9 @@
             if (hasQueued() || localNeedsPush()) {
                 status(tt('docSyncFlushing', 'A enviar fila de sincronização…'), 'syncing');
             }
-            sync(false);
+            sync(false).then(function () {
+                return flushBackgroundQueue();
+            }).catch(function () { /* sync already reported */ });
         }, 400);
     }
     function onDocChange() {
@@ -366,6 +517,9 @@
     window.abeneDocumentSyncSave = function () { return sync(true); };
     window.abeneDocumentSyncOnDocChange = onDocChange;
     window.abeneDocumentSyncHasQueued = function () { return hasQueued(); };
+    window.abeneDocumentSyncHasAnyQueued = hasAnyQueued;
+    window.abeneDocumentSyncHasConflict = function () { return !!conflict; };
+    window.abeneDocumentSyncBeforeArchivePush = beforeArchivePush;
     window.abeneBeforeCloudReplaceRead = function (id) { return readBackup(id); };
     document.addEventListener('input', function (event) {
         var editor = document.getElementById('editor');

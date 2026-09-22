@@ -1462,7 +1462,7 @@ function pdfOptions(g, filename) {
         return {
             margin: 0,
             filename: filename,
-            image: { type: 'jpeg', quality: 0.93 },
+            image: { type: 'png', quality: 1 },
             html2canvas: {
                 scale: 2,
                 useCORS: true,
@@ -1611,7 +1611,7 @@ function pdfOptions(g, filename) {
                 var pageCanvas = cropCanvas(canvas, g);
                 var score = canvasInkScore(pageCanvas);
                 if (score > bestScore) {
-                    bestImage = pageCanvas.toDataURL('image/jpeg', 0.94);
+                    bestImage = pageCanvas.toDataURL('image/png');
                     bestScore = score;
                 }
                 releaseCanvas(pageCanvas);
@@ -1625,12 +1625,12 @@ function pdfOptions(g, filename) {
 
     function stampCanvas(pdf, canvasOrImage, g) {
         try {
-            var image = typeof canvasOrImage === 'string' ? canvasOrImage : canvasOrImage.toDataURL('image/jpeg', 0.94);
-            pdf.addImage(image, 'JPEG', 0, 0, g.wmm, g.hmm, undefined, 'NONE');
+            var image = typeof canvasOrImage === 'string' ? canvasOrImage : canvasOrImage.toDataURL('image/png');
+            pdf.addImage(image, 'PNG', 0, 0, g.wmm, g.hmm, undefined, 'FAST');
             return true;
         } catch (e1) {
             try {
-                pdf.addImage(canvasOrImage, 'JPEG', 0, 0, g.wmm, g.hmm);
+                pdf.addImage(canvasOrImage, 'PNG', 0, 0, g.wmm, g.hmm, undefined, 'FAST');
                 return true;
             } catch (e2) {
                 try {

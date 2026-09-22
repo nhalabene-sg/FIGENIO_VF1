@@ -3,7 +3,8 @@
    Cópia só de leitura: o documento em curso não é tocado ao consultar.
    Fix #7 (mobile nav): back path preview→files→folders, tools collapse,
    44px targets, reachable panes without crushing desktop layout.
-   Fix #7b: injectCss @media aligned with isMobileArchive (pointer:coarse). */
+   Fix #7b: injectCss @media aligned with isMobileArchive (pointer:coarse).
+   Fix #7c: body scroll-lock, keep mobile pane on reopen, files after nova pasta. */
 (function () {
     var STORE = 'abeneArquivoV1';
     var FOLDERS_STORE = 'abeneArquivoFoldersV1';
@@ -13,6 +14,7 @@
     var state = {
         folder: 'all',
         query: '',
+        clientQuery: '',
         type: 'all',
         concludedOnly: false,
         dateFrom: '',
@@ -55,6 +57,9 @@
             done: 'Concluídos',
             byType: 'Por tipo',
             byClient: 'Por cliente',
+            clientSearch: 'Procurar cliente ou trabalho…',
+            clientEmpty: 'Nenhum cliente ou trabalho encontrado.',
+            clientDocuments: 'Ver documentos e trabalhos',
             byPasta: 'Por pasta / obra',
             byYear: 'Por ano',
             drafts: 'Documento em curso e versões Guardar',
@@ -115,7 +120,13 @@
             archiveCancel: 'Cancelar',
             pdfSavedView: 'Versão gravada — a pré-visualização PDF está abaixo.',
             createGo: 'Criar',
-            folderPanelTitle: 'Nova pasta no arquivo'
+            folderPanelTitle: 'Nova pasta no arquivo',
+            gdocsEntry: 'Google Docs',
+            gdocsOpenEntry: 'Abrir o Google Docs ligado',
+            gdocsCreateEntry: 'Criar e abrir no Google Docs',
+            gdocsCopyEntry: 'Criar cópia editável no Google Docs',
+            gdocsCopyNotice: 'Foi criada uma cópia editável; o documento concluído original fica intacto.',
+            gdocsOffline: 'Sem ligação: o Google Docs só pode ser aberto quando houver internet.'
         },
         'fr-FR': {
             title: 'Archives',
@@ -136,6 +147,9 @@
             done: 'Conclus',
             byType: 'Par type',
             byClient: 'Par client',
+            clientSearch: 'Rechercher un client ou un travail…',
+            clientEmpty: 'Aucun client ou travail trouvé.',
+            clientDocuments: 'Voir les documents et travaux',
             byPasta: 'Par dossier / chantier',
             byYear: 'Par année',
             drafts: 'Document en cours et versions Enregistrer',
@@ -196,7 +210,13 @@
             archiveCancel: 'Annuler',
             pdfSavedView: 'Version enregistrée — l’aperçu PDF est ci-dessous.',
             createGo: 'Créer',
-            folderPanelTitle: 'Nouveau dossier dans l’archive'
+            folderPanelTitle: 'Nouveau dossier dans l’archive',
+            gdocsEntry: 'Google Docs',
+            gdocsOpenEntry: 'Ouvrir le Google Docs lié',
+            gdocsCreateEntry: 'Créer et ouvrir dans Google Docs',
+            gdocsCopyEntry: 'Créer une copie modifiable dans Google Docs',
+            gdocsCopyNotice: 'Une copie modifiable a été créée ; le document final original reste intact.',
+            gdocsOffline: 'Hors connexion : Google Docs ne peut être ouvert qu’avec Internet.'
         },
         'en-US': {
             title: 'Archive',
@@ -217,6 +237,9 @@
             done: 'Concluded',
             byType: 'By type',
             byClient: 'By client',
+            clientSearch: 'Find a client or job…',
+            clientEmpty: 'No matching client or job.',
+            clientDocuments: 'View documents and jobs',
             byPasta: 'By job folder',
             byYear: 'By year',
             drafts: 'Current document and Save versions',
@@ -277,7 +300,13 @@
             archiveCancel: 'Cancel',
             pdfSavedView: 'Version saved — PDF preview is below.',
             createGo: 'Create',
-            folderPanelTitle: 'New archive folder'
+            folderPanelTitle: 'New archive folder',
+            gdocsEntry: 'Google Docs',
+            gdocsOpenEntry: 'Open linked Google Doc',
+            gdocsCreateEntry: 'Create and open in Google Docs',
+            gdocsCopyEntry: 'Create an editable copy in Google Docs',
+            gdocsCopyNotice: 'An editable copy was created; the original final document remains unchanged.',
+            gdocsOffline: 'Offline: Google Docs can only be opened with an internet connection.'
         },
         'es-ES': {
             title: 'Archivo',
@@ -298,6 +327,9 @@
             done: 'Concluidos',
             byType: 'Por tipo',
             byClient: 'Por cliente',
+            clientSearch: 'Buscar cliente o trabajo…',
+            clientEmpty: 'No se encontraron clientes ni trabajos.',
+            clientDocuments: 'Ver documentos y trabajos',
             byPasta: 'Por carpeta / obra',
             byYear: 'Por año',
             drafts: 'Documento en curso y versiones Guardar',
@@ -358,7 +390,13 @@
             archiveCancel: 'Cancelar',
             pdfSavedView: 'Versión grabada — la vista PDF está abajo.',
             createGo: 'Crear',
-            folderPanelTitle: 'Nueva carpeta en el archivo'
+            folderPanelTitle: 'Nueva carpeta en el archivo',
+            gdocsEntry: 'Google Docs',
+            gdocsOpenEntry: 'Abrir el Google Docs vinculado',
+            gdocsCreateEntry: 'Crear y abrir en Google Docs',
+            gdocsCopyEntry: 'Crear una copia editable en Google Docs',
+            gdocsCopyNotice: 'Se creó una copia editable; el documento final original permanece intacto.',
+            gdocsOffline: 'Sin conexión: Google Docs solo se puede abrir con Internet.'
         }
     };
 
@@ -442,10 +480,11 @@
 
     var SELECTSTR = {
         'pt-PT': {
-            dateFrom: 'Data desde', dateTo: 'Data até', clearPeriod: 'Limpar período',
+            dateFrom: 'Período desde', dateTo: 'Período até', clearPeriod: 'Limpar período',
             selectAll: 'Selecionar visíveis', clearSelection: 'Limpar seleção', selectedCount: '{n} selecionado(s)',
             downloadSelected: 'Descarregar selecionados', packSelected: 'Pack contabilista selecionado',
             finalizeSelected: 'Criar finais (PDF)', documentDate: 'Data do documento', archiveDate: 'Arquivado em',
+            period: 'Período do documento', periodDay: 'Dia', periodMonth: 'Mês', periodYear: 'Ano', periodToday: 'Hoje',
             selectedEmpty: 'Selecione pelo menos um documento.',
             finalizeConfirm: 'Criar e guardar os PDFs finais de {n} documento(s)? Os originais e os PDFs existentes ficam intactos.',
             finalizeBusy: 'A criar versões finais de {n} documento(s)…',
@@ -454,10 +493,11 @@
             finalizeArchiveOnly: 'A finalização em lote aplica-se apenas aos documentos arquivados.'
         },
         'fr-FR': {
-            dateFrom: 'Date de début', dateTo: 'Date de fin', clearPeriod: 'Effacer la période',
+            dateFrom: 'Période depuis', dateTo: 'Période jusqu’à', clearPeriod: 'Effacer la période',
             selectAll: 'Sélectionner les visibles', clearSelection: 'Effacer la sélection', selectedCount: '{n} sélectionné(s)',
             downloadSelected: 'Télécharger la sélection', packSelected: 'Pack comptable sélectionné',
             finalizeSelected: 'Créer les versions finales (PDF)', documentDate: 'Date du document', archiveDate: 'Archivé le',
+            period: 'Période du document', periodDay: 'Jour', periodMonth: 'Mois', periodYear: 'Année', periodToday: 'Aujourd’hui',
             selectedEmpty: 'Sélectionnez au moins un document.',
             finalizeConfirm: 'Créer et conserver les PDF finaux de {n} document(s) ? Les originaux et les PDF existants resteront intacts.',
             finalizeBusy: 'Création des versions finales de {n} document(s)…',
@@ -466,10 +506,11 @@
             finalizeArchiveOnly: 'La finalisation groupée concerne uniquement les documents archivés.'
         },
         'en-US': {
-            dateFrom: 'Start date', dateTo: 'End date', clearPeriod: 'Clear period',
+            dateFrom: 'Period from', dateTo: 'Period to', clearPeriod: 'Clear period',
             selectAll: 'Select visible', clearSelection: 'Clear selection', selectedCount: '{n} selected',
             downloadSelected: 'Download selected', packSelected: 'Selected accounting pack',
             finalizeSelected: 'Create finals (PDF)', documentDate: 'Document date', archiveDate: 'Archived on',
+            period: 'Document period', periodDay: 'Day', periodMonth: 'Month', periodYear: 'Year', periodToday: 'Today',
             selectedEmpty: 'Select at least one document.',
             finalizeConfirm: 'Create and retain final PDFs for {n} document(s)? Originals and existing PDFs will remain intact.',
             finalizeBusy: 'Creating final versions for {n} document(s)…',
@@ -478,10 +519,11 @@
             finalizeArchiveOnly: 'Bulk finalization applies only to archived documents.'
         },
         'es-ES': {
-            dateFrom: 'Fecha inicial', dateTo: 'Fecha final', clearPeriod: 'Limpiar período',
+            dateFrom: 'Período desde', dateTo: 'Período hasta', clearPeriod: 'Limpiar período',
             selectAll: 'Seleccionar visibles', clearSelection: 'Limpiar selección', selectedCount: '{n} seleccionado(s)',
             downloadSelected: 'Descargar selección', packSelected: 'Pack contable seleccionado',
             finalizeSelected: 'Crear finales (PDF)', documentDate: 'Fecha del documento', archiveDate: 'Archivado el',
+            period: 'Período del documento', periodDay: 'Día', periodMonth: 'Mes', periodYear: 'Año', periodToday: 'Hoy',
             selectedEmpty: 'Seleccione al menos un documento.',
             finalizeConfirm: '¿Crear y conservar los PDF finales de {n} documento(s)? Los originales y los PDF existentes quedarán intactos.',
             finalizeBusy: 'Creando versiones finales de {n} documento(s)…',
@@ -1078,6 +1120,59 @@
         var d = new Date(raw);
         return isNaN(d.getTime()) ? '' : d.toISOString().slice(0, 10);
     }
+    function todayIso() {
+        var d = new Date();
+        return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
+    }
+    function normalizePeriodKind(kind) {
+        return kind === 'month' || kind === 'year' ? kind : 'day';
+    }
+    function normalizePeriodValue(kind, value) {
+        kind = normalizePeriodKind(kind);
+        value = String(value || '').trim();
+        if (kind === 'year') {
+            var y = value.match(/^(\d{4})/);
+            return y ? y[1] : '';
+        }
+        if (kind === 'month') {
+            var m = value.match(/^(\d{4})-(\d{2})/);
+            return m ? m[1] + '-' + m[2] : '';
+        }
+        return normalizeEntryDate(value);
+    }
+    function periodBounds(kind, value) {
+        kind = normalizePeriodKind(kind);
+        value = normalizePeriodValue(kind, value);
+        if (!value) return { kind: kind, value: '', start: '', end: '' };
+        if (kind === 'year') return { kind: kind, value: value, start: value + '-01-01', end: value + '-12-31' };
+        if (kind === 'month') {
+            var parts = value.split('-');
+            var last = new Date(Number(parts[0]), Number(parts[1]), 0).getDate();
+            return { kind: kind, value: value, start: value + '-01', end: value + '-' + ('0' + last).slice(-2) };
+        }
+        return { kind: kind, value: value, start: value, end: value };
+    }
+    function entryPeriod(e) {
+        e = e || {};
+        var fallback = normalizeEntryDate(e.documentDate) || (e.html ? detectMeta(e.html).documentDate : '') || normalizeEntryDate(e.periodStart) || normalizeEntryDate(e.archivedAt);
+        return periodBounds(e.periodKind || 'day', e.periodValue || fallback);
+    }
+    function periodLabel(e) {
+        var p = entryPeriod(e);
+        if (!p.value) return '';
+        return tr('period') + ': ' + p.value;
+    }
+    function setPeriodInput(kindId, valueId, kind, value) {
+        var kindEl = document.getElementById(kindId);
+        var valueEl = document.getElementById(valueId);
+        kind = normalizePeriodKind(kind || (kindEl && kindEl.value));
+        if (kindEl) kindEl.value = kind;
+        if (!valueEl) return;
+        valueEl.type = kind === 'year' ? 'number' : kind;
+        if (kind === 'year') { valueEl.min = '1900'; valueEl.max = '2200'; valueEl.step = '1'; }
+        else { valueEl.removeAttribute('min'); valueEl.removeAttribute('max'); valueEl.removeAttribute('step'); }
+        valueEl.value = normalizePeriodValue(kind, value != null ? value : valueEl.value);
+    }
     function detectMeta(html) {
         var d = parseHtml(html);
         var devis = d.querySelector('[data-abene-block="devis"]');
@@ -1143,6 +1238,7 @@
             !window.abeneSheetsEnabled() || typeof window.abeneSheetsCall !== 'function' || navigator.onLine === false) {
             return Promise.resolve(rec);
         }
+        var period = entryPeriod(entry || rec);
         return blobToBase64(rec.blob).then(function (base64) {
             return window.abeneSheetsCall('SAVE_FINAL_PDF', {
                 ownerId: rec.ownerId,
@@ -1153,6 +1249,10 @@
                 client: entry.client || '',
                 pasta: entry.pasta || '',
                 type: entry.type || '',
+                periodKind: period.kind,
+                periodValue: period.value,
+                periodStart: period.start,
+                periodEnd: period.end,
                 concluded: true,
                 createdAt: rec.createdAt,
                 base64: base64
@@ -1221,6 +1321,7 @@
         var html = liveEditorHtml();
         var name = docState().name || localStorage.getItem('abeneDocName') || 'Documento1';
         var meta = detectMeta(html);
+        var period = periodBounds('day', meta.documentDate || todayIso());
         return {
             id: 'current',
             source: 'current',
@@ -1233,12 +1334,18 @@
             number: meta.number,
             total: meta.total,
             documentDate: meta.documentDate,
+            periodKind: period.kind,
+            periodValue: period.value,
+            periodStart: period.start,
+            periodEnd: period.end,
             concluded: false,
             protected: !!docState().protected,
             archivedAt: new Date().toISOString(),
             hasDevis: meta.hasDevis,
             hasReceipt: meta.hasReceipt,
             hasReport: meta.hasReport,
+            gdocsFileId: docState().gdocsFileId || '',
+            gdocsUrl: docState().gdocsUrl || '',
             readOnlyOrigin: true
         };
     }
@@ -1250,6 +1357,7 @@
             raw.forEach(function (v, i) {
                 var html = v && v.html ? v.html : '';
                 var meta = detectMeta(html);
+                var period = periodBounds('day', meta.documentDate || normalizeEntryDate(v && v.date) || todayIso());
                 list.push({
                     id: 'ver-' + i,
                     source: 'version',
@@ -1261,6 +1369,10 @@
                     number: meta.number,
                     total: meta.total,
                     documentDate: meta.documentDate || normalizeEntryDate(v && v.date),
+                    periodKind: period.kind,
+                    periodValue: period.value,
+                    periodStart: period.start,
+                    periodEnd: period.end,
                     concluded: false,
                     archivedAt: (v && v.date) || '',
                     hasDevis: meta.hasDevis,
@@ -1318,10 +1430,11 @@
         var q = (state.query || '').trim().toLowerCase();
         return list.filter(function (e) {
             var docDate = entryDate(e);
+            var period = entryPeriod(e);
             if (folder !== 'trash' && state.concludedOnly && !e.concluded) return false;
             if (state.type !== 'all' && e.type !== state.type) return false;
-            if (state.dateFrom && (!docDate || docDate < state.dateFrom)) return false;
-            if (state.dateTo && (!docDate || docDate > state.dateTo)) return false;
+            if (state.dateFrom && (!period.end || period.end < state.dateFrom)) return false;
+            if (state.dateTo && (!period.start || period.start > state.dateTo)) return false;
             if (folder === 'done' && !e.concluded) return false;
             if (folder.indexOf('type:') === 0 && e.type !== folder.slice(5)) return false;
             if (folder.indexOf('clientpasta:') === 0) {
@@ -1331,10 +1444,11 @@
             }
             if (folder.indexOf('client:') === 0 && folder.indexOf('clientpasta:') !== 0 && (e.client || tr('noClient')) !== folder.slice(7)) return false;
             if (folder.indexOf('pasta:') === 0 && (e.pasta || tr('none')) !== folder.slice(6)) return false;
-            if (folder.indexOf('year:') === 0 && docDate.slice(0, 4) !== folder.slice(5)) return false;
-            if (folder.indexOf('month:') === 0 && docDate.slice(0, 7) !== folder.slice(6)) return false;
+            if (folder.indexOf('year:') === 0 && period.start.slice(0, 4) !== folder.slice(5)) return false;
+            if (folder.indexOf('month:') === 0 && period.start.slice(0, 7) !== folder.slice(6)) return false;
             if (q) {
-                var blob = [e.name, e.client, e.pasta, e.number, e.type, typeLabel(e.type), docDate].join(' ').toLowerCase();
+                var blob = [e.name, e.client, e.pasta, e.number, e.type, typeLabel(e.type), docDate,
+                    period.value, period.start, period.end, periodLabel(e)].join(' ').toLowerCase();
                 if (blob.indexOf(q) === -1) return false;
             }
             return true;
@@ -1358,6 +1472,7 @@
             document.head.appendChild(css);
         }
         css.textContent =
+            'body.abene-arq-open{overflow:hidden!important;overscroll-behavior:none;}' +
             '#arqOverlay{position:fixed;inset:0;z-index:2600;display:none;flex-direction:column;background:#f3f4f6;color:#1a1a1a;font-family:Calibri,Segoe UI,sans-serif;}' +
             '#arqOverlay.open{display:flex;}' +
             '.arq-top{background:' + NAVY + ';color:#fff;padding:12px 16px;display:flex;align-items:center;gap:12px;}' +
@@ -1381,10 +1496,10 @@
             '.arq-selection-bar{display:flex;align-items:center;gap:10px;padding:7px 16px;background:#eef2f7;border-bottom:1px solid #cbd5e1;}' +
             '.arq-selection-summary{font-size:12px;font-weight:700;color:' + NAVY + ';white-space:nowrap;}' +
             '.arq-selection-actions{display:flex;align-items:center;gap:6px;min-width:0;flex-wrap:wrap;}' +
-            '.arq-archive-panel{display:none;grid-template-columns:1fr 1fr auto auto auto;gap:8px;align-items:end;padding:10px 16px;background:#fff8e8;border-bottom:1px solid ' + GOLD + ';}' +
+            '.arq-archive-panel{display:none;grid-template-columns:repeat(2,minmax(170px,1fr)) repeat(5,auto);gap:8px;align-items:end;padding:10px 16px;background:#fff8e8;border-bottom:1px solid ' + GOLD + ';}' +
             '.arq-archive-panel.open{display:grid;}' +
             '.arq-archive-panel label{font-size:12px;display:flex;flex-direction:column;gap:4px;}' +
-            '.arq-archive-panel input[type=text]{border:1px solid #c5c5c5;padding:6px 8px;}' +
+            '.arq-archive-panel input:not([type=checkbox]),.arq-archive-panel select{border:1px solid #c5c5c5;padding:6px 8px;min-height:34px;background:#fff;}' +
             '.arq-archive-panel .arq-check{flex-direction:row;align-items:center;gap:6px;}' +
             '.arq-archive-panel .arq-panel-title{grid-column:1/-1;font-size:12px;font-weight:700;color:' + NAVY + ';}' +
             '.arq-body{flex:1;display:grid;grid-template-columns:260px minmax(260px,1fr) minmax(340px,1.25fr);min-height:0;}' +
@@ -1398,9 +1513,11 @@
             '.arq-crumb button{border:0;background:none;color:' + NAVY + ';cursor:pointer;font-size:12px;padding:0 2px;text-decoration:underline;}' +
             '.arq-col h3{margin:0;padding:10px 12px;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:#64748b;background:#f8f8f8;border-bottom:1px solid #eee;}' +
             '.arq-tree button,.arq-list button.arq-row{display:block;width:100%;text-align:left;border:0;background:none;padding:7px 12px;font-size:12px;cursor:pointer;}' +
-            '.arq-row-wrap{display:grid;grid-template-columns:42px minmax(0,1fr);align-items:stretch;border-bottom:1px solid #f1f5f9;}' +
+            '.arq-row-wrap{display:grid;grid-template-columns:42px minmax(0,1fr) 48px;align-items:stretch;border-bottom:1px solid #f1f5f9;}' +
             '.arq-row-select{display:flex;align-items:center;justify-content:center;background:#fff;cursor:pointer;}' +
             '.arq-row-select input{width:18px;height:18px;accent-color:' + NAVY + ';}' +
+            '.arq-gdocs-entry{border:0;border-left:1px solid #eef2f7;background:#fff;color:#185abc;font-weight:800;cursor:pointer;font-size:12px;}' +
+            '.arq-gdocs-entry:hover,.arq-gdocs-entry.linked{background:#e8f0fe;color:#174ea6;}' +
             '.arq-row-wrap.selected{box-shadow:inset 4px 0 ' + GOLD + ';background:#fff8e8;}' +
             '.arq-tree button:hover,.arq-list button.arq-row:hover{background:#e8f0fe;}' +
             '.arq-tree button.on,.arq-list button.arq-row.on{background:#0B1223;color:#fff;font-weight:600;}' +
@@ -1423,7 +1540,7 @@
             '#arqPdfFrame{width:100%;min-height:280px;border:1px solid #e5e5e5;background:#fff;display:none;}' +
             '#arqPdfFrame.show{display:block;}' +
             '.arq-form{display:grid;gap:6px;font-size:12px;}' +
-            '.arq-form input{border:1px solid #c5c5c5;padding:5px 7px;}' +
+            '.arq-form input,.arq-form select{border:1px solid #c5c5c5;padding:5px 7px;min-height:34px;background:#fff;}' +
             '.arq-hint{font-size:11px;color:#64748b;}' +
             '.arq-pdf{border:1px solid #e5e5e5;padding:8px;background:#f8f8f8;}' +
             '.arq-pdf h4{margin:0 0 6px;font-size:12px;}' +
@@ -1516,6 +1633,9 @@
             '<div class="arq-panel-title" id="arqArchTitle"></div>' +
             '<label><span id="arqArchClientLbl"></span><input type="text" id="arqArchClient" autocomplete="off" /></label>' +
             '<label><span id="arqArchPastaLbl"></span><input type="text" id="arqArchPasta" autocomplete="off" /></label>' +
+            '<label><span id="arqArchPeriodLbl"></span><select id="arqArchPeriodKind"><option value="day"></option><option value="month"></option><option value="year"></option></select></label>' +
+            '<label><span id="arqArchPeriodValueLbl"></span><input type="date" id="arqArchPeriodValue" /></label>' +
+            '<button type="button" class="arq-btn" id="arqArchToday"></button>' +
             '<label class="arq-check"><input type="checkbox" id="arqArchDone" checked /> <span id="arqArchDoneLbl"></span></label>' +
             '<button type="button" class="arq-btn gold" id="arqArchGo"></button>' +
             '<button type="button" class="arq-btn" id="arqArchCancel"></button>' +
@@ -1552,9 +1672,11 @@
         var cEl = document.getElementById('arqArchClient');
         var pEl = document.getElementById('arqArchPasta');
         var dEl = document.getElementById('arqArchDone');
+        var detectedDate = meta.documentDate || todayIso();
         if (cEl) cEl.value = client;
         if (pEl) pEl.value = pasta;
         if (dEl) dEl.checked = true;
+        setPeriodInput('arqArchPeriodKind', 'arqArchPeriodValue', 'day', detectedDate);
         setPanelOpen('arqArchivePanel', true);
         if (cEl) cEl.focus();
     }
@@ -1562,8 +1684,10 @@
         var client = String((document.getElementById('arqArchClient') || {}).value || '').trim();
         var pasta = String((document.getElementById('arqArchPasta') || {}).value || '').trim();
         var concluded = !!(document.getElementById('arqArchDone') || { checked: true }).checked;
+        var periodKind = normalizePeriodKind((document.getElementById('arqArchPeriodKind') || {}).value || 'day');
+        var periodValue = normalizePeriodValue(periodKind, (document.getElementById('arqArchPeriodValue') || {}).value || todayIso());
         closeArchivePanel();
-        archiveCurrent({ fromPanel: true, client: client, pasta: pasta, concluded: concluded });
+        archiveCurrent({ fromPanel: true, client: client, pasta: pasta, concluded: concluded, periodKind: periodKind, periodValue: periodValue });
     }
     function openFolderPanel(kind) {
         closeArchivePanel();
@@ -1602,6 +1726,7 @@
         renderTree();
         renderList();
         renderPreview();
+        if (isMobileArchive()) setMobilePane('files');
     }
     function selectedEntries(list) {
         list = list || visibleEntries();
@@ -1822,6 +1947,10 @@
         var archCancel = document.getElementById('arqArchCancel');
         if (archGo) archGo.onclick = commitArchivePanel;
         if (archCancel) archCancel.onclick = closeArchivePanel;
+        var archPeriodKind = document.getElementById('arqArchPeriodKind');
+        if (archPeriodKind) archPeriodKind.onchange = function () { setPeriodInput('arqArchPeriodKind', 'arqArchPeriodValue', this.value); };
+        var archToday = document.getElementById('arqArchToday');
+        if (archToday) archToday.onclick = function () { setPeriodInput('arqArchPeriodKind', 'arqArchPeriodValue', 'day', todayIso()); };
         var foldGo = document.getElementById('arqFoldGo');
         var foldCancel = document.getElementById('arqFoldCancel');
         if (foldGo) foldGo.onclick = commitFolderPanel;
@@ -2159,6 +2288,18 @@
         if (acl) acl.textContent = tr('client');
         var apl = document.getElementById('arqArchPastaLbl');
         if (apl) apl.textContent = tr('pasta');
+        var apr = document.getElementById('arqArchPeriodLbl');
+        if (apr) apr.textContent = tr('period');
+        var aprv = document.getElementById('arqArchPeriodValueLbl');
+        if (aprv) aprv.textContent = tr('period');
+        var apk = document.getElementById('arqArchPeriodKind');
+        if (apk) {
+            apk.options[0].textContent = tr('periodDay');
+            apk.options[1].textContent = tr('periodMonth');
+            apk.options[2].textContent = tr('periodYear');
+        }
+        var apt = document.getElementById('arqArchToday');
+        if (apt) apt.textContent = tr('periodToday');
         var adl = document.getElementById('arqArchDoneLbl');
         if (adl) adl.textContent = tr('markDone');
         var ago = document.getElementById('arqArchGo');
@@ -2193,12 +2334,32 @@
         renderPreview();
         if (isMobileArchive()) setMobilePane('files');
     }
+    function clientSearchText(value) {
+        return String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase().trim();
+    }
+    function filterClientTree() {
+        var tree = document.getElementById('arqTree');
+        if (!tree) return;
+        var words = clientSearchText(state.clientQuery).split(/\s+/).filter(Boolean);
+        var visible = 0;
+        tree.querySelectorAll('[data-client-search]').forEach(function (group) {
+            var haystack = group.getAttribute('data-client-search');
+            var match = words.every(function (word) { return haystack.indexOf(word) >= 0; });
+            group.hidden = !match;
+            if (match) visible++;
+            if (words.length && match) group.open = true;
+        });
+        var empty = document.getElementById('arqClientEmpty');
+        if (empty) empty.hidden = visible !== 0;
+    }
     function renderTree() {
         var items = allEntries();
         var trashItems = trashedEntries();
-        var clients = catalogClients();
+        var clients = catalogClients().slice().sort(function (a, b) {
+            return a.localeCompare(b, undefined, { sensitivity: 'base', numeric: true });
+        });
         var pastas = catalogPastas();
-        var years = unique(items.map(function (e) { return entryDate(e).slice(0, 4); }).filter(Boolean));
+        var years = unique(items.map(function (e) { return entryPeriod(e).start.slice(0, 4); }).filter(Boolean));
         var html = '';
         html += treeBtn('all', tr('all'), items.length);
         html += treeBtn('done', tr('done'), items.filter(function (e) { return e.concluded; }).length);
@@ -2210,12 +2371,16 @@
         });
         html += '</details>';
         html += '<details open><summary>' + esc(tr('byClient')) + '</summary>';
-        if (!clients.length) html += '<p class="arq-hint" style="padding:6px 12px;">—</p>';
+        html += '<input type="search" id="arqClientSearch" aria-label="' + esc(tr('clientSearch')) + '" placeholder="' + esc(tr('clientSearch')) + '" value="' + esc(state.clientQuery) + '" style="box-sizing:border-box;width:calc(100% - 16px);margin:8px;min-height:44px;font-size:16px;padding:8px;" />';
+        html += '<p id="arqClientEmpty" role="status" class="arq-hint" style="padding:6px 12px;" hidden>' + esc(tr('clientEmpty')) + '</p>';
         clients.forEach(function (c) {
-            var nAll = items.filter(function (e) { return (e.client || tr('noClient')) === c; }).length;
+            var clientItems = items.filter(function (e) { return (e.client || tr('noClient')) === c; });
+            var nAll = clientItems.length;
             var sub = catalogPastasForClient(c);
-            html += '<details open><summary>' + esc(c) + ' <span class="arq-hint">(' + nAll + ')</span></summary>';
-            html += treeBtn('client:' + c, tr('all'), nAll);
+            var searchText = clientSearchText([c].concat(sub, clientItems.map(function (e) { return [e.name, e.number].join(' '); })).join(' '));
+            var activeClient = state.folder === 'client:' + c || state.folder.indexOf('clientpasta:' + c + '|') === 0;
+            html += '<details data-client-search="' + esc(searchText) + '"' + (activeClient ? ' open' : '') + '><summary>' + esc(c) + ' <span class="arq-hint">(' + nAll + ')</span></summary>';
+            html += treeBtn('client:' + c, tr('clientDocuments'), nAll);
             html += '<div class="arq-tree-sub">';
             sub.forEach(function (p) {
                 var nP = items.filter(function (e) {
@@ -2232,8 +2397,8 @@
         html += '</details>';
         html += '<details><summary>' + esc(tr('byYear')) + '</summary>';
         years.forEach(function (y) {
-            var months = unique(items.filter(function (e) { return entryDate(e).slice(0, 4) === y; })
-                .map(function (e) { return entryDate(e).slice(0, 7); }));
+            var months = unique(items.filter(function (e) { return entryPeriod(e).start.slice(0, 4) === y; })
+                .map(function (e) { return entryPeriod(e).start.slice(0, 7); }));
             html += '<details open><summary>' + esc(y) + '</summary>';
             html += treeBtn('year:' + y, tr('all') + ' ' + y);
             months.forEach(function (m) {
@@ -2248,6 +2413,19 @@
         html += '</details>';
         var tree = document.getElementById('arqTree');
         tree.innerHTML = html;
+        var clientSearch = document.getElementById('arqClientSearch');
+        clientSearch.oninput = function () { state.clientQuery = this.value; filterClientTree(); };
+        clientSearch.onkeydown = function (event) {
+            if (event.key === 'Escape') {
+                event.preventDefault(); event.stopPropagation();
+                this.value = ''; state.clientQuery = ''; filterClientTree();
+            } else if (event.key === 'Enter') {
+                event.preventDefault();
+                var first = tree.querySelector('[data-client-search]:not([hidden]) button[data-folder]');
+                if (first) first.click();
+            }
+        };
+        filterClientTree();
         tree.querySelectorAll('button[data-folder]').forEach(function (btn) {
             btn.onclick = function () { selectFolder(btn.getAttribute('data-folder')); };
         });
@@ -2303,7 +2481,8 @@
             var date = entryDate(e);
             var archived = normalizeEntryDate(e.archivedAt);
             var deleted = normalizeEntryDate(e.deletedAt);
-            var dateMeta = date ? (tr('documentDate') + ': ' + date) : '';
+            var dateMeta = periodLabel(e);
+            if (date) dateMeta += (dateMeta ? ' · ' : '') + tr('documentDate') + ': ' + date;
             if (archived && archived !== date) dateMeta += (dateMeta ? ' · ' : '') + tr('archiveDate') + ': ' + archived;
             if (deleted) dateMeta += (dateMeta ? ' · ' : '') + tr('deletedOn') + ': ' + deleted;
             return '<div class="arq-row-wrap' + (checked ? ' selected' : '') + '" data-id="' + esc(e.id) + '">' +
@@ -2316,7 +2495,9 @@
                 '<span class="arq-badge">' + esc(typeLabel(e.type)) + '</span>' +
                 esc(e.name) +
                 '<span class="arq-meta">' + esc([e.client || tr('noClient'), e.pasta || tr('none'), dateMeta, e.number].filter(Boolean).join(' · ')) + '</span>' +
-                '</button></div>';
+                '</button>' +
+                (!e.deletedAt ? '<button type="button" class="arq-gdocs-entry' + (e.gdocsFileId ? ' linked' : '') + '" data-gdocs-entry="' + esc(e.id) + '" title="' + esc(tr(e.gdocsFileId ? 'gdocsOpenEntry' : ((e.concluded || e.protected || e.readOnlyOrigin) ? 'gdocsCopyEntry' : 'gdocsCreateEntry'))) + '" aria-label="' + esc(tr('gdocsEntry') + ': ' + e.name) + '">' + (e.gdocsFileId ? 'G✓' : 'G+') + '</button>' : '') +
+                '</div>';
         }).join('');
         box.querySelectorAll('.arq-select-cb').forEach(function (cb) {
             cb.onchange = function () {
@@ -2334,6 +2515,15 @@
                 renderList();
                 renderPreview();
                 if (isMobileArchive()) setMobilePane('preview');
+            };
+        });
+        box.querySelectorAll('[data-gdocs-entry]').forEach(function (btn) {
+            btn.onclick = function (event) {
+                event.preventDefault();
+                event.stopPropagation();
+                var id = btn.getAttribute('data-gdocs-entry');
+                var entry = list.filter(function (item) { return String(item.id) === String(id); })[0];
+                if (entry) openEntryInGoogleDocs(entry);
             };
         });
         renderSelectionBar(list);
@@ -2422,6 +2612,7 @@
                 (canOrc ? '<button type="button" class="arq-btn" data-act="copy-orc">' + esc(tr('copyOrc')) + '</button>' : '') +
                 (canRec ? '<button type="button" class="arq-btn" data-act="copy-rec">' + esc(tr('copyRec')) + '</button>' : '') +
                 '<button type="button" class="arq-btn" data-act="dl">' + esc(tr('dlOne')) + '</button>' +
+                '<button type="button" class="arq-btn" data-act="gdocs">G · ' + esc(tr(e.gdocsFileId ? 'gdocsOpenEntry' : ((e.concluded || protectedEntry || e.readOnlyOrigin) ? 'gdocsCopyEntry' : 'gdocsCreateEntry'))) + '</button>' +
                 (!e.readOnlyOrigin && !e.concluded
                     ? '<button type="button" class="arq-btn" data-act="protect">' + esc(tr(protectedEntry ? 'unprotect' : 'protect')) + '</button>'
                     : '') +
@@ -2434,11 +2625,15 @@
                 '</div>';
         }
         var form = '';
-        if (!e.readOnlyOrigin && !e.concluded && !protectedEntry && !trashed) {
+        if (!e.readOnlyOrigin && !trashed) {
+            var ep = entryPeriod(e);
             form = '<div class="arq-form">' +
                 '<label>' + esc(tr('client')) + '<input id="arqEditClient" value="' + esc(e.client) + '" /></label>' +
                 '<label>' + esc(tr('pasta')) + '<input id="arqEditPasta" value="' + esc(e.pasta) + '" /></label>' +
                 '<label>' + esc(tr('documentDate')) + '<input type="date" id="arqEditDate" value="' + esc(entryDate(e)) + '" /></label>' +
+                '<label>' + esc(tr('period')) + '<select id="arqEditPeriodKind"><option value="day"' + (ep.kind === 'day' ? ' selected' : '') + '>' + esc(tr('periodDay')) + '</option><option value="month"' + (ep.kind === 'month' ? ' selected' : '') + '>' + esc(tr('periodMonth')) + '</option><option value="year"' + (ep.kind === 'year' ? ' selected' : '') + '>' + esc(tr('periodYear')) + '</option></select></label>' +
+                '<label>' + esc(tr('period')) + '<input id="arqEditPeriodValue" value="' + esc(ep.value) + '" /></label>' +
+                '<button type="button" class="arq-btn" id="arqEditToday">' + esc(tr('periodToday')) + '</button>' +
                 '<button type="button" class="arq-btn gold" data-act="meta">' + esc(tr('saveFicha')) + '</button>' +
                 '</div>';
         }
@@ -2479,7 +2674,17 @@
         box.querySelectorAll('[data-act]').forEach(function (btn) {
             btn.onclick = function () { runAction(btn.getAttribute('data-act'), e); };
         });
-        ['arqEditClient', 'arqEditPasta', 'arqEditDate'].forEach(function (fid) {
+        if (document.getElementById('arqEditPeriodKind')) {
+            setPeriodInput('arqEditPeriodKind', 'arqEditPeriodValue', ep.kind, ep.value);
+            document.getElementById('arqEditPeriodKind').onchange = function () {
+                setPeriodInput('arqEditPeriodKind', 'arqEditPeriodValue', this.value);
+            };
+            document.getElementById('arqEditToday').onclick = function () {
+                setPeriodInput('arqEditPeriodKind', 'arqEditPeriodValue', 'day', todayIso());
+                runAction('meta', e);
+            };
+        }
+        ['arqEditClient', 'arqEditPasta', 'arqEditDate', 'arqEditPeriodValue'].forEach(function (fid) {
             var field = document.getElementById(fid);
             if (!field) return;
             field.addEventListener('change', function () { runAction('meta', e); });
@@ -2569,6 +2774,10 @@
                     client: entry.client || '',
                     pasta: entry.pasta || '',
                     type: entry.type || '',
+                    periodKind: entryPeriod(entry).kind,
+                    periodValue: entryPeriod(entry).value,
+                    periodStart: entryPeriod(entry).start,
+                    periodEnd: entryPeriod(entry).end,
                     concluded: true
                 };
                 return putFinal(rec).then(function () { return syncFinalToDrive(rec, entry); });
@@ -2738,6 +2947,10 @@
         });
     }
     function runAction(act, e) {
+        if (act === 'gdocs') {
+            openEntryInGoogleDocs(e);
+            return;
+        }
         if (act === 'open') {
             if (e.deletedAt) return;
             if (e.concluded) {
@@ -2801,12 +3014,18 @@
             var client = (document.getElementById('arqEditClient') || {}).value || '';
             var pasta = (document.getElementById('arqEditPasta') || {}).value || '';
             var documentDate = normalizeEntryDate((document.getElementById('arqEditDate') || {}).value || '');
+            var periodKind = normalizePeriodKind((document.getElementById('arqEditPeriodKind') || {}).value || e.periodKind || 'day');
+            var period = periodBounds(periodKind, (document.getElementById('arqEditPeriodValue') || {}).value || e.periodValue || documentDate || todayIso());
             var list2 = loadStore();
             list2.forEach(function (item) {
                 if (item.id === e.id) {
                     item.client = String(client).trim();
                     item.pasta = String(pasta).trim();
                     item.documentDate = documentDate || item.documentDate || normalizeEntryDate(item.archivedAt);
+                    item.periodKind = period.kind;
+                    item.periodValue = period.value;
+                    item.periodStart = period.start;
+                    item.periodEnd = period.end;
                 }
             });
             if (saveStore(list2)) {
@@ -2821,6 +3040,33 @@
                 renderPreview();
             }
         }
+    }
+
+    function openEntryInGoogleDocs(entry) {
+        if (!entry || entry.deletedAt) return false;
+        if (navigator.onLine === false) {
+            toast(tr('gdocsOffline'));
+            return false;
+        }
+        var fileId = String(entry.gdocsFileId || '').replace(/[^a-zA-Z0-9_-]/g, '');
+        if (fileId) {
+            window.open('https://docs.google.com/document/d/' + fileId + '/edit', '_blank', 'noopener,noreferrer');
+            return true;
+        }
+        if (typeof window.abeneOpenInGoogleDocs !== 'function') return false;
+        if (entry.source === 'current' || entry.id === 'current') {
+            closeArquivo();
+            window.abeneOpenInGoogleDocs();
+            return true;
+        }
+        var asCopy = !!(entry.concluded || entry.protected || entry.readOnlyOrigin);
+        var prefix = lang() === 'fr-FR' ? 'Copie — ' : (lang() === 'en-US' ? 'Copy — ' : (lang() === 'es-ES' ? 'Copia — ' : 'Cópia — '));
+        var opened = applyToEditor(entry.html, (asCopy ? prefix : '') + entry.name, asCopy, false, asCopy ? '' : entry.id);
+        if (!opened) return false;
+        closeArquivo();
+        if (asCopy) toast(tr('gdocsCopyNotice'));
+        window.abeneOpenInGoogleDocs();
+        return true;
     }
     function refreshArquivoIfOpen() {
         var el = document.getElementById('arqOverlay');
@@ -2844,6 +3090,11 @@
             existing.number = entry.number;
             existing.total = entry.total;
             existing.documentDate = entry.documentDate || existing.documentDate;
+            existing.periodKind = entry.periodKind || existing.periodKind || 'day';
+            existing.periodValue = entry.periodValue || existing.periodValue || entry.documentDate || normalizeEntryDate(entry.archivedAt);
+            var existingPeriod = periodBounds(existing.periodKind, existing.periodValue);
+            existing.periodStart = existingPeriod.start;
+            existing.periodEnd = existingPeriod.end;
             existing.hasDevis = entry.hasDevis;
             existing.hasReceipt = entry.hasReceipt;
             existing.hasReport = entry.hasReport;
@@ -2890,6 +3141,7 @@
             return null;
         }
         var ds = docState() || {};
+        var period = periodBounds(opts.periodKind || 'day', opts.periodValue || meta.documentDate || todayIso());
         var entry = {
             id: uid(),
             name: snap.name,
@@ -2901,6 +3153,10 @@
             number: meta.number,
             total: meta.total,
             documentDate: meta.documentDate,
+            periodKind: period.kind,
+            periodValue: period.value,
+            periodStart: period.start,
+            periodEnd: period.end,
             concluded: concluded || meta.type === 'completo',
             protected: !(concluded || meta.type === 'completo') && !!snap.protected,
             protectedAt: (!(concluded || meta.type === 'completo') && snap.protected) ? new Date().toISOString() : '',
@@ -2933,9 +3189,11 @@
     function downloadEntries(list, label) {
         list = list || [];
         if (!list.length) { toast(tr('zipEmpty')); return; }
-        var csvHdr = ['Nome', 'Tipo', 'Concluido', 'Cliente', 'Pasta', 'Numero', 'Total', 'Data_documento', 'Data_arquivo'].join(';');
+        var csvHdr = ['Nome', 'Tipo', 'Concluido', 'Cliente', 'Pasta', 'Numero', 'Total', 'Tipo_periodo', 'Periodo', 'Inicio_periodo', 'Fim_periodo', 'Data_documento', 'Data_arquivo'].join(';');
         var csv = '\uFEFF' + csvHdr + '\r\n' + list.map(function (e) {
-            return [e.name, e.type, e.concluded ? 'sim' : 'nao', e.client, e.pasta, e.number, e.total, entryDate(e), normalizeEntryDate(e.archivedAt)]
+            var p = entryPeriod(e);
+            return [e.name, e.type, e.concluded ? 'sim' : 'nao', e.client, e.pasta, e.number, e.total,
+                p.kind, p.value, p.start, p.end, entryDate(e), normalizeEntryDate(e.archivedAt)]
                 .map(csvEsc).join(';');
         }).join('\r\n');
         if (!window.JSZip) {
@@ -2947,13 +3205,13 @@
         var zip = new window.JSZip();
         zip.file('indice.csv', csv);
         list.forEach(function (e) {
-            var folder = [e.client || tr('noClient'), e.pasta || tr('none'), typeLabel(e.type)]
+            var folder = [e.client || tr('noClient'), e.pasta || tr('none'), entryPeriod(e).value || 'Sem_periodo', typeLabel(e.type)]
                 .map(sanitizeName).join('/');
             zip.file(folder + '/' + archiveFileBase(e) + '.html',
                 '<!DOCTYPE html><html><head><meta charset="utf-8"></head><body>' + cleanArchiveHtml(e.html) + '</body></html>');
         });
         Promise.all(list.map(function (e) {
-            var folder = [e.client || tr('noClient'), e.pasta || tr('none'), typeLabel(e.type)]
+            var folder = [e.client || tr('noClient'), e.pasta || tr('none'), entryPeriod(e).value || 'Sem_periodo', typeLabel(e.type)]
                 .map(sanitizeName).join('/');
             return listFinals(ownerIdOf(e)).then(function (rows) {
                 rows.forEach(function (r) {
@@ -2985,7 +3243,8 @@
         if (isMobileArchive()) {
             state.toolsCollapsed = true;
             setToolsCollapsed(true);
-            setMobilePane('folders');
+            /* Fix #7c: preserve last pane on reopen (was always Pastas). */
+            setMobilePane(state.mobilePane || 'folders');
         } else {
             setToolsCollapsed(false);
             syncMobileChrome();
@@ -3039,6 +3298,10 @@
                 number: meta.number || snap.number,
                 total: snap.total,
                 documentDate: snap.documentDate,
+                periodKind: entryPeriod(snap).kind,
+                periodValue: entryPeriod(snap).value,
+                periodStart: entryPeriod(snap).start,
+                periodEnd: entryPeriod(snap).end,
                 concluded: false,
                 protected: !!snap.protected,
                 protectedAt: snap.protected ? new Date().toISOString() : '',
@@ -3113,6 +3376,7 @@
         },
         visibleEntries: function () { return visibleEntries(); },
         allEntries: function () { return allEntries(); },
+        entryPeriod: function (entry) { return entryPeriod(entry); },
         trashedEntries: function () { return trashedEntries(); },
         currentSnapshot: currentSnapshot,
         listFinals: listFinals,

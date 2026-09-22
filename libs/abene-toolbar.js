@@ -899,18 +899,18 @@
         if (tot) tot.outerHTML = buildTablesHtml();
     }
     function resolveInsertRange(editor) {
-        var candidates = [insertPointRange, savedRange];
+        var sel = window.getSelection();
+        var liveRange = sel && sel.rangeCount && editor.contains(sel.anchorNode) && editor.contains(sel.focusNode)
+            ? sel.getRangeAt(0) : null;
+        // A past ribbon click must not override a newer caret on another page.
+        var candidates = [liveRange, savedRange, insertPointRange];
         var i;
         for (i = 0; i < candidates.length; i++) {
             var r = candidates[i];
             if (!r) continue;
             try {
-                if (editor.contains(r.startContainer)) return r.cloneRange();
+                if (editor.contains(r.startContainer) && editor.contains(r.endContainer)) return r.cloneRange();
             } catch (eRes) {}
-        }
-        var sel = window.getSelection();
-        if (sel && sel.rangeCount && editor.contains(sel.anchorNode)) {
-            try { return sel.getRangeAt(0).cloneRange(); } catch (eSel) {}
         }
         return null;
     }

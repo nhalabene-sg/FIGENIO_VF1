@@ -1,4 +1,4 @@
-/* Genius Raros — synchronisation Google Sheets via Apps Script Web App (/exec). */
+﻿/* Genius Raros — synchronisation Google Sheets via Apps Script Web App (/exec). */
 (function () {
     var timer = null;
     var lastStatus = '';
@@ -83,9 +83,16 @@
         if (el) el.style.color = '#C9A84C';
         refreshMailStatus();
     }
+    function setDocumentsPendingStatus() {
+        lastKind = 'documents-pending';
+        setStatus(tt('sheetsWaitDocuments', 'Sheets em espera — concluir primeiro a sincronização dos documentos'));
+        var el = document.getElementById('sheetsSyncStatus');
+        if (el) el.style.color = '#C9A84C';
+    }
     function refreshStatusI18n() {
         if (lastKind === 'syncing') setStatus(tt('sheetsSyncing', 'A sincronizar…'));
         else if (lastKind === 'offline') setLocalStatus();
+        else if (lastKind === 'documents-pending') setDocumentsPendingStatus();
         else if (lastKind === 'ok') {
             var when = (company().sheetsLastSync) || '';
             try {
@@ -197,7 +204,7 @@
             ok: true,
             code: 'ok',
             caps: lastCaps,
-            message: tt('mailStatusReady', 'Gmail prêt'),
+            message: tt('mailStatusReady', 'Gmail pronto'),
             maxBytes: maxB
         };
     }
@@ -216,7 +223,7 @@
             return { kind: 'update', text: tt('mailStatusUpdate', 'Gmail: atualizar Apps Script'), color: '#C9A84C' };
         }
         if (lastCaps && lastCaps.known && lastCaps.mailEnabled) {
-            return { kind: 'ready', text: tt('mailStatusReady', 'Gmail prêt'), color: '#7dcea0' };
+            return { kind: 'ready', text: tt('mailStatusReady', 'Gmail pronto'), color: '#7dcea0' };
         }
         return { kind: 'unknown', text: tt('mailStatusUnknown', 'Gmail: …'), color: '' };
     }
@@ -482,7 +489,7 @@
             setStatus(tt('sheetsOk', 'Sheets') + ' · ' + d.toLocaleTimeString(), true);
         } catch (e) { lastKind = 'ok'; setStatus(tt('sheetsOk', 'Sheets'), true); }
     }
-    function push(reason) {
+    function pushNow(reason) {
         if (!enabled()) return Promise.resolve(null);
         if (!isOnline()) {
             markPending();
@@ -505,6 +512,26 @@
             lastFailMsg = String(err.message || err || '');
             setStatus(tt('sheetsFail', 'Sheets: falha') + ' (' + lastFailMsg + ')', false);
             throw err;
+        });
+    }
+    function push(reason) {
+        if (!enabled()) return Promise.resolve(null);
+        if (!isOnline()) return pushNow(reason);
+        var gate = window.abeneDocumentSyncBeforeArchivePush;
+        if (typeof gate !== 'function') return pushNow(reason);
+        lastKind = 'syncing';
+        setStatus(tt('sheetsSyncing', 'A sincronizar…'));
+        return Promise.resolve().then(function () {
+            return gate(reason || 'auto');
+        }).then(function (result) {
+            if (result && result.ok) return pushNow(reason);
+            markPending();
+            setDocumentsPendingStatus();
+            return Object.assign({ ok: false, blocked: true }, result || {});
+        }).catch(function (err) {
+            markPending();
+            setDocumentsPendingStatus();
+            return { ok: false, blocked: true, error: String((err && err.message) || err || '') };
         });
     }
     function schedule(reason) {

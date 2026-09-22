@@ -3178,6 +3178,71 @@
     }
     window.abeneRevealPageBreakTarget = abeneRevealPageBreakTarget;
 
+    function cancelPageBreakReveal() {
+        window._abeneBreakRevealGen = (window._abeneBreakRevealGen || 0) + 1;
+        window._abeneBreakRevealHold = false;
+        var editor = ed();
+        if (editor) editor.querySelectorAll('[data-abene-break-caret]').forEach(function (node) {
+            node.removeAttribute('data-abene-break-caret');
+        });
+    }
+    function revealEditingCaret() {
+        var editor = ed(), area = document.getElementById('editorArea');
+        var sel = window.getSelection();
+        if (!editor || !area || !sel || !sel.rangeCount || !sel.isCollapsed ||
+            !editor.contains(sel.focusNode) || document.body.classList.contains('abene-excel-mode') ||
+            !(document.activeElement === editor || editor.contains(document.activeElement))) return;
+        if (window._abeneLayingOut || window._abeneFlowNeedsRerun) return;
+        var range = sel.getRangeAt(0).cloneRange();
+        range.collapse(false);
+        var rect = range.getBoundingClientRect();
+        if (!rect || !rect.height) {
+            var node = sel.focusNode;
+            if (node.nodeType === 3 && node.length) {
+                var offset = Math.min(sel.focusOffset, node.length);
+                range.setStart(node, Math.max(0, offset - 1));
+                range.setEnd(node, Math.min(node.length, Math.max(1, offset)));
+                rect = range.getBoundingClientRect();
+            } else {
+                var host = node.nodeType === 1 ? node : node.parentElement;
+                rect = host && host.getBoundingClientRect();
+            }
+        }
+        if (!rect || !rect.height) return;
+        var viewport = area.getBoundingClientRect();
+        var top = viewport.top + 12, bottom = viewport.bottom - 12;
+        if (window.visualViewport) {
+            top = Math.max(top, window.visualViewport.offsetTop + 12);
+            bottom = Math.min(bottom, window.visualViewport.offsetTop + window.visualViewport.height - 12);
+        }
+        if (bottom <= top) return;
+        if (rect.bottom > bottom) area.scrollTop += rect.bottom - bottom;
+        else if (rect.top < top) area.scrollTop = Math.max(0, area.scrollTop + rect.top - top);
+    }
+    var caretRevealFrame = null;
+    function queueEditingCaretReveal() {
+        if (caretRevealFrame !== null) return;
+        caretRevealFrame = requestAnimationFrame(function () {
+            caretRevealFrame = null;
+            revealEditingCaret();
+        });
+    }
+    document.addEventListener('beforeinput', function (event) {
+        var editor = ed();
+        if (editor && editor.contains(event.target)) cancelPageBreakReveal();
+    }, true);
+    document.addEventListener('pointerdown', function (event) {
+        var editor = ed();
+        if (editor && editor.contains(event.target)) cancelPageBreakReveal();
+    }, true);
+    document.addEventListener('input', function (event) {
+        var editor = ed();
+        if (!editor || !editor.contains(event.target)) return;
+        cancelPageBreakReveal();
+        window._abeneFollowCaretAfterLayout = true;
+        queueEditingCaretReveal();
+    });
+
     window.abeneInsertPageBreak = function () {
         if (window._abeneBreakLock) return;
         window._abeneBreakLock = true;
@@ -3433,6 +3498,10 @@
         } else if (pendingReveal && typeof abeneRevealPageBreakTarget === 'function') {
             /* Layout stable: scroll #editorArea onto the new sheet now. */
             abeneRevealPageBreakTarget(breakCaret);
+        }
+        if (window._abeneFollowCaretAfterLayout && !window._abeneFlowNeedsRerun) {
+            window._abeneFollowCaretAfterLayout = false;
+            queueEditingCaretReveal();
         }
     };
 
@@ -4944,6 +5013,8 @@
         if (inEditor && !document.body.classList.contains('abene-excel-mode')) window.abeneOnEditorNav(e);
         if (!inEditor) return;
         if (document.body.classList.contains('abene-excel-mode')) return;
+        // A new user action supersedes pending Ctrl+Enter positioning retries.
+        cancelPageBreakReveal();
         if (handleEditorDelete(e)) return;
         if (e.key === 'Enter' && !e.ctrlKey && !e.metaKey && !e.altKey) {
             requestAnimationFrame(function () {
