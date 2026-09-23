@@ -855,11 +855,178 @@
         { id: 'reschedule', label: 'Cancelamento ou reagendamento', text: 'Cancelamentos ou reagendamentos deverão ser comunicados com antecedência e os custos já assumidos serão apresentados ao cliente para acordo.' },
         { id: 'waste', label: 'Limpeza e resíduos a definir', text: 'A limpeza final e o destino dos resíduos serão realizados nos termos expressamente incluídos neste orçamento ou acordados entre as partes.' }
     ];
+
+    var QUOTE_OPTION_TEXTS_KEY = 'abeneQuoteOptionTextsV1';
+
+    function quoteOptionOriginalGroups() {
+        return {
+            payment: quotePaymentOptions,
+            method: quotePaymentMethodOptions,
+            clause: quoteClauseOptions
+        };
+    }
+
+    function readQuoteOptionTextDefaults() {
+        try {
+            var data = JSON.parse(localStorage.getItem(QUOTE_OPTION_TEXTS_KEY) || '{}');
+            return data && typeof data === 'object' ? data : {};
+        } catch (e) {
+            return {};
+        }
+    }
+
+    function effectiveQuoteOptionGroups() {
+        var saved = readQuoteOptionTextDefaults();
+        var originals = quoteOptionOriginalGroups();
+        var out = {};
+        Object.keys(originals).forEach(function (group) {
+            out[group] = originals[group].map(function (item) {
+                var custom = saved[group + ':' + item.id] || {};
+                return {
+                    id: item.id,
+                    label: String(custom.label || item.label),
+                    text: String(custom.text || item.text)
+                };
+            });
+        });
+        return out;
+    }
+
+    function quoteOptionById(items, id) {
+        return (items || []).filter(function (item) { return item.id === id; })[0] || null;
+    }
+
+    function quoteOptionPresent(value, current, original) {
+        value = String(value || '');
+        return !!((current && current.text && value.indexOf(current.text) >= 0) ||
+            (original && original.text && value.indexOf(original.text) >= 0));
+    }
+
+    function removeQuoteOptionText(value, current, original) {
+        value = String(value || '');
+        [current && current.text, original && original.text].forEach(function (text) {
+            if (text) value = value.split(text).join('');
+        });
+        return value;
+    }
+
+    function replaceQuoteOptionDefaultsInCurrentNotes(previous, next) {
+        var notes = document.getElementById('devisNotes');
+        if (!notes) return;
+        var value = notes.value || '';
+        Object.keys(previous).forEach(function (group) {
+            previous[group].forEach(function (oldItem) {
+                var newItem = quoteOptionById(next[group], oldItem.id);
+                if (newItem && oldItem.text && newItem.text !== oldItem.text && value.indexOf(oldItem.text) >= 0) {
+                    value = value.split(oldItem.text).join(newItem.text);
+                }
+            });
+        });
+        notes.value = value.replace(/\n{3,}/g, '\n\n').trim();
+        notes.dispatchEvent(new Event('input', { bubbles: true }));
+        var terms = document.getElementById('devisPayTerms');
+        if (terms) {
+            previous.payment.some(function (oldItem) {
+                var newItem = quoteOptionById(next.payment, oldItem.id);
+                if (newItem && terms.value === oldItem.label) {
+                    terms.value = newItem.label;
+                    return true;
+                }
+                return false;
+            });
+        }
+    }
+
+    function quoteOptionEditorGroup(title, group, items) {
+        var nameLabel = (typeof t === 'function' && t('quoteOptionName') !== 'quoteOptionName') ? t('quoteOptionName') : 'Nome da opção';
+        var detailLabel = (typeof t === 'function' && t('quoteOptionDetail') !== 'quoteOptionDetail') ? t('quoteOptionDetail') : 'Texto detalhado incluído no orçamento';
+        return '<fieldset style="min-width:0;padding:10px;margin:0 0 12px;border:1px solid #b8c4d4;border-radius:6px">' +
+            '<legend style="font-weight:700;padding:0 5px">' + esc(title) + '</legend>' +
+            items.map(function (item) {
+                return '<div data-quote-option-editor="' + esc(group + ':' + item.id) + '" style="margin:0 0 12px;padding:10px;background:#f7f9fc;border-radius:5px">' +
+                    '<label style="display:block;font-weight:600;margin-bottom:4px">' + esc(nameLabel) + '</label>' +
+                    '<input data-quote-option-label type="text" maxlength="160" value="' + esc(item.label) + '" style="width:100%;margin-bottom:6px">' +
+                    '<label style="display:block;font-weight:600;margin:4px 0">' + esc(detailLabel) + '</label>' +
+                    '<textarea data-quote-option-text maxlength="2000" style="width:100%;min-height:82px;resize:vertical">' + esc(item.text) + '</textarea>' +
+                '</div>';
+            }).join('') + '</fieldset>';
+    }
+
+    window.abeneOpenQuoteOptionTextEditor = function () {
+        if (typeof openGenericModal !== 'function') return;
+        var groups = effectiveQuoteOptionGroups();
+        var title = (typeof t === 'function' && t('quoteCustomizeTitle') !== 'quoteCustomizeTitle')
+            ? t('quoteCustomizeTitle') : 'Personalizar textos do orçamento';
+        var intro = (typeof t === 'function' && t('quoteCustomizeHint') !== 'quoteCustomizeHint')
+            ? t('quoteCustomizeHint') : 'As alterações ficam predefinidas para os próximos orçamentos. Pode restaurar os textos originais quando quiser.';
+        var body = '<p style="margin:0 0 12px">' + esc(intro) + '</p><div style="max-height:58vh;overflow:auto;padding-right:4px">' +
+            quoteOptionEditorGroup('Plano de pagamento', 'payment', groups.payment) +
+            quoteOptionEditorGroup('Meios de pagamento', 'method', groups.method) +
+            quoteOptionEditorGroup('Cláusulas opcionais', 'clause', groups.clause) + '</div>';
+        var restore = (typeof t === 'function' && t('quoteRestoreOriginal') !== 'quoteRestoreOriginal') ? t('quoteRestoreOriginal') : 'Restaurar textos originais';
+        var cancel = (typeof t === 'function' && t('cancel') !== 'cancel') ? t('cancel') : 'Cancelar';
+        var save = (typeof t === 'function' && t('quoteSaveDefaults') !== 'quoteSaveDefaults') ? t('quoteSaveDefaults') : 'Guardar como predefinição';
+        openGenericModal(title, body,
+            '<button type="button" class="btn-secondary" onclick="abeneRestoreQuoteOptionTexts()">' + esc(restore) + '</button>' +
+            '<button type="button" class="btn-secondary" onclick="closeModal(\'genericModal\')">' + esc(cancel) + '</button>' +
+            '<button type="button" class="btn-primary" onclick="abeneSaveQuoteOptionTexts()">' + esc(save) + '</button>');
+    };
+
+    window.abeneSaveQuoteOptionTexts = function () {
+        var previous = effectiveQuoteOptionGroups();
+        var originals = quoteOptionOriginalGroups();
+        var saved = {};
+        document.querySelectorAll('[data-quote-option-editor]').forEach(function (row) {
+            var key = row.getAttribute('data-quote-option-editor') || '';
+            var parts = key.split(':');
+            var original = parts.length === 2 ? quoteOptionById(originals[parts[0]], parts[1]) : null;
+            if (!original) return;
+            var labelEl = row.querySelector('[data-quote-option-label]');
+            var textEl = row.querySelector('[data-quote-option-text]');
+            var label = String((labelEl && labelEl.value) || '').trim() || original.label;
+            var text = String((textEl && textEl.value) || '').trim() || original.text;
+            if (label !== original.label || text !== original.text) saved[key] = { label: label, text: text };
+        });
+        try { localStorage.setItem(QUOTE_OPTION_TEXTS_KEY, JSON.stringify(saved)); } catch (e) {
+            if (typeof showToast === 'function') showToast('Não foi possível guardar estes textos neste dispositivo.');
+            return;
+        }
+        var next = effectiveQuoteOptionGroups();
+        replaceQuoteOptionDefaultsInCurrentNotes(previous, next);
+        if (typeof closeModal === 'function') closeModal('genericModal');
+        setupQuoteConditions();
+        if (typeof showToast === 'function') {
+            var msg = (typeof t === 'function' && t('quoteDefaultsSaved') !== 'quoteDefaultsSaved') ? t('quoteDefaultsSaved') : 'Textos guardados para os próximos orçamentos.';
+            showToast(msg);
+        }
+    };
+
+    window.abeneRestoreQuoteOptionTexts = function () {
+        var question = (typeof t === 'function' && t('quoteRestoreConfirm') !== 'quoteRestoreConfirm')
+            ? t('quoteRestoreConfirm') : 'Restaurar todos os textos originais do orçamento?';
+        if (!window.confirm(question)) return;
+        var previous = effectiveQuoteOptionGroups();
+        try { localStorage.removeItem(QUOTE_OPTION_TEXTS_KEY); } catch (e) {}
+        var next = effectiveQuoteOptionGroups();
+        replaceQuoteOptionDefaultsInCurrentNotes(previous, next);
+        if (typeof closeModal === 'function') closeModal('genericModal');
+        setupQuoteConditions();
+        if (typeof showToast === 'function') {
+            var msg = (typeof t === 'function' && t('quoteOriginalRestored') !== 'quoteOriginalRestored') ? t('quoteOriginalRestored') : 'Textos originais restaurados.';
+            showToast(msg);
+        }
+    };
+
     function setupQuoteConditions() {
         var host = document.getElementById('devisConditionChoices');
         var notes = document.getElementById('devisNotes');
         if (!host || !notes) return;
         var text = notes.value || '';
+        var groups = effectiveQuoteOptionGroups();
+        var originals = quoteOptionOriginalGroups();
+        var paymentOptions = groups.payment;
+        var methodOptions = groups.method;
+        var clauseOptions = groups.clause;
         function quoteUi(key, fallback) {
             if (typeof t !== 'function') return fallback;
             var s = t(key);
@@ -870,40 +1037,46 @@
         var customLabel = quoteUi('quotePayCustom', 'Só texto livre / personalizado');
         var clauseLegend = quoteUi('quoteClauses', 'Cláusulas opcionais');
         var hint = quoteUi('quoteCondHint', 'Propostas a acordar com o cliente. Pode completar ou alterar livremente o texto abaixo.');
+        var customize = quoteUi('quoteCustomizeButton', 'Personalizar textos das opções…');
+        var restore = quoteUi('quoteRestoreOriginal', 'Restaurar textos originais');
         host.innerHTML = '<fieldset style="min-width:0;padding:8px"><legend>' + esc(payLegend) + '</legend>' +
-            '<label style="display:block"><input type="radio" name="devisPaymentChoice" value="custom"' + (!quotePaymentOptions.some(function (p) { return text.indexOf(p.text) >= 0; }) ? ' checked' : '') + '> ' + esc(customLabel) + '</label>' +
-            quotePaymentOptions.map(function (p) {
+            '<label style="display:block"><input type="radio" name="devisPaymentChoice" value="custom"' + (!paymentOptions.some(function (p) { return quoteOptionPresent(text, p, quoteOptionById(originals.payment, p.id)); }) ? ' checked' : '') + '> ' + esc(customLabel) + '</label>' +
+            paymentOptions.map(function (p) {
                 var highlight = (p.id === 'advance20' || p.id === 'advance50') ? 'font-weight:600;' : '';
-                return '<label style="display:block;margin:6px 0;' + highlight + '"><input type="radio" name="devisPaymentChoice" value="' + p.id + '"' + (text.indexOf(p.text) >= 0 ? ' checked' : '') + '> ' + esc(p.label) + '</label>';
+                return '<label style="display:block;margin:6px 0;' + highlight + '"><input type="radio" name="devisPaymentChoice" value="' + p.id + '"' + (quoteOptionPresent(text, p, quoteOptionById(originals.payment, p.id)) ? ' checked' : '') + '> ' + esc(p.label) + '</label>';
             }).join('') + '</fieldset><fieldset style="min-width:0;padding:8px"><legend>' + esc(methodLegend) + '</legend>' +
-            quotePaymentMethodOptions.map(function (p) {
-                return '<label style="display:block;margin:6px 0"><input type="checkbox" data-quote-method="' + p.id + '"' + (text.indexOf(p.text) >= 0 ? ' checked' : '') + '> ' + esc(p.label) + '</label>';
+            methodOptions.map(function (p) {
+                return '<label style="display:block;margin:6px 0"><input type="checkbox" data-quote-method="' + p.id + '"' + (quoteOptionPresent(text, p, quoteOptionById(originals.method, p.id)) ? ' checked' : '') + '> ' + esc(p.label) + '</label>';
             }).join('') + '</fieldset><fieldset style="min-width:0;padding:8px"><legend>' + esc(clauseLegend) + '</legend>' +
-            quoteClauseOptions.map(function (p) {
-                return '<label style="display:block;margin:6px 0"><input type="checkbox" data-quote-clause="' + p.id + '"' + (text.indexOf(p.text) >= 0 ? ' checked' : '') + '> ' + esc(p.label) + '</label>';
-            }).join('') + '</fieldset><small>' + esc(hint) + '</small>';
+            clauseOptions.map(function (p) {
+                return '<label style="display:block;margin:6px 0"><input type="checkbox" data-quote-clause="' + p.id + '"' + (quoteOptionPresent(text, p, quoteOptionById(originals.clause, p.id)) ? ' checked' : '') + '> ' + esc(p.label) + '</label>';
+            }).join('') + '</fieldset><small>' + esc(hint) + '</small>' +
+            '<div style="grid-column:1/-1;display:flex;flex-wrap:wrap;gap:8px;margin-top:2px">' +
+                '<button type="button" class="btn-secondary" onclick="abeneOpenQuoteOptionTextEditor()">✏️ ' + esc(customize) + '</button>' +
+                '<button type="button" class="btn-secondary" onclick="abeneRestoreQuoteOptionTexts()">↶ ' + esc(restore) + '</button>' +
+            '</div>';
         host.onchange = function (event) {
             var input = event.target;
             var value = notes.value;
             if (input.name === 'devisPaymentChoice') {
-                quotePaymentOptions.forEach(function (p) { value = value.split(p.text).join(''); });
-                var selected = quotePaymentOptions.filter(function (p) { return p.id === input.value; })[0];
+                paymentOptions.forEach(function (p) { value = removeQuoteOptionText(value, p, quoteOptionById(originals.payment, p.id)); });
+                var selected = quoteOptionById(paymentOptions, input.value);
                 if (selected) {
                     value = value.trim() + '\n\n' + selected.text;
                     setField('devisPayTerms', selected.label);
                 } else {
                     var terms = document.getElementById('devisPayTerms');
-                    if (terms && quotePaymentOptions.some(function (p) { return terms.value === p.label; })) terms.value = '';
+                    if (terms && paymentOptions.some(function (p) { return terms.value === p.label; })) terms.value = '';
                 }
             } else if (input.hasAttribute('data-quote-method')) {
-                var method = quotePaymentMethodOptions.filter(function (p) { return p.id === input.getAttribute('data-quote-method'); })[0];
+                var method = quoteOptionById(methodOptions, input.getAttribute('data-quote-method'));
                 if (!method) return;
-                value = value.split(method.text).join('');
+                value = removeQuoteOptionText(value, method, quoteOptionById(originals.method, method.id));
                 if (input.checked) value = value.trim() + '\n\n' + method.text;
             } else {
-                var clause = quoteClauseOptions.filter(function (p) { return p.id === input.getAttribute('data-quote-clause'); })[0];
+                var clause = quoteOptionById(clauseOptions, input.getAttribute('data-quote-clause'));
                 if (!clause) return;
-                value = value.split(clause.text).join('');
+                value = removeQuoteOptionText(value, clause, quoteOptionById(originals.clause, clause.id));
                 if (input.checked) value = value.trim() + '\n\n' + clause.text;
             }
             notes.value = value.replace(/\n{3,}/g, '\n\n').trim();
