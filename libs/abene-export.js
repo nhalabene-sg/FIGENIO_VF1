@@ -36,6 +36,74 @@
         return n;
     }
 
+    var DOCX_MIME = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+
+    function safeDocxFilename(filename) {
+        var name = String(filename || 'document').replace(/\.docx$/i, '');
+        name = name.replace(/[<>:"/\\|?*\u0000-\u001F]/g, ' ')
+            .replace(/\s+/g, ' ')
+            .replace(/[. ]+$/g, '')
+            .trim()
+            .slice(0, 180);
+        if (!name) name = 'document';
+        if (/^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i.test(name)) name = 'document-' + name;
+        return name + '.docx';
+    }
+
+    function clickDocxDownload(href, name, cleanup, cleanupDelay) {
+        var link = document.createElement('a');
+        link.href = href;
+        link.download = name;
+        link.rel = 'noopener';
+        link.style.display = 'none';
+        (document.body || document.documentElement).appendChild(link);
+        link.click();
+        root.setTimeout(function () {
+            if (link.parentNode) link.parentNode.removeChild(link);
+            if (typeof cleanup === 'function') cleanup();
+        }, cleanupDelay || 1000);
+    }
+
+    function downloadDocxObjectUrl(blob, name) {
+        var url = root.URL.createObjectURL(blob);
+        // Chrome may still be reading the Blob after click(); revoking immediately can cancel
+        // the download and leave a UUID entry marked "Deleted".
+        clickDocxDownload(url, name, function () {
+            root.URL.revokeObjectURL(url);
+        }, 60000);
+    }
+
+    function downloadDocxBlob(content, filename) {
+        var blob = content instanceof Blob ? content : new Blob([content], { type: DOCX_MIME });
+        if (blob.type !== DOCX_MIME && typeof blob.slice === 'function') {
+            blob = blob.slice(0, blob.size, DOCX_MIME);
+        }
+        var name = safeDocxFilename(filename);
+        if (!blob.size) throw new Error('empty-docx');
+        var metadata = { filename: name, size: blob.size, type: blob.type || DOCX_MIME };
+
+        // This prevents Chrome from keeping image-rich DOCX files under a UUID/.tmp name.
+        // The existing Blob URL download remains the fallback for large files or reader errors.
+        if (root.FileReader && blob.size <= 64 * 1024 * 1024) {
+            var reader = new root.FileReader();
+            reader.onload = function () {
+                if (typeof reader.result === 'string' && reader.result.indexOf('data:') === 0) {
+                    clickDocxDownload(reader.result, name);
+                } else {
+                    downloadDocxObjectUrl(blob, name);
+                }
+            };
+            reader.onerror = function () {
+                downloadDocxObjectUrl(blob, name);
+            };
+            reader.readAsDataURL(blob);
+            return metadata;
+        }
+
+        downloadDocxObjectUrl(blob, name);
+        return metadata;
+    }
+
     function A() { return root.abene || {}; }
     function ed() { return (A().editor) || document.getElementById('editor'); }
     function G() { return root.PageGeometry || {}; }
@@ -1919,6 +1987,7 @@ function pdfOptions(g, filename) {
         pageImagesToBlob: pageImagesToBlob,
         htmlToPagedBlob: htmlToPagedBlob,
         htmlElementToPdfBlob: htmlElementToPdfBlob,
+        downloadDocxBlob: downloadDocxBlob,
         buildDocxSections: buildDocxSections,
         notifyDocxLimitsOnce: notifyDocxLimitsOnce
     };

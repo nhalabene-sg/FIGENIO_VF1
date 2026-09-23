@@ -11294,16 +11294,24 @@ table { border-collapse: collapse; }
         }
         window.buildDocxBlob = buildDocxBlob;
 
+        function downloadBuiltDocx(blob, filename) {
+            var exportApi = window.ABENE && window.ABENE.Export;
+            if (exportApi && typeof exportApi.downloadDocxBlob === 'function') {
+                return exportApi.downloadDocxBlob(blob, filename);
+            }
+            return downloadFile(blob, filename, blob.type || 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+        }
+
         async function exportDocx() {
             if (originalDocxState.blob && originalDocxState.snapshot === originalDocxSnapshot()) {
-                downloadFile(originalDocxState.blob, `${documentState.name || 'document'}.docx`, originalDocxState.blob.type || 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+                downloadBuiltDocx(originalDocxState.blob, `${documentState.name || 'document'}.docx`);
                 showToast(t('docxOriginalExported') || 'DOCX original descarregado sem alteração.');
                 closeAllDropdowns();
                 return;
             }
             var blob = await buildDocxBlob();
             if (!blob) return;
-            downloadFile(blob, `${documentState.name || 'document'}.docx`, blob.type);
+            downloadBuiltDocx(blob, `${documentState.name || 'document'}.docx`);
             if (originalDocxState.blob) showToast(t('docxRebuiltExported') || 'DOCX recriado com as alterações; layouts Word muito complexos podem variar.');
             closeAllDropdowns();
         }
@@ -12994,11 +13002,11 @@ table { border-collapse: collapse; }
     <script src="libs/abene-tables.js?v=20260915-sort-1"></script>
     <script src="libs/abene-document.js?v=20260915-vers-1"></script>
     <script src="libs/abene-history.js?v=20260915-outline-1"></script>
-    <script src="libs/abene-export.js?v=20260922-sync-format-1"></script>
+    <script src="libs/abene-export.js?v=20260923-docx-download-2"></script>
     <script src="libs/abene-modelo.js?v=20260914-meta-1"></script>
     <script src="libs/abene-comercial.js?v=20260920-fix9-3"></script>
     <script src="libs/abene-contabilidade.js?v=20260922-period-1"></script>
-    <script src="libs/abene-arquivo.js?v=20260922-period-1"></script>
+    <script src="libs/abene-arquivo.js?v=20260923-arquivo-layout-2"></script>
     <script src="libs/abene-phone.js?v=20260920-wordphone-1"></script>
     <script src="libs/abene-sheets.js?v=20260922-sync-format-1"></script>
     <script src="libs/abene-document-sync.js?v=20260922-sync-format-1"></script>

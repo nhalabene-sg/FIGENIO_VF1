@@ -1547,6 +1547,7 @@
             '.arq-pdf-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:4px 0;border-top:1px solid #eee;font-size:12px;}' +
             '.arq-pdf-row.on{background:#fff;}' +
             '@media(max-width:900px){.arq-body{grid-template-columns:1fr;}.arq-archive-panel{grid-template-columns:1fr;}}' +
+            '@media(min-width:821px) and (max-width:900px){.arq-body{grid-template-columns:220px minmax(220px,1fr) minmax(300px,1.15fr);}}' +
             '@media(max-width:820px),(max-width:960px) and (pointer:coarse),(max-width:960px) and (max-height:480px) and (orientation:landscape){' +
             '#arqOverlay{height:100dvh;max-height:100dvh;overflow:hidden;}' +
             '.arq-top{flex-wrap:wrap;gap:8px;padding:8px 12px;padding-top:max(8px,env(safe-area-inset-top,0px));flex-shrink:0;}' +
@@ -3238,6 +3239,7 @@
         ensureDom();
         fillChrome();
         if (typeof closeAllDropdowns === 'function') closeAllDropdowns();
+        if (typeof closeImageToolbar === 'function') closeImageToolbar();
         document.getElementById('arqOverlay').classList.add('open');
         try { document.body.classList.add('abene-arq-open'); } catch (eOpen) {}
         if (isMobileArchive()) {
