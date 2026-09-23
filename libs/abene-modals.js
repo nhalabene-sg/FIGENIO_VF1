@@ -696,7 +696,8 @@
         var hint = tt('exportAsHint') || tt('saveAsHint') || '';
         openGenericModal(title,
             (hint ? ('<p class="save-as-hint">' + esc(hint) + '</p>') : '') +
-            btn('exportDocx', '📘', tt('exportAsWord') || tt('saveAsWord') || tt('fileDocx')) +
+            btn('exportDocx', '📘', tt('exportAsWordFaithful') || tt('exportAsWord') || tt('fileDocx')) +
+            btn('exportDocxEditable', '✏️', tt('exportAsWordEditable') || tt('exportAsWord') || tt('fileDocx')) +
             btn('exportPDF', '📥', tt('exportAsPdf') || tt('saveAsPdf') || tt('filePdf')) +
             btn('saveForAccountant', '📊', tt('saveAsAcct') || tt('acctCsv')) +
             btn('exportWord', '📄', tt('fileDoc')) +

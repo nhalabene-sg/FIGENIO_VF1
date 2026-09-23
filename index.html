@@ -7533,7 +7533,7 @@
     <input type="file" id="fileInput" style="display:none" accept=".html,.htm,.txt,.docx,.json" onchange="loadFile(event)">
     <input type="file" id="imageInput" style="display:none" accept="image/*" multiple onchange="handleImageUpload(event)">
 
-    <script src="libs/abene-i18n.js?v=20260923-final-workflow-1"></script>
+    <script src="libs/abene-i18n.js?v=20260923-docx-faithful-1"></script>
     <script src="libs/abene-tips.js?v=20260915-cite-1"></script>
     <script src="libs/abene-tips-mobile.js?v=20260923-mobile-tip-1"></script>
     <script src="libs/abene-page-geometry.js?v=20260914-review-1"></script>
@@ -11512,7 +11512,7 @@ table { border-collapse: collapse; }
         window.abeneSavePreparedDocx = abeneSavePreparedDocx;
         window.abeneCancelPreparedDocx = abeneCancelPreparedDocx;
 
-        async function exportDocx() {
+        async function exportDocxByMode(mode) {
             var filename = `${documentState.name || 'document'}.docx`;
             var exportApi = window.ABENE && window.ABENE.Export;
             // Call the picker before the first await so Chrome still sees the user's click.
@@ -11523,9 +11523,18 @@ table { border-collapse: collapse; }
             var saveTarget = saveTargetPromise ? await saveTargetPromise : null;
             if (saveTarget && saveTarget.cancelled) return;
             var blob;
+            var faithfulFallback = false;
             var originalUnchanged = originalDocxState.blob && originalDocxState.snapshot === originalDocxSnapshot();
             if (originalUnchanged) blob = originalDocxState.blob;
-            else blob = await buildDocxBlob();
+            else if (mode === 'faithful' && exportApi && typeof exportApi.buildFaithfulDocxBlob === 'function') {
+                try {
+                    blob = await exportApi.buildFaithfulDocxBlob();
+                } catch (eFaithful) {
+                    faithfulFallback = true;
+                    showToast(t('docxFaithfulFallback') || 'Não foi possível criar o Word fiel. Foi preparada a versão editável.');
+                    blob = await buildDocxBlob();
+                }
+            } else blob = await buildDocxBlob();
             if (!blob) return;
             var savedWithPicker = false;
             if (saveTarget && saveTarget.handle && exportApi && typeof exportApi.writeDocxSaveTarget === 'function') {
@@ -11536,8 +11545,19 @@ table { border-collapse: collapse; }
             }
             if (!savedWithPicker) offerPreparedDocxDownload(blob, filename);
             if (originalUnchanged) showToast(t('docxOriginalExported') || 'DOCX original descarregado sem alteração.');
+            else if (mode === 'faithful' && !faithfulFallback) showToast(t('docxFaithfulExported') || 'Word fiel preparado com a mesma apresentação das páginas ABENE.');
             else if (originalDocxState.blob) showToast(t('docxRebuiltExported') || 'DOCX recriado com as alterações; layouts Word muito complexos podem variar.');
         }
+
+        async function exportDocx() {
+            return exportDocxByMode('faithful');
+        }
+
+        async function exportDocxEditable() {
+            return exportDocxByMode('editable');
+        }
+
+        window.exportDocxEditable = exportDocxEditable;
 
         /* ── DOCX import engine (high-fidelity, persistent and editable) ────── */
         var _docxImages = {};      // persistent data URLs keyed by relationship id
@@ -13221,11 +13241,11 @@ table { border-collapse: collapse; }
     <script src="libs/abene-commands.js?v=20260915-fx-1"></script>
     <script src="libs/abene-notes.js?v=20260915-dark-1"></script>
     <script src="libs/abene-objects.js?v=20260915-date-1"></script>
-    <script src="libs/abene-modals.js?v=20260920-guardar-2"></script>
+    <script src="libs/abene-modals.js?v=20260923-docx-faithful-1"></script>
     <script src="libs/abene-tables.js?v=20260915-sort-1"></script>
     <script src="libs/abene-document.js?v=20260915-vers-1"></script>
     <script src="libs/abene-history.js?v=20260915-outline-1"></script>
-    <script src="libs/abene-export.js?v=20260923-docx-download-4"></script>
+    <script src="libs/abene-export.js?v=20260923-docx-faithful-1"></script>
     <script src="libs/abene-modelo.js?v=20260914-meta-1"></script>
     <script src="libs/abene-comercial.js?v=20260923-lazy-1"></script>
     <script src="libs/abene-contabilidade.js?v=20260922-period-1"></script>

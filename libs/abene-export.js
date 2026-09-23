@@ -1898,6 +1898,86 @@ function pdfOptions(g, filename) {
         });
     }
 
+    function pngDataUrlBytes(dataUrl) {
+        var raw = String(dataUrl || '').replace(/^data:image\/png;base64,/i, '');
+        if (!raw) throw new Error('docx-faithful-image-empty');
+        var binary = root.atob(raw);
+        var bytes = new Uint8Array(binary.length);
+        for (var i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+        return bytes;
+    }
+
+    /*
+       Word fiel: cada folha já paginada por ABENE é colocada inteira no DOCX.
+       O exportador editável existente continua disponível em paralelo; este caminho
+       serve quando a prioridade é conservar exatamente a apresentação no ecrã.
+    */
+    function buildFaithfulDocxBlob(filterFn) {
+        var loads = [];
+        if (!root.docx && typeof root.abeneEnsureLibrary === 'function') loads.push(root.abeneEnsureLibrary('docx'));
+        if (!root.html2pdf && typeof root.abeneEnsureLibrary === 'function') loads.push(root.abeneEnsureLibrary('pdf'));
+        return Promise.all(loads).then(function () {
+            var D = root.docx;
+            if (!D || !D.Document || !D.Packer || !D.Paragraph || !D.ImageRun) {
+                throw new Error('docx-library-unavailable');
+            }
+            return captureLivePagedImages(filterFn).then(function (pack) {
+                var images = pack.images || [];
+                var g = pack.g || geo();
+                if (!images.length) throw new Error('docx-faithful-no-pages');
+                var paper = docxPaperProps();
+                var portrait = paper.portrait || { w: 794, h: 1123 };
+                var PageOrientation = D.PageOrientation || {};
+                var Horizontal = D.HorizontalPositionRelativeFrom || { PAGE: 'page' };
+                var Vertical = D.VerticalPositionRelativeFrom || { PAGE: 'page' };
+                var Wrap = D.TextWrappingType || { NONE: 0 };
+                var paragraphs = images.map(function (image, index) {
+                    return new D.Paragraph({
+                        pageBreakBefore: index > 0,
+                        spacing: { before: 0, after: 0 },
+                        children: [new D.ImageRun({
+                            data: pngDataUrlBytes(image),
+                            transformation: {
+                                width: Math.max(1, Math.round(g.w)),
+                                height: Math.max(1, Math.round(g.h))
+                            },
+                            floating: {
+                                horizontalPosition: { relative: Horizontal.PAGE || 'page', offset: 0 },
+                                verticalPosition: { relative: Vertical.PAGE || 'page', offset: 0 },
+                                wrap: { type: Wrap.NONE != null ? Wrap.NONE : 0 },
+                                margins: { top: 0, right: 0, bottom: 0, left: 0 },
+                                allowOverlap: true,
+                                behindDocument: false,
+                                lockAnchor: true
+                            }
+                        })]
+                    });
+                });
+                var doc = new D.Document({
+                    sections: [{
+                        properties: {
+                            page: {
+                                size: {
+                                    width: paper.pxToTwip(portrait.w),
+                                    height: paper.pxToTwip(portrait.h),
+                                    orientation: paper.orientation === 'landscape'
+                                        ? (PageOrientation.LANDSCAPE || 'landscape')
+                                        : (PageOrientation.PORTRAIT || 'portrait')
+                                },
+                                margin: { top: 0, right: 0, bottom: 0, left: 0, header: 0, footer: 0, gutter: 0 }
+                            }
+                        },
+                        children: paragraphs
+                    }]
+                });
+                return D.Packer.toBlob(doc).then(function (blob) {
+                    if (!blob || !blob.size) throw new Error('docx-faithful-empty');
+                    return blob;
+                });
+            });
+        });
+    }
+
     function captureLivePagedBlob(filterFn) {
         return captureLivePagedImages(filterFn).then(function (pack) {
             return pdfFromPageImages(pack.images, pack.g).then(function (pdf) {
@@ -2040,6 +2120,7 @@ function pdfOptions(g, filename) {
         pagedPdfToBlob: pagedPdfToBlob,
         captureLivePagedImages: captureLivePagedImages,
         captureLivePagedBlob: captureLivePagedBlob,
+        buildFaithfulDocxBlob: buildFaithfulDocxBlob,
         savePageImagesPdf: savePageImagesPdf,
         pageImagesToBlob: pageImagesToBlob,
         htmlToPagedBlob: htmlToPagedBlob,
