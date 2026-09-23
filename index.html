@@ -11302,18 +11302,58 @@ table { border-collapse: collapse; }
             return downloadFile(blob, filename, blob.type || 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
         }
 
+        var pendingDocxDownload = null;
+
+        function offerPreparedDocxDownload(blob, filename) {
+            pendingDocxDownload = { blob: blob, filename: filename };
+            openGenericModal(
+                'Documento Word pronto',
+                '<p>O documento está pronto. Clique em <strong>Guardar ficheiro…</strong> para confirmar o download com o nome correto.</p>',
+                '<button type="button" class="btn-primary" id="abenePreparedDocxSave" onclick="abeneSavePreparedDocx()">Guardar ficheiro…</button>' +
+                '<button type="button" class="btn-secondary" onclick="abeneCancelPreparedDocx()">Cancelar</button>'
+            );
+        }
+
+        function abeneSavePreparedDocx() {
+            var prepared = pendingDocxDownload;
+            if (!prepared) return;
+            pendingDocxDownload = null;
+            closeModal('genericModal');
+            downloadBuiltDocx(prepared.blob, prepared.filename);
+        }
+
+        function abeneCancelPreparedDocx() {
+            pendingDocxDownload = null;
+            closeModal('genericModal');
+        }
+        window.abeneSavePreparedDocx = abeneSavePreparedDocx;
+        window.abeneCancelPreparedDocx = abeneCancelPreparedDocx;
+
         async function exportDocx() {
-            if (originalDocxState.blob && originalDocxState.snapshot === originalDocxSnapshot()) {
-                downloadBuiltDocx(originalDocxState.blob, `${documentState.name || 'document'}.docx`);
-                showToast(t('docxOriginalExported') || 'DOCX original descarregado sem alteração.');
-                closeAllDropdowns();
-                return;
-            }
-            var blob = await buildDocxBlob();
-            if (!blob) return;
-            downloadBuiltDocx(blob, `${documentState.name || 'document'}.docx`);
-            if (originalDocxState.blob) showToast(t('docxRebuiltExported') || 'DOCX recriado com as alterações; layouts Word muito complexos podem variar.');
+            var filename = `${documentState.name || 'document'}.docx`;
+            var exportApi = window.ABENE && window.ABENE.Export;
+            // Call the picker before the first await so Chrome still sees the user's click.
+            var saveTargetPromise = exportApi && typeof exportApi.beginDocxSave === 'function'
+                ? exportApi.beginDocxSave(filename)
+                : null;
             closeAllDropdowns();
+            var saveTarget = saveTargetPromise ? await saveTargetPromise : null;
+            if (saveTarget && saveTarget.cancelled) return;
+            var blob;
+            var originalUnchanged = originalDocxState.blob && originalDocxState.snapshot === originalDocxSnapshot();
+            if (originalUnchanged) blob = originalDocxState.blob;
+            else blob = await buildDocxBlob();
+            if (!blob) return;
+            var savedWithPicker = false;
+            if (saveTarget && saveTarget.handle && exportApi && typeof exportApi.writeDocxSaveTarget === 'function') {
+                try {
+                    await exportApi.writeDocxSaveTarget(saveTarget, blob);
+                    savedWithPicker = true;
+                } catch (eDocxWrite) {}
+            }
+            if (!savedWithPicker) offerPreparedDocxDownload(blob, filename);
+            if (originalUnchanged) showToast(t('docxOriginalExported') || 'DOCX original descarregado sem alteração.');
+            else if (originalDocxState.blob) showToast(t('docxRebuiltExported') || 'DOCX recriado com as alterações; layouts Word muito complexos podem variar.');
         }
 
         /* ── DOCX import engine (high-fidelity, persistent and editable) ────── */
@@ -13002,7 +13042,7 @@ table { border-collapse: collapse; }
     <script src="libs/abene-tables.js?v=20260915-sort-1"></script>
     <script src="libs/abene-document.js?v=20260915-vers-1"></script>
     <script src="libs/abene-history.js?v=20260915-outline-1"></script>
-    <script src="libs/abene-export.js?v=20260923-docx-download-2"></script>
+    <script src="libs/abene-export.js?v=20260923-docx-download-4"></script>
     <script src="libs/abene-modelo.js?v=20260914-meta-1"></script>
     <script src="libs/abene-comercial.js?v=20260920-fix9-3"></script>
     <script src="libs/abene-contabilidade.js?v=20260922-period-1"></script>

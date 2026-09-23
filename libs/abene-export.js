@@ -50,6 +50,57 @@
         return name + '.docx';
     }
 
+    function beginDocxSave(filename) {
+        var name = safeDocxFilename(filename);
+        if (typeof root.showSaveFilePicker !== 'function') return null;
+        var options = {
+            suggestedName: name,
+            types: [{ description: 'Word', accept: {} }]
+        };
+        options.types[0].accept[DOCX_MIME] = ['.docx'];
+        try {
+            return root.showSaveFilePicker(options).then(function (handle) {
+                return { handle: handle, filename: name, cancelled: false };
+            }).catch(function (err) {
+                return {
+                    handle: null,
+                    filename: name,
+                    cancelled: !!(err && err.name === 'AbortError'),
+                    failed: !(err && err.name === 'AbortError')
+                };
+            });
+        } catch (errPicker) {
+            return Promise.resolve({
+                handle: null,
+                filename: name,
+                cancelled: !!(errPicker && errPicker.name === 'AbortError'),
+                failed: !(errPicker && errPicker.name === 'AbortError')
+            });
+        }
+    }
+
+    function writeDocxSaveTarget(target, content) {
+        var blob = content instanceof Blob ? content : new Blob([content], { type: DOCX_MIME });
+        if (blob.type !== DOCX_MIME && typeof blob.slice === 'function') {
+            blob = blob.slice(0, blob.size, DOCX_MIME);
+        }
+        if (!blob.size) return Promise.reject(new Error('empty-docx'));
+        if (!target || !target.handle || typeof target.handle.createWritable !== 'function') {
+            return Promise.reject(new Error('docx-save-target-unavailable'));
+        }
+        return target.handle.createWritable().then(function (writable) {
+            return Promise.resolve(writable.write(blob)).then(function () {
+                return writable.close();
+            }).then(function () {
+                return {
+                    filename: target.filename || 'document.docx',
+                    size: blob.size,
+                    type: blob.type || DOCX_MIME
+                };
+            });
+        });
+    }
+
     function clickDocxDownload(href, name, cleanup, cleanupDelay) {
         var link = document.createElement('a');
         link.href = href;
@@ -71,6 +122,7 @@
         clickDocxDownload(url, name, function () {
             root.URL.revokeObjectURL(url);
         }, 60000);
+        return true;
     }
 
     function downloadDocxBlob(content, filename) {
@@ -82,26 +134,24 @@
         if (!blob.size) throw new Error('empty-docx');
         var metadata = { filename: name, size: blob.size, type: blob.type || DOCX_MIME };
 
-        // This prevents Chrome from keeping image-rich DOCX files under a UUID/.tmp name.
-        // The existing Blob URL download remains the fallback for large files or reader errors.
+        // Keep this synchronous when called from a click: Chrome then preserves download=name.
+        try {
+            downloadDocxObjectUrl(blob, name);
+            return metadata;
+        } catch (errObjectUrl) {}
+
+        // Distant fallback for browsers without Blob URL support.
         if (root.FileReader && blob.size <= 64 * 1024 * 1024) {
             var reader = new root.FileReader();
             reader.onload = function () {
                 if (typeof reader.result === 'string' && reader.result.indexOf('data:') === 0) {
                     clickDocxDownload(reader.result, name);
-                } else {
-                    downloadDocxObjectUrl(blob, name);
                 }
-            };
-            reader.onerror = function () {
-                downloadDocxObjectUrl(blob, name);
             };
             reader.readAsDataURL(blob);
             return metadata;
         }
-
-        downloadDocxObjectUrl(blob, name);
-        return metadata;
+        throw new Error('docx-download-unavailable');
     }
 
     function A() { return root.abene || {}; }
@@ -1987,6 +2037,8 @@ function pdfOptions(g, filename) {
         pageImagesToBlob: pageImagesToBlob,
         htmlToPagedBlob: htmlToPagedBlob,
         htmlElementToPdfBlob: htmlElementToPdfBlob,
+        beginDocxSave: beginDocxSave,
+        writeDocxSaveTarget: writeDocxSaveTarget,
         downloadDocxBlob: downloadDocxBlob,
         buildDocxSections: buildDocxSections,
         notifyDocxLimitsOnce: notifyDocxLimitsOnce
