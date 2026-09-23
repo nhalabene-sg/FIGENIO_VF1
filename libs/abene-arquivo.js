@@ -1089,6 +1089,9 @@
         });
     }
     function htmlToPdfBlob(html) {
+        if (!window.html2pdf && typeof window.abeneEnsureLibrary === 'function') {
+            return window.abeneEnsureLibrary('pdf').then(function () { return htmlToPdfBlob(html); });
+        }
         var Ex = window.ABENE && window.ABENE.Export;
         if (Ex && typeof Ex.htmlToPagedBlob === 'function') {
             return Ex.htmlToPagedBlob(html).catch(function () {
@@ -2745,6 +2748,9 @@
     }
     function gravarEtape(etape, opts) {
         opts = opts || {};
+        if (!window.html2pdf && typeof window.abeneEnsureLibrary === 'function') {
+            return window.abeneEnsureLibrary('pdf').then(function () { return gravarEtape(etape, opts); });
+        }
         var entry = opts.entry || currentSnapshot();
         if (opts.html) {
             entry = Object.assign({}, entry, {

@@ -1375,6 +1375,12 @@
         window.print();
     };
     window.downloadPaperPreviewPdf = function () {
+        if (!window.html2pdf && typeof window.abeneEnsureLibrary === 'function') {
+            window.abeneEnsureLibrary('pdf').then(function () { window.downloadPaperPreviewPdf(); }).catch(function () {
+                window.printPaperPreview();
+            });
+            return;
+        }
         var sheet = document.getElementById('paperPreviewSheet');
         if (!sheet || !sheet.innerHTML.trim()) return;
         var data = previewState && previewState.data;
@@ -1393,6 +1399,12 @@
         toastMsg('toastPdfPreview', 'PDF da pré-visualização descarregado. Ainda não é a versão definitiva no documento.');
     };
     window.emailPaperPreview = function () {
+        if (!window.html2pdf && typeof window.abeneEnsureLibrary === 'function') {
+            window.abeneEnsureLibrary('pdf').then(function () { window.emailPaperPreview(); }).catch(function () {
+                toastMsg('mailFail', 'O PDF não pôde ser criado. Nada foi enviado.');
+            });
+            return;
+        }
         if (!previewState) return;
         var data = previewState.data || {};
         var isQuote = previewState.kind !== 'receipt';

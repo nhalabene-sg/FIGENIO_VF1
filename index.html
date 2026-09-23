@@ -86,9 +86,53 @@
     <link rel="icon" href="branding/favicon.svg" type="image/svg+xml">
     <link rel="apple-touch-icon" href="branding/icon_96.svg">
     <link rel="manifest" href="manifest.webmanifest">
+    <script>
+      /* Bibliotecas pesadas carregadas apenas quando a função é usada. */
+      (function () {
+        var defs = {
+          pdf: { src: 'libs/html2pdf.bundle.min.js?v=20260923-lazy-1', global: 'html2pdf' },
+          docx: { src: 'libs/docx.umd.js?v=20260923-lazy-1', global: 'docx' }
+        };
+        var pending = {};
+        window.abeneEnsureLibrary = function (name) {
+          var def = defs[name];
+          if (!def) return Promise.reject(new Error('unknown-library'));
+          if (window[def.global]) return Promise.resolve(window[def.global]);
+          if (pending[name]) return pending[name];
+          pending[name] = new Promise(function (resolve, reject) {
+            var script = document.createElement('script');
+            script.src = def.src;
+            script.async = true;
+            script.setAttribute('data-abene-lazy-lib', name);
+            script.onload = function () {
+              if (window[def.global]) {
+                var loaded = Object.assign({}, window.abeneLibraries || {});
+                loaded[name] = true;
+                window.abeneLibraries = loaded;
+                resolve(window[def.global]);
+                return;
+              }
+              pending[name] = null;
+              reject(new Error('library-not-ready'));
+            };
+            script.onerror = function () {
+              var failed = Object.assign({}, window.abeneLibraries || {});
+              failed[name] = false;
+              window.abeneLibraries = failed;
+              pending[name] = null;
+              reject(new Error('library-load-failed'));
+            };
+            document.head.appendChild(script);
+          });
+          return pending[name];
+        };
+      })();
+    </script>
     <script src="libs/jszip.min.js?v=20260914-essential-1" onerror="window.abeneLibraries={...(window.abeneLibraries||{}),jszip:false}"></script>
+    <!-- Carregamento direto anterior preservado para referência. Não executar: o carregador acima abre as mesmas bibliotecas quando necessário.
     <script src="libs/html2pdf.bundle.min.js?v=20260914-essential-1" onerror="window.abeneLibraries={...(window.abeneLibraries||{}),pdf:false}"></script>
     <script src="libs/docx.umd.js?v=20260914-essential-1" onerror="window.abeneLibraries={...(window.abeneLibraries||{}),docx:false}"></script>
+    -->
     <style>
         * {
             margin: 0;
@@ -10736,6 +10780,13 @@
         }
 
         function exportPDF() {
+            if (!window.html2pdf && typeof window.abeneEnsureLibrary === 'function') {
+                window.abeneEnsureLibrary('pdf').then(function () { exportPDF(); }).catch(function () {
+                    printDocument();
+                    closeAllDropdowns();
+                });
+                return;
+            }
             if (window.abeneBuildPagedExport && window.html2pdf) {
                 window.abeneRemoveExportRoot && window.abeneRemoveExportRoot();
                 if (typeof refreshPagination === 'function') refreshPagination();
@@ -11293,6 +11344,9 @@ table { border-collapse: collapse; }
 
         /* Constrói o blob DOCX (reutilizado por exportar e Abrir no Google Docs). */
         async function buildDocxBlob() {
+            if (!window.docx && typeof window.abeneEnsureLibrary === 'function') {
+                try { await window.abeneEnsureLibrary('docx'); } catch (eDocxLoad) {}
+            }
             if (!window.docx) { alert(t('aNoDocx')); return null; }
             if (window.abenePrepareForExport) window.abenePrepareForExport();
             const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, WidthType, HeadingLevel, Header, Footer, AlignmentType, PageNumber, PageOrientation, ImageRun, ShadingType, PageBreak, BorderStyle } = window.docx;
@@ -13172,9 +13226,9 @@ table { border-collapse: collapse; }
     <script src="libs/abene-history.js?v=20260915-outline-1"></script>
     <script src="libs/abene-export.js?v=20260923-docx-download-4"></script>
     <script src="libs/abene-modelo.js?v=20260914-meta-1"></script>
-    <script src="libs/abene-comercial.js?v=20260923-final-workflow-1"></script>
+    <script src="libs/abene-comercial.js?v=20260923-lazy-1"></script>
     <script src="libs/abene-contabilidade.js?v=20260922-period-1"></script>
-    <script src="libs/abene-arquivo.js?v=20260923-final-workflow-1"></script>
+    <script src="libs/abene-arquivo.js?v=20260923-lazy-1"></script>
     <script src="libs/abene-phone.js?v=20260920-wordphone-1"></script>
     <script src="libs/abene-sheets.js?v=20260922-security-post-1"></script>
     <script src="libs/abene-document-sync.js?v=20260922-multipc-1"></script>
