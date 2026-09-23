@@ -55,7 +55,10 @@
         if (typeof root.showSaveFilePicker !== 'function') return null;
         var options = {
             suggestedName: name,
-            types: [{ description: 'Word', accept: {} }]
+            types: [{
+                description: 'Word',
+                accept: {}
+            }]
         };
         options.types[0].accept[DOCX_MIME] = ['.docx'];
         try {
@@ -92,11 +95,7 @@
             return Promise.resolve(writable.write(blob)).then(function () {
                 return writable.close();
             }).then(function () {
-                return {
-                    filename: target.filename || 'document.docx',
-                    size: blob.size,
-                    type: blob.type || DOCX_MIME
-                };
+                return { filename: target.filename || 'document.docx', size: blob.size, type: blob.type || DOCX_MIME };
             });
         });
     }
@@ -134,24 +133,32 @@
         if (!blob.size) throw new Error('empty-docx');
         var metadata = { filename: name, size: blob.size, type: blob.type || DOCX_MIME };
 
-        // Keep this synchronous when called from a click: Chrome then preserves download=name.
+        // Keep the named Blob URL click in this call. Waiting for FileReader can make Chrome
+        // lose the download name and create an extensionless UUID instead.
         try {
             downloadDocxObjectUrl(blob, name);
             return metadata;
-        } catch (errObjectUrl) {}
+        } catch (eObjectUrl) {}
 
-        // Distant fallback for browsers without Blob URL support.
+        // Distant fallback only when the synchronous Blob URL path is unavailable.
         if (root.FileReader && blob.size <= 64 * 1024 * 1024) {
             var reader = new root.FileReader();
             reader.onload = function () {
                 if (typeof reader.result === 'string' && reader.result.indexOf('data:') === 0) {
                     clickDocxDownload(reader.result, name);
+                } else {
+                    downloadDocxObjectUrl(blob, name);
                 }
+            };
+            reader.onerror = function () {
+                downloadDocxObjectUrl(blob, name);
             };
             reader.readAsDataURL(blob);
             return metadata;
         }
-        throw new Error('docx-download-unavailable');
+
+        downloadDocxObjectUrl(blob, name);
+        return metadata;
     }
 
     function A() { return root.abene || {}; }

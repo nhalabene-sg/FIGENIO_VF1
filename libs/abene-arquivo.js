@@ -97,6 +97,8 @@
             opened: 'Documento aberto para modificar. A cópia no arquivo ficou intacta.',
             openedFinalHint: 'Versão definitiva aberta só para consulta. O PDF final no arquivo não foi alterado.',
             sentMarked: 'Marcado como enviado ao cliente (PDF — não definitivo).',
+            sentFinalMarked: 'Enviado ao cliente e guardado no Arquivo como versão final.',
+            sentFinalFailed: 'O PDF foi enviado, mas a versão final não pôde ser guardada no Arquivo.',
             zipOk: 'Conjunto descarregado ({n} ficheiro(s)).',
             zipEmpty: 'Nada a descarregar nesta vista.',
             packOk: 'Pack contabilista PT descarregado ({n} documento(s)).',
@@ -187,6 +189,8 @@
             opened: 'Document ouvert pour modification. La copie dans l’archive est intacte.',
             openedFinalHint: 'Version définitive ouverte en consultation. Le PDF final dans l’archive n’a pas changé.',
             sentMarked: 'Marqué comme envoyé au client (PDF — non définitif).',
+            sentFinalMarked: 'Envoyé au client et conservé dans les archives comme version finale.',
+            sentFinalFailed: 'Le PDF a été envoyé, mais la version finale n’a pas pu être conservée dans les archives.',
             zipOk: 'Ensemble téléchargé ({n} fichier(s)).',
             zipEmpty: 'Rien à télécharger dans cette vue.',
             packOk: 'Pack comptable PT téléchargé ({n} document(s)).',
@@ -277,6 +281,8 @@
             opened: 'Document opened to edit. The archive copy is intact.',
             openedFinalHint: 'Final version opened for viewing. The final PDF in the archive was not changed.',
             sentMarked: 'Marked as sent to client (PDF — not final).',
+            sentFinalMarked: 'Sent to the client and stored in the archive as a final version.',
+            sentFinalFailed: 'The PDF was sent, but the final version could not be stored in the archive.',
             zipOk: 'Set downloaded ({n} file(s)).',
             zipEmpty: 'Nothing to download in this view.',
             packOk: 'PT accounting pack downloaded ({n} document(s)).',
@@ -367,6 +373,8 @@
             opened: 'Documento abierto para modificar. La copia en el archivo quedó intacta.',
             openedFinalHint: 'Versión definitiva abierta solo para consulta. El PDF final no cambió.',
             sentMarked: 'Marcado como enviado al cliente (PDF — no definitivo).',
+            sentFinalMarked: 'Enviado al cliente y guardado en el archivo como versión final.',
+            sentFinalFailed: 'El PDF fue enviado, pero la versión final no pudo guardarse en el archivo.',
             zipOk: 'Conjunto descargado ({n} fichero(s)).',
             zipEmpty: 'Nada que descargar en esta vista.',
             packOk: 'Pack contable PT descargado ({n} documento(s)).',
@@ -1637,7 +1645,7 @@
             '<label><span id="arqArchPeriodLbl"></span><select id="arqArchPeriodKind"><option value="day"></option><option value="month"></option><option value="year"></option></select></label>' +
             '<label><span id="arqArchPeriodValueLbl"></span><input type="date" id="arqArchPeriodValue" /></label>' +
             '<button type="button" class="arq-btn" id="arqArchToday"></button>' +
-            '<label class="arq-check"><input type="checkbox" id="arqArchDone" checked /> <span id="arqArchDoneLbl"></span></label>' +
+            '<label class="arq-check"><input type="checkbox" id="arqArchDone" /> <span id="arqArchDoneLbl"></span></label>' +
             '<button type="button" class="arq-btn gold" id="arqArchGo"></button>' +
             '<button type="button" class="arq-btn" id="arqArchCancel"></button>' +
             '</div>';
@@ -1676,7 +1684,8 @@
         var detectedDate = meta.documentDate || todayIso();
         if (cEl) cEl.value = client;
         if (pEl) pEl.value = pasta;
-        if (dEl) dEl.checked = true;
+        // Editing remains a draft unless the user explicitly chooses the final state.
+        if (dEl) dEl.checked = false;
         setPeriodInput('arqArchPeriodKind', 'arqArchPeriodValue', 'day', detectedDate);
         setPanelOpen('arqArchivePanel', true);
         if (cEl) cEl.focus();
@@ -1684,7 +1693,7 @@
     function commitArchivePanel() {
         var client = String((document.getElementById('arqArchClient') || {}).value || '').trim();
         var pasta = String((document.getElementById('arqArchPasta') || {}).value || '').trim();
-        var concluded = !!(document.getElementById('arqArchDone') || { checked: true }).checked;
+        var concluded = !!(document.getElementById('arqArchDone') || { checked: false }).checked;
         var periodKind = normalizePeriodKind((document.getElementById('arqArchPeriodKind') || {}).value || 'day');
         var periodValue = normalizePeriodValue(periodKind, (document.getElementById('arqArchPeriodValue') || {}).value || todayIso());
         closeArchivePanel();
@@ -3131,12 +3140,12 @@
         var concluded;
         if (opts.silent) {
             if (!pasta) pasta = String(snap.name || 'Documento').trim();
-            concluded = opts.concluded !== false || meta.type === 'completo';
+            concluded = opts.concluded === true;
         } else if (opts.fromPanel) {
             client = String(opts.client != null ? opts.client : clientDef).trim();
             pasta = String(opts.pasta != null ? opts.pasta : pastaDef).trim();
             if (!pasta) pasta = String(snap.name || 'Documento').trim();
-            concluded = opts.concluded != null ? !!opts.concluded : true;
+            concluded = opts.concluded != null ? !!opts.concluded : false;
         } else {
             openArchivePanel();
             return null;
@@ -3158,9 +3167,9 @@
             periodValue: period.value,
             periodStart: period.start,
             periodEnd: period.end,
-            concluded: concluded || meta.type === 'completo',
-            protected: !(concluded || meta.type === 'completo') && !!snap.protected,
-            protectedAt: (!(concluded || meta.type === 'completo') && snap.protected) ? new Date().toISOString() : '',
+            concluded: !!concluded,
+            protected: !concluded && !!snap.protected,
+            protectedAt: (!concluded && snap.protected) ? new Date().toISOString() : '',
             archivedAt: new Date().toISOString(),
             hasDevis: meta.hasDevis,
             hasReceipt: meta.hasReceipt,
@@ -3270,6 +3279,24 @@
         } catch (eHook2) {}
     }
 
+    function openEntryById(entryId) {
+        entryId = String(entryId || '');
+        var exists = allEntries().concat(trashedEntries()).some(function (entry) {
+            return String(entry.id || '') === entryId;
+        });
+        if (!exists) {
+            openArquivo();
+            return false;
+        }
+        state.folder = 'all';
+        state.selectedId = entryId;
+        state.previewTab = 'doc';
+        state.selectedPdfId = null;
+        openArquivo();
+        if (isMobileArchive()) setMobilePane('preview');
+        return true;
+    }
+
     function markSentToClient(meta) {
         meta = meta || {};
         var list = loadStore();
@@ -3325,7 +3352,116 @@
         return touched;
     }
 
+    function base64PdfBlob(value, mimeType) {
+        var raw = String(value || '');
+        var comma = raw.indexOf(',');
+        if (comma >= 0) raw = raw.slice(comma + 1);
+        var binary = atob(raw);
+        var bytes = new Uint8Array(binary.length);
+        for (var i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+        return new Blob([bytes], { type: mimeType || 'application/pdf' });
+    }
+
+    function finalizeSentToClient(meta) {
+        meta = meta || {};
+        var list = loadStore();
+        var boundId = String((docState() && docState().archiveEntryId) || '');
+        var num = String(meta.number || '').trim();
+        var client = String(meta.client || '').trim().toLowerCase();
+        var entry = list.filter(function (item) {
+            return item && !item.deletedAt && boundId && String(item.id || '') === boundId;
+        })[0] || list.filter(function (item) {
+            return item && !item.deletedAt && num && String(item.number || '') === num;
+        })[0] || list.filter(function (item) {
+            return item && !item.deletedAt && client && String(item.client || '').toLowerCase() === client;
+        })[0];
+
+        if (!entry) {
+            archiveCurrent({
+                silent: true,
+                concluded: false,
+                client: meta.client || '',
+                pasta: meta.pasta || ''
+            });
+            list = loadStore();
+            boundId = String((docState() && docState().archiveEntryId) || '');
+            entry = list.filter(function (item) { return item && String(item.id || '') === boundId; })[0];
+        }
+        if (!entry) {
+            toast(tr('sentFinalFailed'));
+            return Promise.resolve(false);
+        }
+
+        entry.sentToClient = true;
+        entry.sentAt = new Date().toISOString();
+        if (!saveStore(list)) {
+            toast(tr('sentFinalFailed'));
+            return Promise.resolve(false);
+        }
+
+        var attachment = meta.attachment || {};
+        var etape = meta.kind === 'devis' ? 'orcamento' : (meta.kind === 'receipt' ? 'recibo' : 'relatorio');
+        var blob;
+        try {
+            blob = base64PdfBlob(attachment.data, attachment.mimeType);
+        } catch (eBlob) {
+            toast(tr('sentFinalFailed'));
+            return Promise.resolve(false);
+        }
+        if (!blob.size || blob.type !== 'application/pdf') {
+            toast(tr('sentFinalFailed'));
+            return Promise.resolve(false);
+        }
+
+        return listFinals(ownerIdOf(entry)).then(function (rows) {
+            var same = rows.filter(function (row) { return row.etape === etape; });
+            var lastRev = same.length ? Math.max.apply(null, same.map(function (row) { return Number(row.rev) || 0; })) : 0;
+            var rec = {
+                id: ownerIdOf(entry) + ':' + etape + ':v' + (lastRev + 1),
+                ownerId: ownerIdOf(entry),
+                etape: etape,
+                rev: lastRev + 1,
+                number: entry.number || num,
+                name: entry.name || attachment.name || '',
+                createdAt: new Date().toISOString(),
+                bytes: blob.size,
+                blob: blob,
+                client: entry.client || meta.client || '',
+                pasta: entry.pasta || meta.pasta || '',
+                type: entry.type || '',
+                periodKind: entryPeriod(entry).kind,
+                periodValue: entryPeriod(entry).value,
+                periodStart: entryPeriod(entry).start,
+                periodEnd: entryPeriod(entry).end,
+                concluded: true
+            };
+            return putFinal(rec).then(function () { return syncFinalToDrive(rec, entry); });
+        }).then(function () {
+            list = loadStore();
+            list.forEach(function (item) {
+                if (item.id !== entry.id) return;
+                item.concluded = true;
+                item.protected = false;
+                item.protectedAt = '';
+                item.concludedAt = new Date().toISOString();
+                item.sentToClient = true;
+                item.sentAt = entry.sentAt;
+            });
+            if (!saveStore(list)) throw new Error('archive-save');
+            try {
+                if (docState()) docState().sentToClient = true;
+            } catch (eState) {}
+            refreshArquivoIfOpen();
+            toast(tr('sentFinalMarked'));
+            return true;
+        }).catch(function () {
+            toast(tr('sentFinalFailed'));
+            return false;
+        });
+    }
+
     window.openArquivoWindow = openArquivo;
+    window.abeneArquivoOpenEntry = openEntryById;
     window.closeArquivoWindow = closeArquivo;
     window.abeneArquivoMobileBack = mobileBack;
     window.abeneArquivoSetMobilePane = setMobilePane;
@@ -3393,6 +3529,7 @@
         lastJob: loadLastJob,
         saveLastJob: saveLastJob,
         markSentToClient: markSentToClient,
+        finalizeSentToClient: finalizeSentToClient,
         mobileBack: mobileBack,
         setMobilePane: setMobilePane,
         isMobileArchive: isMobileArchive

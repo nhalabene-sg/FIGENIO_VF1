@@ -10,7 +10,14 @@
 (function () {
     'use strict';
     var busy = false, ready = false, conflict = null, timer, scope = '', base = null;
+    var pendingExplicitSave = false;
     var multiOk = false, lastKind = 'idle', flushTimer;
+    var remoteCheckBusy = false, lastLocalEditAt = 0, otherSessionSeenAt = 0;
+    var syncChannel = null;
+    var tabId = 'tab-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8);
+    var LEADER_TTL = 15000;
+    var REMOTE_CHECK_MS = 8000;
+    var TYPING_QUIET_MS = 2000;
 
     function state() { return (window.abene || {}).documentState || {}; }
     function tt(key, fb) {
@@ -30,6 +37,35 @@
     function connRoot() {
         var c = (window.abene || {}).companyData || {};
         return String(c.appsScriptUrl || window.API_URL || '');
+    }
+    function leaderKey() {
+        return 'abeneDocumentSyncLeader:' + connRoot();
+    }
+    function readLeader() {
+        try { return JSON.parse(localStorage.getItem(leaderKey()) || 'null'); }
+        catch (e) { return null; }
+    }
+    function ownsLeaderLease() {
+        var lease = readLeader();
+        return !!(lease && lease.id === tabId && Number(lease.expires) > Date.now());
+    }
+    function claimAutoLeader() {
+        if (!syncChannel) return true;
+        var now = Date.now();
+        var lease = readLeader();
+        if (lease && lease.id !== tabId && Number(lease.expires) > now) return false;
+        try {
+            localStorage.setItem(leaderKey(), JSON.stringify({ id: tabId, expires: now + LEADER_TTL }));
+            return ownsLeaderLease();
+        } catch (e) {
+            // Storage unavailable: preserve the previous per-tab behavior.
+            return true;
+        }
+    }
+    function broadcastStatus(text, kind) {
+        if (!syncChannel || !ownsLeaderLease()) return;
+        try { syncChannel.postMessage({ type: 'status', text: text, kind: kind || 'idle', source: tabId }); }
+        catch (e) { /* optional coordination only */ }
     }
     function snapshot() {
         var settings = JSON.parse(projectSettings());
@@ -54,7 +90,7 @@
         delete settings.company;
         return JSON.stringify([doc.name || '', doc.html || '', settings]);
     }
-    function status(text, kind) {
+    function status(text, kind, fromChannel) {
         lastKind = kind || lastKind || 'idle';
         var el = document.getElementById('documentSyncStatus');
         if (!el) {
@@ -71,6 +107,9 @@
             : (lastKind === 'queued'
                 ? tt('docSyncQueuedHint', 'Alterações em fila — serão enviadas quando houver ligação.')
                 : (text + ' — ' + tt('docSyncNoOt', 'Não há sincronização em tempo real tipo Google Docs.')));
+        if (otherSessionSeenAt && Date.now() - otherSessionSeenAt < 60000) {
+            tip += '\n' + tt('docSyncOtherSession', 'Outra sessão pode estar a editar este documento');
+        }
         el.title = tip;
         if (lastKind === 'conflict') el.style.color = '#c0392b';
         else if (lastKind === 'syncing') el.style.color = '#C9A84C';
@@ -78,6 +117,44 @@
         else if (lastKind === 'ok') el.style.color = '#7dcea0';
         else if (lastKind === 'warn') el.style.color = '#C9A84C';
         else el.style.color = '';
+        updateConflictActions();
+        if (!fromChannel) broadcastStatus(text, lastKind);
+    }
+
+    function updateConflictActions() {
+        var host = document.getElementById('saveStatus');
+        var wrap = document.getElementById('documentSyncConflictActions');
+        if (!wrap && conflict && host && host.parentNode) {
+            wrap = document.createElement('span');
+            wrap.id = 'documentSyncConflictActions';
+            wrap.style.cssText = 'display:flex;flex-wrap:wrap;gap:4px;align-items:center;max-width:100%';
+            var take = document.createElement('button');
+            take.id = 'documentSyncTakeDrive';
+            take.type = 'button';
+            take.style.cssText = 'font:inherit;padding:2px 7px;border:1px solid currentColor;border-radius:4px;background:transparent;color:inherit;cursor:pointer';
+            take.onclick = takeRemoteConflict;
+            var keep = document.createElement('button');
+            keep.id = 'documentSyncKeepMine';
+            keep.type = 'button';
+            keep.style.cssText = take.style.cssText;
+            keep.onclick = keepLocalConflict;
+            wrap.appendChild(take);
+            wrap.appendChild(keep);
+            host.parentNode.appendChild(wrap);
+        }
+        if (!wrap) return;
+        wrap.style.display = conflict ? 'flex' : 'none';
+        if (!conflict) return;
+        var takeButton = document.getElementById('documentSyncTakeDrive');
+        var keepButton = document.getElementById('documentSyncKeepMine');
+        if (takeButton) {
+            takeButton.textContent = tt('docSyncUpdateDrive', 'Atualizar da Drive');
+            takeButton.title = tt('docSyncTakeRemote', 'Carregar a versão do Drive? A versão deste dispositivo fica guardada como cópia de segurança.');
+        }
+        if (keepButton) {
+            keepButton.textContent = tt('docSyncKeepMine', 'Manter a minha versão');
+            keepButton.title = tt('docSyncPushLocal', 'Enviar a versão deste dispositivo para o Drive? A versão anterior do Drive fica no histórico.');
+        }
     }
     function scopeKeyFor(id) {
         return 'abeneDocumentSync:' + connRoot() + ':' + sanitizeId(id || 'current');
@@ -114,8 +191,20 @@
             return {};
         }
     }
+    function storageFullWarning(error) {
+        var message = tt('docSyncStorageFull', 'Espaço local cheio — exporte uma cópia e liberte espaço antes de continuar. A cópia já guardada não foi apagada.');
+        status(message, 'warn');
+        if (typeof showToast === 'function') showToast(message);
+        return error;
+    }
     function writeQueue(q) {
-        localStorage.setItem(queueStoreKey(), JSON.stringify(q || {}));
+        try {
+            localStorage.setItem(queueStoreKey(), JSON.stringify(q || {}));
+            return true;
+        } catch (e) {
+            storageFullWarning(e);
+            return false;
+        }
     }
     function enqueue(reason) {
         if (state().protected) return false;
@@ -135,7 +224,11 @@
         if (prev && prev.document && prev.fingerprint === q[id].fingerprint && !snap.html) {
             q[id].document = prev.document;
         }
-        writeQueue(q);
+        if (prev && prev.conflictReason) {
+            q[id].conflictReason = prev.conflictReason;
+            q[id].conflictAt = prev.conflictAt || Date.now();
+        }
+        if (!writeQueue(q)) return false;
         status(tt('docSyncQueued', 'Fila de sincronização — aguarda ligação'), 'queued');
         return true;
     }
@@ -145,6 +238,7 @@
         if (!q[target]) return;
         delete q[target];
         writeQueue(q);
+        updateQueueConflictBadge();
     }
     function hasQueued(id) {
         var q = readQueue();
@@ -159,6 +253,56 @@
     }
     function hasAnyQueued() {
         return queuedIds().length > 0;
+    }
+    function queuedConflicts() {
+        var q = readQueue();
+        return Object.keys(q).filter(function (id) {
+            return !!(q[id] && q[id].document && q[id].conflictReason);
+        }).map(function (id) {
+            return { documentId: id, reason: q[id].conflictReason, at: q[id].conflictAt || 0 };
+        });
+    }
+    function conflictReasonLabel(reason) {
+        return reason === 'remote-newer'
+            ? tt('docSyncQueueRemoteNewer', 'versão mais recente no Drive')
+            : tt('docSyncQueueRevisionConflict', 'alterações diferentes neste dispositivo e no Drive');
+    }
+    function updateQueueConflictBadge() {
+        var rows = queuedConflicts();
+        var el = document.getElementById('documentSyncQueueBadge');
+        if (!el && rows.length) {
+            el = document.createElement('button');
+            el.id = 'documentSyncQueueBadge';
+            el.type = 'button';
+            el.className = 'status-sync-conflict-badge';
+            var host = document.getElementById('saveStatus');
+            if (host && host.parentNode) host.parentNode.appendChild(el);
+        }
+        if (!el) return;
+        el.style.display = rows.length ? '' : 'none';
+        if (!rows.length) return;
+        el.textContent = '⚠ ' + tt('docSyncQueueConflictCount', '{n} conflito(s) em fila').replace('{n}', String(rows.length));
+        el.title = rows.map(function (row) {
+            return row.documentId + ' — ' + conflictReasonLabel(row.reason);
+        }).join('\n') + '\n\n' + tt('docSyncQueueOpenHint', 'Clique para abrir a ficha no Arquivo e resolver sem substituição automática.');
+        el.onclick = function () {
+            var first = queuedConflicts()[0];
+            if (!first) return;
+            if (typeof window.abeneArquivoOpenEntry === 'function') window.abeneArquivoOpenEntry(first.documentId);
+            else if (typeof window.openArquivoWindow === 'function') window.openArquivoWindow();
+            if (typeof showToast === 'function') {
+                showToast(tt('docSyncQueueOpenToast', 'Abra a ficha indicada para comparar e escolher a versão a conservar.') + ' ' + first.documentId);
+            }
+        };
+    }
+    function markQueuedConflict(id, reason) {
+        var q = readQueue();
+        if (!q[id] || !q[id].document) return false;
+        q[id].conflictReason = reason || 'revision-conflict';
+        q[id].conflictAt = Date.now();
+        writeQueue(q);
+        updateQueueConflictBadge();
+        return true;
     }
     function localNeedsPush() {
         try {
@@ -180,7 +324,12 @@
             documentId: docId(),
             document: doc
         });
-        localStorage.setItem(backupKey(), payload);
+        try {
+            localStorage.setItem(backupKey(), payload);
+        } catch (e) {
+            storageFullWarning(e);
+            throw e;
+        }
         // Legacy single key kept for older recovery paths / prior QA tools.
         try {
             localStorage.setItem('abeneBeforeCloudReplace', payload);
@@ -249,10 +398,35 @@
     }
     function showConflict(remote) {
         conflict = remote;
-        status(tt('docSyncConflict', 'Conflito entre dispositivos — clique para escolher'), 'conflict');
+        otherSessionSeenAt = Date.now();
+        status(tt('docSyncConflictChoose', 'Conflito — escolha a versão'), 'conflict');
         if (typeof showToast === 'function') {
             showToast(tt('docSyncConflictToast', 'Conflito Drive: duas versões diferentes. Sem fusão automática — escolha qual conservar.'));
         }
+    }
+    function takeRemoteConflict() {
+        if (!conflict || busy || state().protected) return false;
+        var remote = conflict;
+        try {
+            applyRemote(remote.document);
+            remember(remote.revision, snapshot());
+            conflict = null;
+            dequeue(docId());
+            status(tt('docSyncUpdatedFromDrive', 'Documento atualizado a partir do Drive'), 'ok');
+            return true;
+        } catch (e) {
+            status(tt('docSyncBackupFail', 'Não foi possível guardar a cópia local') + ': ' + (e && e.message ? e.message : e), 'warn');
+            return false;
+        }
+    }
+    function keepLocalConflict() {
+        if (!conflict || busy || state().protected) return false;
+        var remote = conflict;
+        // The server still rechecks this exact revision under LockService before accepting the push.
+        base = { revision: remote.revision, fingerprint: '', documentId: docId() };
+        conflict = null;
+        updateConflictActions();
+        return sync(true);
     }
     function resolveConflict() {
         if (!conflict || busy) { sync(true); return; }
@@ -269,22 +443,11 @@
             tt('docSyncNoOt', 'Não há sincronização em tempo real tipo Google Docs.') + ' ' +
             tt('docSyncConflictHint', 'Sem fusão automática. Clique para escolher a versão a conservar (local ou Drive).'));
         if (window.confirm(tt('docSyncTakeRemote', 'Carregar a versão do Drive? A versão deste dispositivo fica guardada como cópia de segurança. Cancelar = manter local e decidir a seguir.'))) {
-            try {
-                applyRemote(remote.document);
-                remember(remote.revision, snapshot());
-                conflict = null;
-                dequeue(docId());
-                status(tt('docSyncUpdatedFromDrive', 'Documento atualizado a partir do Drive'), 'ok');
-            } catch (e) {
-                status(tt('docSyncBackupFail', 'Não foi possível guardar a cópia local') + ': ' + (e && e.message ? e.message : e), 'warn');
-            }
+            takeRemoteConflict();
         } else if (window.confirm(tt('docSyncPushLocal', 'Enviar a versão deste dispositivo para o Drive? A versão anterior do Drive fica no histórico. Cancelar = manter ambas sem substituir.'))) {
-            // The server rechecks this revision under its lock.
-            base = { revision: remote.revision, fingerprint: '', documentId: docId() };
-            conflict = null;
-            sync(true);
+            keepLocalConflict();
         } else {
-            status(tt('docSyncConflict', 'Conflito entre dispositivos — clique para escolher'), 'conflict');
+            status(tt('docSyncConflictChoose', 'Conflito — escolha a versão'), 'conflict');
         }
     }
     function isLikelyNetworkError(e) {
@@ -293,7 +456,23 @@
         return /network|offline|failed to fetch|load failed|timeout|timed out|net::|err_internet|err_connection|abort/i.test(msg);
     }
     async function sync(explicit) {
-        if (busy) return;
+        if (remoteCheckBusy) {
+            if (explicit) pendingExplicitSave = true;
+            return;
+        }
+        if (busy) {
+            // Guardar is an explicit promise to the user: never lose it behind an in-flight sync.
+            // Automatic/debounced requests keep the existing busy guard and do not queue loops.
+            if (explicit) pendingExplicitSave = true;
+            return;
+        }
+        if (!explicit && !claimAutoLeader()) {
+            status(tt('docSyncOtherTab', 'Sincronização automática gerida por outro separador'), 'idle', true);
+            if (syncChannel && (hasAnyQueued() || localNeedsPush())) {
+                try { syncChannel.postMessage({ type: 'wake', source: tabId }); } catch (eWake) {}
+            }
+            return;
+        }
         if (scope !== key()) { conflict = null; ready = false; multiOk = false; base = null; scope = ''; }
         if (conflict) {
             if (explicit) status(tt('docSyncConflict', 'Conflito entre dispositivos — clique para escolher'), 'conflict');
@@ -386,11 +565,82 @@
                 if (localNeedsPush()) enqueue('error');
                 status(tt('docSyncPending', 'Cópia local conservada — sincronização pendente') + ': ' + String(e.message || e), 'warn');
             }
-        } finally { busy = false; }
+        } finally {
+            busy = false;
+            if (pendingExplicitSave) {
+                pendingExplicitSave = false;
+                Promise.resolve().then(function () { return sync(true); });
+            }
+        }
     }
     function schedule() {
         clearTimeout(timer);
         timer = setTimeout(function () { sync(false); }, 2500);
+    }
+    async function checkRemote(reason, force) {
+        if (remoteCheckBusy || busy || conflict || document.hidden) return false;
+        if (state().protected || !window.abeneSheetsEnabled || !window.abeneSheetsEnabled()) return false;
+        if (navigator.onLine === false) return false;
+        // A passive check is read-only. While the user is actively typing, wait for a quiet moment.
+        if (!force && lastLocalEditAt && Date.now() - lastLocalEditAt < TYPING_QUIET_MS) return false;
+        if (!force && !claimAutoLeader()) return false;
+        remoteCheckBusy = true;
+        try {
+            if (scope !== key()) {
+                conflict = null;
+                ready = false;
+                multiOk = false;
+                scope = key();
+                base = JSON.parse(localStorage.getItem(scope) || 'null');
+                if (base && base.documentId && base.documentId !== docId()) base = null;
+            }
+            var id = docId();
+            if (!ready) {
+                var ping = await window.abeneSheetsCall('PING');
+                if (!ping.safeDocumentSync) return false;
+                multiOk = !!ping.multiDocumentSync;
+                if (id !== 'current' && !multiOk) return false;
+                ready = true;
+            } else if (id !== 'current' && !multiOk) {
+                return false;
+            }
+            // No document body is sent here: this call only reads the current Drive revision/document.
+            var remote = await window.abeneSheetsCall('SYNC_DOCUMENT', { documentId: id });
+            if (!remote || !remote.document) return false;
+            var local = snapshot();
+            var localPrint = fingerprint(local);
+            var remotePrint = fingerprint(remote.document);
+            if (localPrint === remotePrint) {
+                remember(remote.revision, local);
+                return false;
+            }
+            var remoteChanged = !base || remote.revision !== base.revision || remotePrint !== base.fingerprint;
+            if (!remoteChanged) return false;
+            otherSessionSeenAt = Date.now();
+            if (typeof showToast === 'function') {
+                showToast(tt('docSyncOtherSession', 'Outra sessão pode estar a editar este documento'));
+            }
+            status(tt('docSyncRemoteNewer', 'Versão mais recente na Drive'), 'warn');
+            var localChanged = base ? localPrint !== base.fingerprint : !!(state().dirty || hasQueued(id));
+            if (localChanged) {
+                showConflict(remote);
+                return true;
+            }
+            applyRemote(remote.document);
+            remember(remote.revision, snapshot());
+            dequeue(id);
+            status(tt('docSyncRemoteNewer', 'Versão mais recente na Drive') + ' — ' + tt('docSyncUpdatedFromDrive', 'Documento atualizado a partir do Drive'), 'ok');
+            return true;
+        } catch (e) {
+            // The regular 20-second sync keeps its existing error/queue reporting path.
+            return false;
+        } finally {
+            remoteCheckBusy = false;
+            if (pendingExplicitSave && !busy) {
+                pendingExplicitSave = false;
+                Promise.resolve().then(function () { return sync(true); });
+            }
+        }
     }
     async function flushBackgroundQueue() {
         if (navigator.onLine === false) return;
@@ -430,6 +680,7 @@
                 }
                 if (otherBase && localPrint === otherBase.fingerprint && remote.document) {
                     // Open editor still has another doc — leave remote adoption for reopen.
+                    markQueuedConflict(id, 'remote-newer');
                     continue;
                 }
                 if ((otherBase && otherBase.revision === remote.revision) || !remote.document) {
@@ -438,12 +689,16 @@
                         baseRevision: remote.revision,
                         document: local
                     });
-                    if (result.conflict) continue;
+                    if (result.conflict) {
+                        markQueuedConflict(id, 'revision-conflict');
+                        continue;
+                    }
                     rememberFor(id, result.revision, local, false);
                     dequeue(id);
                     pushed++;
                 }
                 // Else: real conflict — keep queued until that archiveEntryId is reopened.
+                markQueuedConflict(id, 'revision-conflict');
             } catch (e) {
                 // Keep entry; next online/visibility pass retries.
             }
@@ -451,6 +706,7 @@
         if (pushed && !busy) {
             status(tt('docSyncOkEntry', 'Documento do Arquivo sincronizado com o Drive'), 'ok');
         }
+        updateQueueConflictBadge();
     }
     function waitUntilIdle(timeoutMs) {
         var started = Date.now();
@@ -519,11 +775,31 @@
     window.abeneDocumentSyncHasQueued = function () { return hasQueued(); };
     window.abeneDocumentSyncHasAnyQueued = hasAnyQueued;
     window.abeneDocumentSyncHasConflict = function () { return !!conflict; };
+    window.abeneDocumentSyncCheckRemote = function () { return checkRemote('manual', true); };
+    window.abeneDocumentSyncTakeDrive = takeRemoteConflict;
+    window.abeneDocumentSyncKeepMine = keepLocalConflict;
+    window.abeneDocumentSyncQueuedConflicts = queuedConflicts;
     window.abeneDocumentSyncBeforeArchivePush = beforeArchivePush;
     window.abeneBeforeCloudReplaceRead = function (id) { return readBackup(id); };
+    if (typeof window.BroadcastChannel === 'function') {
+        try {
+            syncChannel = new window.BroadcastChannel('abeneDocumentSync');
+            syncChannel.onmessage = function (event) {
+                var data = event && event.data || {};
+                if (!data || data.source === tabId) return;
+                if (data.type === 'status' && !ownsLeaderLease()) {
+                    status(String(data.text || ''), data.kind || 'idle', true);
+                } else if (data.type === 'wake' && claimAutoLeader()) {
+                    flushQueueSoon();
+                }
+            };
+            claimAutoLeader();
+        } catch (eChannel) { syncChannel = null; }
+    }
     document.addEventListener('input', function (event) {
         var editor = document.getElementById('editor');
         if (editor && editor.contains(event.target)) {
+            lastLocalEditAt = Date.now();
             if (navigator.onLine === false && !state().protected) {
                 enqueue('offline');
             }
@@ -539,9 +815,21 @@
         if (localNeedsPush() || hasQueued()) enqueue('offline');
         else status(tt('docSyncOffline', 'Guardado neste dispositivo — sem ligação'), 'warn');
     });
-    document.addEventListener('visibilitychange', function () { if (!document.hidden) schedule(); });
+    document.addEventListener('visibilitychange', function () {
+        if (!document.hidden) {
+            checkRemote('visibility', false);
+            schedule();
+        }
+    });
+    setInterval(function () { if (!document.hidden) checkRemote('interval', false); }, REMOTE_CHECK_MS);
     setInterval(function () { if (!document.hidden) sync(false); }, 20000);
+    setInterval(function () {
+        if (!syncChannel || !ownsLeaderLease()) return;
+        try { localStorage.setItem(leaderKey(), JSON.stringify({ id: tabId, expires: Date.now() + LEADER_TTL })); }
+        catch (eLease) { /* optional coordination only */ }
+    }, 5000);
     setTimeout(function () {
+        updateQueueConflictBadge();
         if (hasQueued() && navigator.onLine !== false) flushQueueSoon();
         else if (hasQueued()) status(tt('docSyncQueued', 'Fila de sincronização — aguarda ligação'), 'queued');
         else sync(false);

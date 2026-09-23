@@ -1896,6 +1896,10 @@
         }
         #devisConditionChoices label { min-height: 32px; cursor: pointer; }
         #devisConditionChoices fieldset { border: 1px solid #b8c4d4; border-radius: 4px; }
+        @media screen and (min-width: 900px) {
+            #devisConditionChoices { grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: start; }
+            #devisConditionChoices > small { grid-column: 1 / -1; }
+        }
         #devisNotes { min-height: 120px; }
         .form-group textarea {
             resize: vertical;
@@ -5577,6 +5581,121 @@
             background: #2b2a29;
         }
 
+        /* Barre d'état lisible et adaptable — groupes additifs, mêmes commandes/IDs. */
+        .status-bar {
+            height: auto;
+            min-height: 34px;
+            max-height: none;
+            padding: 4px 8px max(4px, env(safe-area-inset-bottom, 0px));
+            gap: 6px;
+        }
+        .status-bar .left {
+            flex: 1 1 auto;
+            min-width: 0;
+            align-items: center;
+            gap: 6px;
+            overflow: hidden;
+        }
+        .status-bar .right { flex: 0 0 auto; gap: 6px; }
+        .status-group {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            min-width: 0;
+            min-height: 25px;
+            padding: 2px 8px;
+            border: 1px solid rgba(255,255,255,.18);
+            border-radius: 5px;
+            background: rgba(255,255,255,.08);
+            white-space: nowrap;
+        }
+        .status-group > span,
+        .status-group > button,
+        .status-group > select { flex: 0 0 auto; white-space: nowrap; }
+        .status-cloud { flex: 1 1 260px; overflow: hidden; }
+        .status-cloud > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+        .status-doc { flex: 0 1 auto; overflow: hidden; }
+        .status-metrics, .status-nav { flex: 0 0 auto; }
+        .status-page-jump { white-space: nowrap; }
+        #saveStatus { white-space: nowrap; }
+        #documentSyncStatus {
+            max-width: 260px !important;
+            min-width: 70px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap !important;
+        }
+        .status-sync-conflict-badge {
+            border: 1px solid rgba(255,255,255,.55);
+            border-radius: 4px;
+            background: #8e2a2a;
+            color: #fff;
+            padding: 2px 7px;
+            font: inherit;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+        .status-bar .status-group button:hover,
+        .status-sync-conflict-badge:hover { background-color: rgba(255,255,255,.22); }
+        @media screen and (min-width: 701px) and (max-width: 1399px) {
+            .status-bar { align-items: flex-start; }
+            .status-bar .left { flex-wrap: wrap; overflow: visible; }
+            .status-cloud { order: 10; flex: 1 0 100%; max-width: 100%; }
+            .status-bar .right { align-self: flex-start; }
+        }
+        @media screen and (max-width: 700px) {
+            .status-bar {
+                display: flex;
+                height: auto !important;
+                min-height: 44px !important;
+                max-height: 82px !important;
+                overflow-x: auto !important;
+                overflow-y: hidden !important;
+                align-items: center;
+                justify-content: flex-start;
+                -webkit-overflow-scrolling: touch;
+                scroll-snap-type: x proximity;
+            }
+            .status-bar .left {
+                flex: 0 0 auto;
+                width: max-content;
+                overflow: visible;
+                flex-wrap: nowrap !important;
+            }
+            .status-group, .status-bar .right { flex-shrink: 0; scroll-snap-align: start; }
+            .status-cloud { flex-basis: auto; max-width: min(240px, 72vw); overflow-x: auto; }
+            .status-metrics { display: none; }
+            #documentSyncStatus { max-width: min(190px, 55vw) !important; }
+            .status-bar .right .view-buttons { display: none; }
+            .status-bar .zoom-control input[type="range"] { width: 64px; }
+            .status-bar .zoom-control button { min-width: 34px; min-height: 34px; }
+            #languageStatus { min-width: 8.5em; max-width: 48vw; }
+        }
+        body.abene-phone .status-bar {
+            display: flex;
+            height: 44px !important;
+            min-height: 44px !important;
+            max-height: 44px !important;
+            overflow-x: auto !important;
+            overflow-y: hidden !important;
+            align-items: center;
+            justify-content: flex-start;
+        }
+        body.abene-phone .status-bar .left {
+            flex: 0 0 auto;
+            width: max-content;
+            overflow: visible;
+            flex-wrap: nowrap !important;
+        }
+        body.abene-phone .status-cloud {
+            order: initial;
+            flex: 0 0 auto;
+            max-width: min(240px, 72vw);
+            overflow-x: auto;
+        }
+        body.abene-phone .status-metrics,
+        body.abene-phone.abene-kb-open .status-metrics { display: none !important; }
+
     </style>
 </head>
 <body class="abene-print-layout">
@@ -6549,23 +6668,31 @@
     <!-- Status Bar -->
     <div class="status-bar">
         <div class="left">
-            <span class="status-page-jump" onclick="jumpToPageFromStatus()" data-i18n-title="gotoPage" title="Ir para a página"><span data-i18n="statusPage">Página</span> <span id="pageNum">1</span> <span data-i18n="statusOf">de</span> <span id="totalPages">1</span></span>
-            <span id="sheetsSyncStatus" onclick="openCompanySettings()" style="cursor:pointer;font-size:11px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>
-            <span id="gmailMailStatus" onclick="openCompanySettings()" style="cursor:pointer;font-size:11px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-left:6px;"></span>
-            <button type="button" onclick="abeneSheetsRefresh && abeneSheetsRefresh().catch(function(){})" style="border:0;background:rgba(255,255,255,.15);color:inherit;cursor:pointer;font-size:11px;padding:1px 8px;border-radius:3px;" data-i18n="sheetsRefresh" data-i18n-title="sheetsRefreshTitle" title="Atualizar da folha">↻ Atualizar</button>
-            <span id="gdocsLinkStatus" onclick="var u=this.getAttribute('data-url'); if(u) window.open(u,'_blank','noopener,noreferrer');" style="display:none;cursor:pointer;font-size:11px;color:#7dcea0;" data-i18n-title="gdocsOpenHint" title=""></span>
-            <button type="button" id="gdocsPullBtn" onclick="abenePullFromGoogleDocs && abenePullFromGoogleDocs()" style="display:none;border:0;background:rgba(255,255,255,.15);color:inherit;cursor:pointer;font-size:11px;padding:1px 8px;border-radius:3px;" data-i18n="gdocsPullShort" data-i18n-title="gdocsPullHint" title="Atualizar desde Google Docs">↻ Docs</button>
-            <span id="collabPresence" class="abene-collab-presence" data-i18n-title="collabPeers" title=""></span>
-            <span id="saveStatus">Modificado</span>
-            <span><span id="wordCountStatus">0</span> <span data-i18n="statusWords">palavras</span></span>
-            <span><span id="charCount">0</span> <span data-i18n="statusChars">caracteres</span></span>
-            <button type="button" onclick="openArquivoWindow()" style="border:0;background:transparent;color:inherit;cursor:pointer;font-size:12px;padding:0 8px;" data-i18n="fileArquivo" data-i18n-title="fileArquivoTitle" title="Arquivo — pastas e documentos concluídos">Arquivo</button>
-            <select id="languageStatus" onchange="applyLanguage(this.value)" data-i18n-title="langTitle" title="Alterar idioma" data-i18n-label="langTitle" aria-label="Alterar idioma">
-                <option value="pt-PT">Português (Portugal)</option>
-                <option value="fr-FR">Français</option>
-                <option value="es-ES">Español</option>
-                <option value="en-US">English (US)</option>
-            </select>
+            <div class="status-group status-doc">
+                <span class="status-page-jump" onclick="jumpToPageFromStatus()" data-i18n-title="gotoPage" title="Ir para a página"><span data-i18n="statusPage">Página</span> <span id="pageNum">1</span> <span data-i18n="statusOf">de</span> <span id="totalPages">1</span></span>
+                <span id="saveStatus">Modificado</span>
+            </div>
+            <div class="status-group status-cloud">
+                <span id="sheetsSyncStatus" onclick="openCompanySettings()" style="cursor:pointer;font-size:11px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>
+                <span id="gmailMailStatus" onclick="openCompanySettings()" style="cursor:pointer;font-size:11px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>
+                <button type="button" onclick="abeneSheetsRefresh && abeneSheetsRefresh().catch(function(){})" style="border:0;background:rgba(255,255,255,.15);color:inherit;cursor:pointer;font-size:11px;padding:2px 8px;border-radius:3px;" data-i18n="sheetsRefresh" data-i18n-title="sheetsRefreshTitle" title="Atualizar da folha">↻ Atualizar</button>
+                <span id="gdocsLinkStatus" onclick="var u=this.getAttribute('data-url'); if(u) window.open(u,'_blank','noopener,noreferrer');" style="display:none;cursor:pointer;font-size:11px;color:#7dcea0;" data-i18n-title="gdocsOpenHint" title=""></span>
+                <button type="button" id="gdocsPullBtn" onclick="abenePullFromGoogleDocs && abenePullFromGoogleDocs()" style="display:none;border:0;background:rgba(255,255,255,.15);color:inherit;cursor:pointer;font-size:11px;padding:2px 8px;border-radius:3px;" data-i18n="gdocsPullShort" data-i18n-title="gdocsPullHint" title="Atualizar desde Google Docs">↻ Docs</button>
+                <span id="collabPresence" class="abene-collab-presence" data-i18n-title="collabPeers" title=""></span>
+            </div>
+            <div class="status-group status-metrics">
+                <span><span id="wordCountStatus">0</span> <span data-i18n="statusWords">palavras</span></span>
+                <span><span id="charCount">0</span> <span data-i18n="statusChars">caracteres</span></span>
+            </div>
+            <div class="status-group status-nav">
+                <button type="button" onclick="openArquivoWindow()" style="border:0;background:transparent;color:inherit;cursor:pointer;font-size:12px;padding:0 5px;" data-i18n="fileArquivo" data-i18n-title="fileArquivoTitle" title="Arquivo — pastas e documentos concluídos">Arquivo</button>
+                <select id="languageStatus" onchange="applyLanguage(this.value)" data-i18n-title="langTitle" title="Alterar idioma" data-i18n-label="langTitle" aria-label="Alterar idioma">
+                    <option value="pt-PT">Português (Portugal)</option>
+                    <option value="fr-FR">Français</option>
+                    <option value="es-ES">Español</option>
+                    <option value="en-US">English (US)</option>
+                </select>
+            </div>
         </div>
         <div class="right">
             <div class="view-buttons">
@@ -7362,7 +7489,7 @@
     <input type="file" id="fileInput" style="display:none" accept=".html,.htm,.txt,.docx,.json" onchange="loadFile(event)">
     <input type="file" id="imageInput" style="display:none" accept="image/*" multiple onchange="handleImageUpload(event)">
 
-    <script src="libs/abene-i18n.js?v=20260922-period-1"></script>
+    <script src="libs/abene-i18n.js?v=20260923-final-workflow-1"></script>
     <script src="libs/abene-tips.js?v=20260915-cite-1"></script>
     <script src="libs/abene-page-geometry.js?v=20260914-review-1"></script>
     <script>
@@ -11326,6 +11453,7 @@ table { border-collapse: collapse; }
             pendingDocxDownload = null;
             closeModal('genericModal');
         }
+
         window.abeneSavePreparedDocx = abeneSavePreparedDocx;
         window.abeneCancelPreparedDocx = abeneCancelPreparedDocx;
 
@@ -13044,12 +13172,12 @@ table { border-collapse: collapse; }
     <script src="libs/abene-history.js?v=20260915-outline-1"></script>
     <script src="libs/abene-export.js?v=20260923-docx-download-4"></script>
     <script src="libs/abene-modelo.js?v=20260914-meta-1"></script>
-    <script src="libs/abene-comercial.js?v=20260920-fix9-3"></script>
+    <script src="libs/abene-comercial.js?v=20260923-final-workflow-1"></script>
     <script src="libs/abene-contabilidade.js?v=20260922-period-1"></script>
-    <script src="libs/abene-arquivo.js?v=20260923-arquivo-layout-2"></script>
+    <script src="libs/abene-arquivo.js?v=20260923-final-workflow-1"></script>
     <script src="libs/abene-phone.js?v=20260920-wordphone-1"></script>
-    <script src="libs/abene-sheets.js?v=20260922-sync-format-1"></script>
-    <script src="libs/abene-document-sync.js?v=20260922-sync-format-1"></script>
+    <script src="libs/abene-sheets.js?v=20260922-security-post-1"></script>
+    <script src="libs/abene-document-sync.js?v=20260922-multipc-1"></script>
     <script src="libs/abene-collab.js?v=20260915-share-1"></script>
     <script src="libs/abene-gdocs.js?v=20260921-audit1-1"></script>
     <script src="libs/abene-pickers.js?v=20260915-modo-2"></script>

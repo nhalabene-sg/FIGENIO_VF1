@@ -827,11 +827,33 @@
         { id: 'invoice15', label: 'Pagamento a 15 dias da fatura', text: 'Pagamento: no prazo de 15 dias após a emissão da fatura correspondente aos trabalhos realizados.' },
         { id: 'invoice30', label: 'Pagamento a 30 dias da fatura', text: 'Pagamento: no prazo de 30 dias após a emissão da fatura correspondente aos trabalhos realizados.' }
     ];
+    var quotePaymentMethodOptions = [
+        { id: 'bank', label: 'Transferência bancária', text: 'Meio de pagamento aceite: transferência bancária para o IBAN indicado, com referência ao número do orçamento.' },
+        { id: 'mbway', label: 'MB WAY', text: 'Meio de pagamento aceite: MB WAY, para o contacto indicado pelo prestador.' },
+        { id: 'multibanco', label: 'Referência Multibanco', text: 'Meio de pagamento aceite: referência Multibanco fornecida para o efeito.' },
+        { id: 'card', label: 'Cartão', text: 'Meio de pagamento aceite: cartão de débito ou crédito.' },
+        { id: 'cash', label: 'Numerário', text: 'Meio de pagamento aceite: numerário, mediante entrega do respetivo comprovativo.' },
+        { id: 'cheque', label: 'Cheque', text: 'Meio de pagamento aceite: cheque, sujeito a boa cobrança.' },
+        { id: 'paypal', label: 'PayPal', text: 'Meio de pagamento aceite: PayPal, através dos dados comunicados pelo prestador.' },
+        { id: 'directdebit', label: 'Débito direto', text: 'Meio de pagamento aceite: débito direto, após autorização válida do cliente.' },
+        { id: 'paylink', label: 'Link de pagamento', text: 'Meio de pagamento aceite: link de pagamento seguro enviado ao cliente.' },
+        { id: 'todefine', label: 'A definir entre as partes', text: 'O meio de pagamento será definido por escrito entre as partes antes do início dos trabalhos.' }
+    ];
     var quoteClauseOptions = [
         { id: 'written', label: 'Aceitação por escrito', text: 'A adjudicação depende da aceitação por escrito deste orçamento e das condições acordadas.' },
         { id: 'extras', label: 'Trabalhos adicionais só após aprovação', text: 'Trabalhos ou materiais não incluídos neste orçamento serão objeto de proposta adicional e só serão executados após aprovação por escrito do cliente.' },
         { id: 'schedule', label: 'Datas e acesso ao local a combinar', text: 'A data de início, o prazo de execução e as condições de acesso ao local serão acordados por escrito antes do início dos trabalhos.' },
-        { id: 'transfer', label: 'Transferência bancária com referência', text: 'O pagamento será efetuado por transferência bancária para o IBAN indicado, identificando o número do orçamento.' }
+        { id: 'transfer', label: 'Transferência bancária com referência', text: 'O pagamento será efetuado por transferência bancária para o IBAN indicado, identificando o número do orçamento.' },
+        { id: 'startdeposit', label: 'Início após adjudicação / sinal', text: 'O início dos trabalhos fica condicionado à adjudicação escrita e, quando aplicável, ao pagamento do sinal acordado.' },
+        { id: 'access', label: 'Acesso, água e eletricidade no local', text: 'O cliente assegurará o acesso ao local e, quando necessários, água e eletricidade em condições adequadas à execução dos trabalhos.' },
+        { id: 'permits', label: 'Licenças e autorizações do cliente', text: 'As licenças, autorizações ou aprovações que dependam do cliente deverão estar disponíveis antes do início dos trabalhos.' },
+        { id: 'unforeseen', label: 'Situações imprevistas comunicadas antes de avançar', text: 'Condições ocultas ou imprevistas serão comunicadas ao cliente e qualquer alteração de preço ou prazo será acordada antes da continuação dos trabalhos afetados.' },
+        { id: 'weather', label: 'Prazo sujeito a clima e força maior', text: 'Os prazos poderão ser ajustados por condições meteorológicas, força maior, atrasos de fornecimento ou outras causas não imputáveis ao prestador.' },
+        { id: 'materials', label: 'Preço de materiais sujeito a confirmação', text: 'Os preços de materiais sujeitos a forte variação de mercado serão confirmados na adjudicação; qualquer alteração será comunicada antes da encomenda.' },
+        { id: 'quantities', label: 'Quantidades finais medidas em obra', text: 'As quantidades finais poderão ser ajustadas às medições efetivamente verificadas em obra, mediante informação ao cliente.' },
+        { id: 'warranty', label: 'Garantia conforme trabalhos e materiais', text: 'A garantia aplicável será a prevista para os trabalhos executados e materiais fornecidos, sem prejuízo dos direitos legais do cliente.' },
+        { id: 'reschedule', label: 'Cancelamento ou reagendamento', text: 'Cancelamentos ou reagendamentos deverão ser comunicados com antecedência e os custos já assumidos serão apresentados ao cliente para acordo.' },
+        { id: 'waste', label: 'Limpeza e resíduos a definir', text: 'A limpeza final e o destino dos resíduos serão realizados nos termos expressamente incluídos neste orçamento ou acordados entre as partes.' }
     ];
     function setupQuoteConditions() {
         var host = document.getElementById('devisConditionChoices');
@@ -844,6 +866,7 @@
             return (!s || s === key) ? fallback : s;
         }
         var payLegend = quoteUi('quotePayPlan', 'Plano de pagamento (escolha uma opção)');
+        var methodLegend = quoteUi('quotePayMethods', 'Meios de pagamento (pode escolher vários)');
         var customLabel = quoteUi('quotePayCustom', 'Só texto livre / personalizado');
         var clauseLegend = quoteUi('quoteClauses', 'Cláusulas opcionais');
         var hint = quoteUi('quoteCondHint', 'Propostas a acordar com o cliente. Pode completar ou alterar livremente o texto abaixo.');
@@ -852,6 +875,9 @@
             quotePaymentOptions.map(function (p) {
                 var highlight = (p.id === 'advance20' || p.id === 'advance50') ? 'font-weight:600;' : '';
                 return '<label style="display:block;margin:6px 0;' + highlight + '"><input type="radio" name="devisPaymentChoice" value="' + p.id + '"' + (text.indexOf(p.text) >= 0 ? ' checked' : '') + '> ' + esc(p.label) + '</label>';
+            }).join('') + '</fieldset><fieldset style="min-width:0;padding:8px"><legend>' + esc(methodLegend) + '</legend>' +
+            quotePaymentMethodOptions.map(function (p) {
+                return '<label style="display:block;margin:6px 0"><input type="checkbox" data-quote-method="' + p.id + '"' + (text.indexOf(p.text) >= 0 ? ' checked' : '') + '> ' + esc(p.label) + '</label>';
             }).join('') + '</fieldset><fieldset style="min-width:0;padding:8px"><legend>' + esc(clauseLegend) + '</legend>' +
             quoteClauseOptions.map(function (p) {
                 return '<label style="display:block;margin:6px 0"><input type="checkbox" data-quote-clause="' + p.id + '"' + (text.indexOf(p.text) >= 0 ? ' checked' : '') + '> ' + esc(p.label) + '</label>';
@@ -869,6 +895,11 @@
                     var terms = document.getElementById('devisPayTerms');
                     if (terms && quotePaymentOptions.some(function (p) { return terms.value === p.label; })) terms.value = '';
                 }
+            } else if (input.hasAttribute('data-quote-method')) {
+                var method = quotePaymentMethodOptions.filter(function (p) { return p.id === input.getAttribute('data-quote-method'); })[0];
+                if (!method) return;
+                value = value.split(method.text).join('');
+                if (input.checked) value = value.trim() + '\n\n' + method.text;
             } else {
                 var clause = quoteClauseOptions.filter(function (p) { return p.id === input.getAttribute('data-quote-clause'); })[0];
                 if (!clause) return;
@@ -1418,10 +1449,15 @@
                 attachments: list
             }).then(function (json) {
                 var from = (json && json.from) || co.googleOwnerEmail || '';
-                toastMsg('mailSentPdf', from
-                    ? ('PDF enviado por ' + from + ' (não definitivo).')
-                    : 'PDF enviado ao cliente (não definitivo).');
-                markSentToClient();
+                return markSentToClient(list[0]).then(function (finalized) {
+                    if (finalized) {
+                        toastMsg('mailSentPdf', from
+                            ? ('PDF enviado por ' + from + ' e guardado como versão final.')
+                            : 'PDF enviado ao cliente e guardado como versão final.');
+                    } else {
+                        toastMsg('mailSentPdfArchiveFail', 'O PDF foi enviado, mas a versão final não pôde ser guardada no Arquivo.');
+                    }
+                });
             }).catch(function (err) {
                 var detail = (err && err.abeneMessage) ||
                     (typeof window.abeneEmailExplainError === 'function' ? window.abeneEmailExplainError(err) : '') ||
@@ -1430,22 +1466,32 @@
             });
         }
 
-        function markSentToClient() {
+        function markSentToClient(attachment) {
             try {
                 if (window.abene && window.abene.documentState) {
                     window.abene.documentState.sentToClient = true;
                 }
             } catch (e0) {}
             try {
-                if (window.abeneArquivoApi && typeof window.abeneArquivoApi.markSentToClient === 'function') {
+                if (window.abeneArquivoApi && typeof window.abeneArquivoApi.finalizeSentToClient === 'function') {
                     var meta = previewState && previewState.data;
-                    window.abeneArquivoApi.markSentToClient({
+                    return Promise.resolve(window.abeneArquivoApi.finalizeSentToClient({
                         client: isQuote ? (meta && meta.client) : (meta && meta.payerName),
                         number: meta && meta.number,
+                        kind: previewState && previewState.kind,
+                        attachment: attachment
+                    }));
+                }
+                if (window.abeneArquivoApi && typeof window.abeneArquivoApi.markSentToClient === 'function') {
+                    var legacyMeta = previewState && previewState.data;
+                    window.abeneArquivoApi.markSentToClient({
+                        client: isQuote ? (legacyMeta && legacyMeta.client) : (legacyMeta && legacyMeta.payerName),
+                        number: legacyMeta && legacyMeta.number,
                         kind: previewState && previewState.kind
                     });
                 }
             } catch (e1) {}
+            return Promise.resolve(false);
         }
 
         if (!gmailOn) {

@@ -64,13 +64,14 @@ Google Docs (CFG.VERSION 2.6+): Ficheiro → Abrir no Google Docs
 ou Rever → Google Docs / Atualizar Docs.
 Cria OU atualiza o MESMO ficheiro em Drive (pasta Google_Docs).
 Atualizar desde Google Docs traz o HTML de volta para o Word ABENE.
-Enviar ao cliente = sempre PDF (não definitivo).
+Enviar ao cliente = sempre PDF; depois de um envio confirmado, a aplicação conserva esse PDF no Arquivo como versão final.
 PDF finais (CFG.VERSION 2.6+): são preservados localmente e enviados
 para a pasta Cliente/Pasta/Tipo/Ano/Concluidos no Drive. Se estiver
 temporariamente offline, a aplicação tenta novamente quando a ligação voltar.
 Depois de colar o script 2.6: Gerir implementações → lápis → Nova versão.
 
 Arquivo — Lixo e proteção individual:
+- « Arquivar documento atual » cria um rascunho por defeito; só uma confirmação explícita ou um envio confirmado ao cliente o torna final.
 - Só os rascunhos podem ser movidos para o Lixo e depois restaurados.
 - Os documentos concluídos/finais não podem ser eliminados.
 - A proteção aplica-se apenas ao documento escolhido; um rascunho protegido

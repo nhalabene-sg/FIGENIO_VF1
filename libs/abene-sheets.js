@@ -343,11 +343,13 @@
     function ping() {
         var url = execUrl();
         if (!url) return Promise.reject(new Error('no-url'));
-        var getUrl = url + (url.indexOf('?') >= 0 ? '&' : '?') + 'action=PING&token=' + encodeURIComponent(token());
-        return fetch(getUrl, { method: 'GET', mode: 'cors', redirect: 'follow' }).then(function (res) {
-            return res.text().then(parseApiJson);
-        }).then(acceptApiJson).catch(function () {
-            return callApi('PING').catch(function () { return jsonpCall('PING'); });
+        // Prefer POST so the access token stays out of the URL, browser history and proxy logs.
+        // Legacy GET/JSONP remains only as an additive compatibility fallback for older deployments.
+        return callApi('PING').catch(function () {
+            var getUrl = url + (url.indexOf('?') >= 0 ? '&' : '?') + 'action=PING&token=' + encodeURIComponent(token());
+            return fetch(getUrl, { method: 'GET', mode: 'cors', redirect: 'follow' }).then(function (res) {
+                return res.text().then(parseApiJson);
+            }).then(acceptApiJson).catch(function () { return jsonpCall('PING'); });
         });
     }
     function collectMetier(wb) {
