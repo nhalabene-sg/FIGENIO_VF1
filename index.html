@@ -6779,6 +6779,7 @@
         <div class="dropdown-item" onclick="exportPDF()">📥 <span data-i18n="filePdf">Exportar PDF</span></div>
         <div class="dropdown-item" onclick="exportDocx()">📘 <span data-i18n="fileDocx">Exportar DOCX</span></div>
         <div class="dropdown-item" onclick="abeneOpenInGoogleDocs && abeneOpenInGoogleDocs()">☁ <span data-i18n="fileGdocs">Abrir no Google Docs</span></div>
+        <div class="dropdown-item" onclick="abeneOpenFaithfulInGoogleDocs && abeneOpenFaithfulInGoogleDocs()">▣ <span data-i18n="fileGdocsFaithful">Abrir cópia fiel no Google Docs</span></div>
         <div class="dropdown-item" onclick="abenePullFromGoogleDocs && abenePullFromGoogleDocs()">↻ <span data-i18n="gdocsPull">Atualizar desde Google Docs</span></div>
         <div class="dropdown-item" onclick="exportWord()">📥 <span data-i18n="fileDoc">Exportar Word (.doc)</span></div>
         <div class="dropdown-item" onclick="openStatsModal()">📊 <span data-i18n="fileStats">Estatísticas</span></div>
@@ -7530,10 +7531,10 @@
     </div>
 
     <!-- Hidden file input -->
-    <input type="file" id="fileInput" style="display:none" accept=".html,.htm,.txt,.docx,.json" onchange="loadFile(event)">
+    <input type="file" id="fileInput" style="display:none" accept=".html,.htm,.txt,.docx,.json,.pdf" onchange="loadFile(event)">
     <input type="file" id="imageInput" style="display:none" accept="image/*" multiple onchange="handleImageUpload(event)">
 
-    <script src="libs/abene-i18n.js?v=20260923-quote-defaults-1"></script>
+    <script src="libs/abene-i18n.js?v=20260925-final-workflow-1"></script>
     <script src="libs/abene-tips.js?v=20260915-cite-1"></script>
     <script src="libs/abene-tips-mobile.js?v=20260923-mobile-tip-1"></script>
     <script src="libs/abene-page-geometry.js?v=20260914-review-1"></script>
@@ -7568,6 +7569,7 @@
         let documentState = { name: 'Document1', dirty: true, protected: false, tracking: false, pagination: true, gdocsFileId: '', gdocsUrl: '', sentToClient: false, pdfOwnerId: '' };
         let originalDocxState = { blob: null, snapshot: '', fileName: '' };
         let originalDocxClearPromise = Promise.resolve();
+        let pendingImportedOriginalFile = null;
         let documentVersions = JSON.parse(localStorage.getItem('abeneVersions') || '[]');
         let lastEditorHTML = '';
         let imageResize = null;
@@ -10371,7 +10373,7 @@
                     editor.innerHTML = htmlFromPlainText(raw);
                 }
                 finishOpenedDocument(file.name, t('docxImportOk') || 'Documento aberto com formatação original');
-                setTimeout(function() { showImportAnalysis(file.name); }, 350);
+                setTimeout(function() { showImportAnalysis(file); }, 350);
             };
             reader.readAsText(file);
         }
@@ -10380,8 +10382,8 @@
             if (!file) return false;
             const name = String(file.name || '');
             const type = String(file.type || '');
-            return /\.(docx|html|htm|txt)$/i.test(name) ||
-                /wordprocessingml|text\/(html|plain)/i.test(type);
+            return /\.(docx|html|htm|txt|pdf)$/i.test(name) ||
+                /wordprocessingml|application\/pdf|text\/(html|plain)/i.test(type);
         }
 
         function openImportedFile(file, opts) {
@@ -10389,6 +10391,14 @@
             opts = opts || {};
             const name = String(file.name || '');
             const type = String(file.type || '');
+            pendingImportedOriginalFile = file;
+            if (/\.pdf$/i.test(name) || type === 'application/pdf') {
+                if (window.abeneArquivoApi && typeof window.abeneArquivoApi.openOriginalImportDialog === 'function') {
+                    window.abeneArquivoApi.openOriginalImportDialog(file);
+                    return true;
+                }
+                return false;
+            }
             if (/\.docx$/i.test(name) || /wordprocessingml\.document/i.test(type)) {
                 if (!opts.skipConfirm && !confirmReplaceDocument()) return false;
                 if (typeof switchTab === 'function') switchTab('home');
@@ -12271,12 +12281,17 @@ table { border-collapse: collapse; }
                 rememberOriginalDocx(file);
 
                 // Post-import analysis: detect tables with numbers → offer quote
-                setTimeout(function() { showImportAnalysis(file.name); }, 350);
+                setTimeout(function() { showImportAnalysis(file); }, 350);
             } catch (error) { console.error('DOCX import:', error); alert(t('aDocxFail')); }
         }
 
         /* ── Post-import analysis dialog ───────────────────────────────────── */
-        function showImportAnalysis(fileName) {
+        function showImportAnalysis(importedFile) {
+            const fileName = typeof importedFile === 'string' ? importedFile : String((importedFile && importedFile.name) || 'Documento');
+            if (importedFile && typeof importedFile !== 'string') pendingImportedOriginalFile = importedFile;
+            const importHints = window.abeneArquivoApi && typeof window.abeneArquivoApi.inferOriginalFile === 'function'
+                ? window.abeneArquivoApi.inferOriginalFile(importedFile || { name: fileName })
+                : { type: 'documento', client: '', pasta: '', periodKind: 'day', periodValue: '' };
             const tables = editor.querySelectorAll('table');
             let numbersInTables = 0;
             let tableRowCount = 0;
@@ -12301,6 +12316,10 @@ table { border-collapse: collapse; }
             body += '<input id="impRegNumber" type="text" value="' + baseName.replace(/"/g, '&quot;') + '" placeholder="' + nextNum + '"></div>';
             body += '<div class="form-group"><label>' + (t('impAutoNumber') || 'Ou gerar automaticamente') + '</label>';
             body += '<button type="button" class="btn-secondary" style="margin-bottom:8px;" onclick="document.getElementById(\'impRegNumber\').value=\'' + nextNum.replace(/'/g, "\\'") + '\'">' + nextNum + ' ← ' + (t('impUseAuto') || 'Utilizar este número') + '</button></div>';
+            body += '<div style="display:grid;grid-template-columns:repeat(3,minmax(120px,1fr));gap:8px;">';
+            body += '<label>' + (t('client') || 'Cliente') + '<input id="impClient" value="' + String(importHints.client || '').replace(/"/g, '&quot;') + '"></label>';
+            body += '<label>' + (t('project') || 'Pasta / obra') + '<input id="impPasta" value="' + String(importHints.pasta || '').replace(/"/g, '&quot;') + '"></label>';
+            body += '<label>' + (t('impDocType') || 'Tipo de documento') + '<select id="impDocType"><option value="relatorio">' + (t('typeRel') || 'Relatório') + '</option><option value="orcamento">' + (t('typeOrc') || 'Orçamento') + '</option><option value="recibo">' + (t('typeRec') || 'Recibo') + '</option><option value="documento">' + (t('typeDoc') || 'Outro documento') + '</option></select></label></div>';
             if (hasTables) {
                 body += '<div style="border-top:1px solid #e0e0e0;padding-top:10px;margin-top:8px;">';
                 body += '<p style="color:#2b579a;font-weight:600;">📊 ' + (t('impTablesFound') || 'Tabela(s) com números encontrada(s)') + ' (' + tables.length + ' tabela(s), ' + tableRowCount + ' linha(s))</p>';
@@ -12320,7 +12339,9 @@ table { border-collapse: collapse; }
 
             if (typeof openGenericModal === 'function') {
                 openGenericModal(t('impTitle') || 'Ficheiro importado', body, footer);
-                setImportPeriodToday();
+                const typeEl = document.getElementById('impDocType');
+                if (typeEl) typeEl.value = importHints.type || 'documento';
+                window.setImportPeriodKind(importHints.periodKind || 'day', importHints.periodValue || '');
             }
         }
 
@@ -12354,6 +12375,9 @@ table { border-collapse: collapse; }
             const archive = document.getElementById('impArchive') && document.getElementById('impArchive').checked;
             const periodKind = (document.getElementById('impPeriodKind') || {}).value || 'day';
             const periodValue = (document.getElementById('impPeriodValue') || {}).value || '';
+            const client = (document.getElementById('impClient') || {}).value || '';
+            const pasta = (document.getElementById('impPasta') || {}).value || '';
+            const docType = (document.getElementById('impDocType') || {}).value || 'documento';
 
             // Set the document name to the registration number if provided
             if (regNumber) {
@@ -12369,7 +12393,12 @@ table { border-collapse: collapse; }
 
             // Archive the document
             if (archive && typeof window.abeneArquivoArchive === 'function') {
-                try { window.abeneArquivoArchive({ silent: true, periodKind: periodKind, periodValue: periodValue }); } catch (e) {}
+                try {
+                    const archiveId = window.abeneArquivoArchive({ silent: true, client: client, pasta: pasta, type: docType, number: regNumber, periodKind: periodKind, periodValue: periodValue });
+                    if (archiveId && pendingImportedOriginalFile && window.abeneArquivoApi && typeof window.abeneArquivoApi.attachOriginal === 'function') {
+                        window.abeneArquivoApi.attachOriginal(archiveId, pendingImportedOriginalFile).catch(function() {});
+                    }
+                } catch (e) {}
             } else if (archive) {
                 // Fallback: just save
                 try { saveDocument(); } catch (e) {}
@@ -12380,6 +12409,7 @@ table { border-collapse: collapse; }
                 setTimeout(function() { window.convertToDevis(); }, 200);
             }
 
+            pendingImportedOriginalFile = null;
             showToast(t('impDone') || 'Ficheiro registado.');
         };
 
@@ -12744,6 +12774,7 @@ table { border-collapse: collapse; }
                 <p class="abene-arquivo-guide-warning"><strong>Limite conhecido:</strong> o código prevê sincronização Drive/Sheets e exportações, mas a sincronização completa entre vários dispositivos e a fidelidade visual de cada exportação devem ser testadas com cópias antes de uso definitivo.</p>
                 <p><strong>Google Docs por documento:</strong> no Arquivo, use o ícone <code>G✓</code> para abrir o Google Docs já ligado ou <code>G+</code> para criar um. Num documento concluído/protegido, <code>G+</code> cria uma cópia editável e conserva o original intacto.</p>
                 <p><strong>Período do documento:</strong> ao importar ou arquivar, escolha <code>Dia</code>, <code>Mês</code> ou <code>Ano</code>; <code>Hoje</code> preenche a data imediatamente. Este período é diferente da data técnica de arquivo e é usado na pesquisa, na organização por ano/mês e no pack do contabilista.</p>
+                <p><strong>Juntar e conservar o original:</strong> use <code>Juntar ficheiro</code> para guardar um PDF, DOCX, HTML ou TXT sem alterar o formato recebido. O Arquivo propõe cliente, tipo e período, que pode confirmar ou corrigir. <code>Ficheiro</code> → <code>Abrir cópia fiel no Google Docs</code> cria uma cópia visual separada; o Google Docs editável ligado continua disponível em paralelo.</p>
                 <section><h4>1. Abrir o Arquivo</h4><ol><li>No friso, clique em <code>Arquivo</code>; em alternativa, use <code>Ficheiro</code> → <code>Arquivo</code> ou o botão da barra inferior.</li><li>A janela apresenta <code>Pastas</code>, <code>Ficheiros</code> e <code>Pré-visualização</code>.</li><li>Selecionar um ficheiro mostra apenas uma cópia de consulta; o Word em curso permanece intacto.</li></ol></section>
                 <section><h4>2. Procurar por cliente, trabalho ou documento</h4><ol><li>Abra <code>Por cliente</code>.</li><li>Em <code>Procurar cliente ou trabalho…</code>, escreva parte do cliente, pasta/obra, nome do documento ou número. A pesquisa ignora diferenças de acentos.</li><li>Abra o cliente e escolha <code>Ver documentos e trabalhos</code> para ver tudo, ou escolha uma pasta/obra específica.</li><li>Selecione o documento em <code>Ficheiros</code>.</li></ol><p>A pesquisa geral <code>Pesquisar nome, cliente, pasta…</code> pode ser combinada com tipo, <code>Só concluídos</code>, <code>Data desde</code>, <code>Data até</code>, ano e pasta.</p></section>
                 <section><h4>3. Pré-visualizar e abrir</h4><ul><li>O separador <code>Documento</code> mostra o conteúdo arquivado.</li><li><code>Versões finais (PDF)</code> mostra relatório, orçamento e recibo por versão. <code>Ver</code> abre a versão; <code>Descarregar</code> transfere-a.</li><li><code>Drive ✓</code> indica que essa versão PDF tem um identificador Drive guardado.</li><li>Num rascunho não protegido, <code>Abrir para modificar</code> tenta primeiro guardar o documento atual e depois abre a ficha para edição.</li><li>Um documento concluído ou protegido usa <code>Abrir para consultar</code> e fica em leitura.</li></ul></section>
@@ -12759,6 +12790,7 @@ table { border-collapse: collapse; }
                 <p class="abene-arquivo-guide-warning"><strong>Limite connue :</strong> le code prévoit la synchronisation Drive/Sheets et les exports, mais la synchronisation complète entre plusieurs appareils et la fidélité visuelle de chaque export doivent être testées sur des copies avant un usage définitif.</p>
                 <p><strong>Google Docs par document :</strong> dans Arquivo, utilisez l’icône <code>G✓</code> pour ouvrir le Google Docs déjà lié ou <code>G+</code> pour en créer un. Pour un document final/protégé, <code>G+</code> crée une copie modifiable et conserve l’original intact.</p>
                 <p><strong>Période du document :</strong> lors de l’importation ou de l’archivage, choisissez <code>Jour</code>, <code>Mois</code> ou <code>Année</code> ; <code>Aujourd’hui</code> remplit immédiatement la date. Cette période est distincte de la date technique d’archivage et sert à la recherche, au classement annuel/mensuel et au pack comptable.</p>
+                <p><strong>Joindre et conserver l’original :</strong> utilisez <code>Juntar ficheiro</code> pour enregistrer un PDF, DOCX, HTML ou TXT sans modifier le format reçu. Arquivo propose le client, le type et la période, que vous pouvez confirmer ou corriger. <code>Ficheiro</code> → <code>Abrir cópia fiel no Google Docs</code> crée une copie visuelle séparée ; le Google Docs modifiable lié reste disponible en parallèle.</p>
                 <section><h4>1. Ouvrir Arquivo</h4><ol><li>Dans le ruban, cliquez sur <code>Arquivo</code> ; sinon utilisez <code>Ficheiro</code> → <code>Arquivo</code> ou le bouton de la barre inférieure.</li><li>La fenêtre présente <code>Pastas</code>, <code>Ficheiros</code> et <code>Pré-visualização</code>.</li><li>Sélectionner un fichier affiche seulement une copie de consultation ; le document en cours reste intact.</li></ol></section>
                 <section><h4>2. Rechercher un client, un travail ou un document</h4><ol><li>Ouvrez <code>Por cliente</code>.</li><li>Dans <code>Procurar cliente ou trabalho…</code>, saisissez une partie du client, du dossier/chantier, du nom du document ou du numéro. La recherche tolère les différences d’accents.</li><li>Ouvrez le client et choisissez <code>Ver documentos e trabalhos</code> pour tout voir, ou choisissez un chantier précis.</li><li>Sélectionnez le document dans <code>Ficheiros</code>.</li></ol><p>La recherche générale <code>Pesquisar nome, cliente, pasta…</code> se combine avec le type, <code>Só concluídos</code>, <code>Data desde</code>, <code>Data até</code>, l’année et le dossier.</p></section>
                 <section><h4>3. Aperçu et ouverture</h4><ul><li>L’onglet <code>Documento</code> montre le contenu archivé.</li><li><code>Versões finais (PDF)</code> liste les rapports, devis et reçus par version. <code>Ver</code> affiche une version ; <code>Descarregar</code> la télécharge.</li><li><code>Drive ✓</code> indique que cette version PDF possède un identifiant Drive enregistré.</li><li>Pour un brouillon non protégé, <code>Abrir para modificar</code> tente d’abord d’enregistrer le document actuel, puis ouvre la fiche en modification.</li><li>Un document conclu ou protégé utilise <code>Abrir para consultar</code> et reste en lecture seule.</li></ul></section>
@@ -12774,6 +12806,7 @@ table { border-collapse: collapse; }
                 <p class="abene-arquivo-guide-warning"><strong>Known limitation:</strong> the code provides Drive/Sheets synchronization and exports, but complete multi-device synchronization and the visual fidelity of every export must be tested on copies before production use.</p>
                 <p><strong>Google Docs per document:</strong> in Arquivo, use <code>G✓</code> to open the already linked Google Doc or <code>G+</code> to create one. For a final/protected document, <code>G+</code> creates an editable copy and keeps the original unchanged.</p>
                 <p><strong>Document period:</strong> when importing or archiving, choose <code>Day</code>, <code>Month</code>, or <code>Year</code>; <code>Today</code> fills the date immediately. This is separate from the technical archive date and is used for search, year/month filing, and the accountant pack.</p>
+                <p><strong>Attach and preserve the original:</strong> use <code>Juntar ficheiro</code> to store a PDF, DOCX, HTML, or TXT without changing the received format. Arquivo suggests the client, type, and period, which you can confirm or correct. <code>Ficheiro</code> → <code>Abrir cópia fiel no Google Docs</code> creates a separate visual copy; the linked editable Google Doc remains available in parallel.</p>
                 <section><h4>1. Open Arquivo</h4><ol><li>On the ribbon, click <code>Arquivo</code>; alternatively use <code>Ficheiro</code> → <code>Arquivo</code> or the bottom status-bar button.</li><li>The window contains <code>Pastas</code>, <code>Ficheiros</code>, and <code>Pré-visualização</code>.</li><li>Selecting a file only displays a viewing copy; the current document remains unchanged.</li></ol></section>
                 <section><h4>2. Find a client, job, or document</h4><ol><li>Open <code>Por cliente</code>.</li><li>In <code>Procurar cliente ou trabalho…</code>, enter part of the client, job folder, document name, or number. Accent differences are ignored.</li><li>Open the client and choose <code>Ver documentos e trabalhos</code> to see everything, or choose a specific job folder.</li><li>Select the document under <code>Ficheiros</code>.</li></ol><p>The general search <code>Pesquisar nome, cliente, pasta…</code> can be combined with document type, <code>Só concluídos</code>, <code>Data desde</code>, <code>Data até</code>, year, and folder.</p></section>
                 <section><h4>3. Preview and open</h4><ul><li>The <code>Documento</code> tab displays the archived content.</li><li><code>Versões finais (PDF)</code> lists report, quote, and receipt versions. <code>Ver</code> opens a version; <code>Descarregar</code> downloads it.</li><li><code>Drive ✓</code> means that the PDF version has a stored Drive identifier.</li><li>For an unprotected draft, <code>Abrir para modificar</code> first attempts to save the current document, then opens the record for editing.</li><li>A completed or protected document uses <code>Abrir para consultar</code> and remains read-only.</li></ul></section>
@@ -12789,6 +12822,7 @@ table { border-collapse: collapse; }
                 <p class="abene-arquivo-guide-warning"><strong>Límite conocido:</strong> el código prevé sincronización Drive/Sheets y exportaciones, pero la sincronización completa entre varios dispositivos y la fidelidad visual de cada exportación deben probarse con copias antes del uso definitivo.</p>
                 <p><strong>Google Docs por documento:</strong> en Arquivo, use <code>G✓</code> para abrir el Google Docs ya vinculado o <code>G+</code> para crear uno. En un documento final/protegido, <code>G+</code> crea una copia editable y conserva el original intacto.</p>
                 <p><strong>Período del documento:</strong> al importar o archivar, elija <code>Día</code>, <code>Mes</code> o <code>Año</code>; <code>Hoy</code> completa la fecha inmediatamente. Este período es independiente de la fecha técnica de archivo y se usa para buscar, organizar por año/mes y preparar el paquete contable.</p>
+                <p><strong>Adjuntar y conservar el original:</strong> use <code>Juntar ficheiro</code> para guardar un PDF, DOCX, HTML o TXT sin cambiar el formato recibido. Arquivo propone el cliente, el tipo y el período, que puede confirmar o corregir. <code>Ficheiro</code> → <code>Abrir cópia fiel no Google Docs</code> crea una copia visual separada; el Google Docs editable vinculado sigue disponible en paralelo.</p>
                 <section><h4>1. Abrir Arquivo</h4><ol><li>En la cinta, pulse <code>Arquivo</code>; también puede usar <code>Ficheiro</code> → <code>Arquivo</code> o el botón de la barra inferior.</li><li>La ventana contiene <code>Pastas</code>, <code>Ficheiros</code> y <code>Pré-visualização</code>.</li><li>Seleccionar un archivo solo muestra una copia de consulta; el documento actual permanece intacto.</li></ol></section>
                 <section><h4>2. Buscar un cliente, trabajo o documento</h4><ol><li>Abra <code>Por cliente</code>.</li><li>En <code>Procurar cliente ou trabalho…</code>, escriba parte del cliente, carpeta/obra, nombre del documento o número. La búsqueda ignora diferencias de acentos.</li><li>Abra el cliente y elija <code>Ver documentos e trabalhos</code> para ver todo, o elija una obra concreta.</li><li>Seleccione el documento en <code>Ficheiros</code>.</li></ol><p>La búsqueda general <code>Pesquisar nome, cliente, pasta…</code> se combina con el tipo, <code>Só concluídos</code>, <code>Data desde</code>, <code>Data até</code>, el año y la carpeta.</p></section>
                 <section><h4>3. Vista previa y apertura</h4><ul><li>La pestaña <code>Documento</code> muestra el contenido archivado.</li><li><code>Versões finais (PDF)</code> lista informes, presupuestos y recibos por versión. <code>Ver</code> abre una versión; <code>Descarregar</code> la descarga.</li><li><code>Drive ✓</code> indica que esa versión PDF tiene un identificador Drive guardado.</li><li>Para un borrador no protegido, <code>Abrir para modificar</code> intenta guardar primero el documento actual y después abre la ficha para editarla.</li><li>Un documento concluido o protegido usa <code>Abrir para consultar</code> y permanece en modo lectura.</li></ul></section>
@@ -13248,13 +13282,13 @@ table { border-collapse: collapse; }
     <script src="libs/abene-export.js?v=20260923-docx-faithful-1"></script>
     <script src="libs/abene-modelo.js?v=20260914-meta-1"></script>
     <script src="libs/abene-comercial.js?v=20260923-quote-defaults-1"></script>
-    <script src="libs/abene-contabilidade.js?v=20260922-period-1"></script>
-    <script src="libs/abene-arquivo.js?v=20260923-lazy-1"></script>
+    <script src="libs/abene-contabilidade.js?v=20260925-final-workflow-1"></script>
+    <script src="libs/abene-arquivo.js?v=20260925-final-workflow-1"></script>
     <script src="libs/abene-phone.js?v=20260920-wordphone-1"></script>
     <script src="libs/abene-sheets.js?v=20260922-security-post-1"></script>
     <script src="libs/abene-document-sync.js?v=20260922-multipc-1"></script>
     <script src="libs/abene-collab.js?v=20260915-share-1"></script>
-    <script src="libs/abene-gdocs.js?v=20260921-audit1-1"></script>
+    <script src="libs/abene-gdocs.js?v=20260925-final-workflow-1"></script>
     <script src="libs/abene-pickers.js?v=20260915-modo-2"></script>
     <script src="libs/abene-proof.js?v=20260915-smart-1"></script>
 

@@ -603,7 +603,19 @@
         var papers = [];
         var seen = {};
         entries.forEach(function (e) {
-            papersFromHtml(e.html || '', e, true).forEach(function (p) {
+            var found = papersFromHtml(e.html || '', e, true);
+            if (!found.length && e.originalFileName) {
+                var period = entryPeriodInfo(e);
+                var originalType = e.type === 'orcamento' ? 'ORCAMENTO' : (e.type === 'recibo' ? 'RECIBO_COMERCIAL' : (e.type === 'relatorio' ? 'RELATORIO' : 'DOCUMENTO_SUPORTE'));
+                found.push({
+                    tipo: originalType, codigoSAFT: '', numero: e.number || '', data: e.documentDate || period.start || '',
+                    cliente: e.client || '', nif: e.nif || '', objeto: e.name || e.originalFileName || '', total: Number(e.total) || 0,
+                    items: [], pasta: e.pasta || '', arquivoNome: e.name || '', ownerId: api && api.ownerIdOf ? api.ownerIdOf(e) : e.id,
+                    status: e.concluded ? 'final' : 'draft', final: !!e.concluded, hasPdf: /\.pdf$/i.test(e.originalFileName || ''),
+                    periodKind: period.kind, periodValue: period.value, periodStart: period.start, periodEnd: period.end, archivedAt: e.archivedAt || ''
+                });
+            }
+            found.forEach(function (p) {
                 var key = (p.ownerId || '') + '|' + (p.tipo || p.codigoSAFT || '') + '|' + (p.numero || '') + '|' + (p.cliente || '');
                 if (seen[key]) return;
                 seen[key] = true;
@@ -1117,41 +1129,54 @@
         });
         var index = [['Cliente', 'Pasta', 'TipoArquivo', 'Numero', 'DataDocumento', 'EtapaPDF', 'Revisao', 'Ficheiro']
             .map(csvEsc).join(';')];
+        var originalIndex = [['Cliente', 'Pasta', 'TipoArquivo', 'Periodo', 'FicheiroOriginal']
+            .map(csvEsc).join(';')];
         var attached = 0;
+        var originalsAttached = 0;
         return Promise.all(entries.map(function (e) {
             var owner = api.ownerIdOf ? api.ownerIdOf(e) : e.id;
             if (!owner || typeof api.listFinals !== 'function') return Promise.resolve();
-            return api.listFinals(owner).then(function (rows) {
-                (rows || []).forEach(function (r) {
-                    if (!r.blob) return;
-                    if (!allowed[String(owner)] || !allowed[String(owner)][r.etape]) return;
-                    var matchedPaper = (papers || []).filter(function (p) {
-                        if (String(p.ownerId || '') !== String(owner)) return false;
-                        if (r.etape === 'relatorio') return p.tipo === 'RELATORIO';
-                        if (r.etape === 'orcamento') return p.tipo === 'ORCAMENTO';
-                        if (r.etape === 'recibo') return p.tipo === 'RECIBO_COMERCIAL';
-                        return false;
-                    })[0] || null;
-                    var base = fileBase(e);
+            return Promise.all([
+                api.listFinals(owner).then(function (rows) {
+                    (rows || []).forEach(function (r) {
+                        if (!r.blob) return;
+                        if (!allowed[String(owner)] || !allowed[String(owner)][r.etape]) return;
+                        var matchedPaper = (papers || []).filter(function (p) {
+                            if (String(p.ownerId || '') !== String(owner)) return false;
+                            if (r.etape === 'relatorio') return p.tipo === 'RELATORIO';
+                            if (r.etape === 'orcamento') return p.tipo === 'ORCAMENTO';
+                            if (r.etape === 'recibo') return p.tipo === 'RECIBO_COMERCIAL';
+                            return false;
+                        })[0] || null;
+                        var base = fileBase(e);
+                        var period = entryPeriodInfo(e);
+                        var folder = ['PDF', san(e.client || 'Cliente'), san(period.value || 'Sem_periodo'), base].join('/');
+                        var path = folder + '/' + base + '_' + r.etape + '_v' + r.rev + '.pdf';
+                        zip.file(path, r.blob);
+                        attached += 1;
+                        index.push([
+                            e.client || (matchedPaper && matchedPaper.cliente) || '',
+                            e.pasta || (matchedPaper && matchedPaper.pasta) || '',
+                            e.type || (matchedPaper && matchedPaper.tipo) || '',
+                            e.number || (matchedPaper && matchedPaper.numero) || '',
+                            isoDate(e.documentDate || (matchedPaper && matchedPaper.data) || e.archivedAt),
+                            r.etape || '', r.rev || '', path
+                        ].map(csvEsc).join(';'));
+                    });
+                }),
+                typeof api.getOriginal === 'function' ? api.getOriginal(owner).then(function (rec) {
+                    if (!rec || !rec.blob) return;
                     var period = entryPeriodInfo(e);
-                    var folder = ['PDF', san(e.client || 'Cliente'), san(period.value || 'Sem_periodo'), base].join('/');
-                    var path = folder + '/' + base + '_' + r.etape + '_v' + r.rev + '.pdf';
-                    zip.file(path, r.blob);
-                    attached += 1;
-                    index.push([
-                        e.client || (matchedPaper && matchedPaper.cliente) || '',
-                        e.pasta || (matchedPaper && matchedPaper.pasta) || '',
-                        e.type || (matchedPaper && matchedPaper.tipo) || '',
-                        e.number || (matchedPaper && matchedPaper.numero) || '',
-                        isoDate(e.documentDate || (matchedPaper && matchedPaper.data) || e.archivedAt),
-                        r.etape || '', r.rev || '', path
-                    ]
-                        .map(csvEsc).join(';'));
-                });
-            });
+                    var path = ['ORIGINAIS', san(e.client || 'Cliente'), san(period.value || 'Sem_periodo'), san(rec.fileName || e.originalFileName || 'documento')].join('/');
+                    zip.file(path, rec.blob);
+                    originalsAttached += 1;
+                    originalIndex.push([e.client || '', e.pasta || '', e.type || '', period.value || '', path].map(csvEsc).join(';'));
+                }) : Promise.resolve()
+            ]);
         })).then(function () {
             if (attached) zip.file('PDF/00_indice_PDF.csv', '\uFEFF' + index.join('\r\n') + '\r\n');
             else zip.file('PDF/LEIA-ME.txt', 'Nenhum PDF final corresponde aos documentos selecionados. Finalize os documentos no Arquivo para os incluir aqui.\r\n');
+            if (originalsAttached) zip.file('ORIGINAIS/00_indice_originais.csv', '\uFEFF' + originalIndex.join('\r\n') + '\r\n');
             return attached;
         });
     }
@@ -1256,6 +1281,7 @@
             '<label><input type="checkbox" class="pack-type-cb" value="RELATORIO" checked> ' + esc(tt('packTypeReport', 'Relatórios')) + '</label>' +
             '<label><input type="checkbox" class="pack-type-cb" value="ORCAMENTO" checked> ' + esc(tt('packTypeQuote', 'Orçamentos')) + '</label>' +
             '<label><input type="checkbox" class="pack-type-cb" value="RECIBO_COMERCIAL" checked> ' + esc(tt('packTypeReceipt', 'Recibos')) + '</label>' +
+            '<label><input type="checkbox" class="pack-type-cb" value="DOCUMENTO_SUPORTE" checked> ' + esc(tt('packTypeSupport', 'Documentos de suporte')) + '</label>' +
             '<label><input type="checkbox" id="packFinalsOnly"> ' + esc(tt('packFinalsOnly', 'Só versões finais / concluídos')) + '</label></div></div>' +
             '<div class="pack-section"><div class="pack-group-title">' + esc(tt('packContents', 'Conteúdo do ficheiro')) + '</div><div class="pack-outputs">' +
             '<label><input type="checkbox" id="packIncludeCsv" checked> ' + esc(tt('packIncludeCsv', 'CSV para Excel / importação ERP')) + '</label>' +
@@ -1297,7 +1323,7 @@
             });
         }
         function paperLabel(p, i) {
-            var name = p.tipo === 'RELATORIO' ? tt('packTypeReportOne', 'Relatório') : (p.tipo === 'ORCAMENTO' ? tt('packTypeQuoteOne', 'Orçamento') : tt('packTypeReceiptOne', 'Recibo'));
+            var name = p.tipo === 'RELATORIO' ? tt('packTypeReportOne', 'Relatório') : (p.tipo === 'ORCAMENTO' ? tt('packTypeQuoteOne', 'Orçamento') : (p.tipo === 'RECIBO_COMERCIAL' ? tt('packTypeReceiptOne', 'Recibo') : tt('packTypeSupportOne', 'Documento de suporte')));
             return esc((p.numero || ('#' + (i + 1))) + ' — ' + (p.cliente || tt('packNoClient', 'Sem cliente')) + ' — ' + name);
         }
         function renderDocs() {

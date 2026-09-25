@@ -259,7 +259,8 @@
     function openInGoogleDocs(options) {
         if (busy) return;
         if (typeof root.closeAllDropdowns === 'function') root.closeAllDropdowns();
-        var existing = getLink();
+        var faithful = !!(options && options.faithful);
+        var existing = faithful ? null : getLink();
         if (existing && !(options && options.send)) {
             root.open('https://docs.google.com/document/d/' + existing.id + '/edit', '_blank', 'noopener,noreferrer');
             updateStatusUi();
@@ -270,13 +271,15 @@
             openSettingsHint();
             return;
         }
-        if (typeof root.buildDocxBlob !== 'function') {
+        var exportApi = root.ABENE && root.ABENE.Export;
+        if ((!faithful && typeof root.buildDocxBlob !== 'function') ||
+            (faithful && (!exportApi || typeof exportApi.buildFaithfulDocxBlob !== 'function'))) {
             toast(tt('aNoDocx', 'A biblioteca DOCX não está carregada.'));
             return;
         }
         busy = true;
         var startedStamp = documentStamp();
-        var startedName = docName();
+        var startedName = docName() + (faithful ? ' — fiel' : '');
         var pendingTab = root.open('about:blank', '_blank');
         if (pendingTab) pendingTab.opener = null;
         toast(existing
@@ -284,7 +287,7 @@
             : tt('gdocsSending', 'A enviar para o Google Docs…'));
         root.abeneSheetsCall('PING').then(function () {
             if (documentStamp() !== startedStamp) throw new Error('document-changed');
-            return root.buildDocxBlob();
+            return faithful ? exportApi.buildFaithfulDocxBlob() : root.buildDocxBlob();
         }).then(function (blob) {
             if (documentStamp() !== startedStamp) throw new Error('document-changed');
             if (!blob) throw new Error('no-blob');
@@ -315,10 +318,12 @@
                 toast('Documento enviado, mas o relatório aberto mudou. A ligação foi conservada para recuperação; o documento atual não foi substituído.');
                 return;
             }
-            setLink(id, url);
-            toast(json.updated
-                ? tt('gdocsUpdatedOpen', 'Mesmo documento atualizado — a abrir o Google Docs.')
-                : tt('gdocsOpened', 'Documento aberto no Google Docs.'));
+            if (!faithful) setLink(id, url);
+            toast(faithful
+                ? tt('gdocsFaithfulOpened', 'Cópia fiel aberta no Google Docs. A apresentação é preservada como páginas e o Google Docs editável ligado não foi substituído.')
+                : (json.updated
+                    ? tt('gdocsUpdatedOpen', 'Mesmo documento atualizado — a abrir o Google Docs.')
+                    : tt('gdocsOpened', 'Documento aberto no Google Docs.')));
             if (pendingTab && !pendingTab.closed) pendingTab.location.href = 'https://docs.google.com/document/d/' + id + '/edit';
             else toast('Documento ligado. Clique em «Google Docs ligado» para abrir.');
         }).catch(function (err) {
@@ -433,6 +438,7 @@
 
     root.abeneOpenInGoogleDocs = openInGoogleDocs;
     root.openInGoogleDocs = openInGoogleDocs;
+    root.abeneOpenFaithfulInGoogleDocs = function () { return openInGoogleDocs({ faithful: true }); };
     root.abeneSendToGoogleDocs = function () { return openInGoogleDocs({ send: true }); };
     root.abenePullFromGoogleDocs = pullFromGoogleDocs;
     root.abeneGdocsGetLink = getLink;

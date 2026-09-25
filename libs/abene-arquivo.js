@@ -28,6 +28,7 @@
         toolsCollapsed: true,
         eventsBound: false
     };
+    var pendingOriginalFile = null;
 
     function isMobileArchive() {
         try {
@@ -544,6 +545,44 @@
         if (STR[l]) Object.assign(STR[l], SELECTSTR[l]);
     });
 
+    var IMPORTSTR = {
+        'pt-PT': {
+            attachFile: 'Juntar ficheiro', originalFile: 'Ficheiro original', downloadOriginal: 'Descarregar original',
+            viewOriginal: 'Ver original', importTitle: 'Juntar ao Arquivo', importHint: 'Confirme as sugestões detetadas antes de guardar. O ficheiro original não será alterado.',
+            detectedHint: 'Sugestões automáticas pelo nome/data do ficheiro — pode corrigir tudo.', docType: 'Tipo de documento',
+            importGo: 'Guardar no Arquivo', importOk: 'Ficheiro original guardado no Arquivo.', importFail: 'Não foi possível guardar o ficheiro original.',
+            originalDrive: 'Original no Drive', originalLocal: 'Original guardado neste aparelho; será enviado ao Drive quando a ligação estiver configurada.',
+            unsupportedOriginal: 'Formato não suportado. Use PDF, DOCX, HTML ou TXT.'
+        },
+        'fr-FR': {
+            attachFile: 'Joindre un fichier', originalFile: 'Fichier original', downloadOriginal: 'Télécharger l’original',
+            viewOriginal: 'Voir l’original', importTitle: 'Joindre aux Archives', importHint: 'Vérifiez les suggestions détectées avant d’enregistrer. Le fichier original ne sera pas modifié.',
+            detectedHint: 'Suggestions automatiques d’après le nom/la date du fichier — tout reste modifiable.', docType: 'Type de document',
+            importGo: 'Enregistrer dans les Archives', importOk: 'Fichier original enregistré dans les Archives.', importFail: 'Impossible d’enregistrer le fichier original.',
+            originalDrive: 'Original dans Drive', originalLocal: 'Original conservé sur cet appareil ; il sera envoyé vers Drive lorsque la connexion sera configurée.',
+            unsupportedOriginal: 'Format non pris en charge. Utilisez PDF, DOCX, HTML ou TXT.'
+        },
+        'en-US': {
+            attachFile: 'Attach file', originalFile: 'Original file', downloadOriginal: 'Download original',
+            viewOriginal: 'View original', importTitle: 'Attach to Archive', importHint: 'Check the detected suggestions before saving. The original file will not be changed.',
+            detectedHint: 'Automatic suggestions from the file name/date — every field remains editable.', docType: 'Document type',
+            importGo: 'Save to Archive', importOk: 'Original file saved in the Archive.', importFail: 'Could not save the original file.',
+            originalDrive: 'Original in Drive', originalLocal: 'Original stored on this device; it will be sent to Drive when the connection is configured.',
+            unsupportedOriginal: 'Unsupported format. Use PDF, DOCX, HTML, or TXT.'
+        },
+        'es-ES': {
+            attachFile: 'Adjuntar archivo', originalFile: 'Archivo original', downloadOriginal: 'Descargar original',
+            viewOriginal: 'Ver original', importTitle: 'Adjuntar al Archivo', importHint: 'Revise las sugerencias detectadas antes de guardar. El archivo original no se modificará.',
+            detectedHint: 'Sugerencias automáticas según el nombre/fecha del archivo — todo puede corregirse.', docType: 'Tipo de documento',
+            importGo: 'Guardar en el Archivo', importOk: 'Archivo original guardado en el Archivo.', importFail: 'No se pudo guardar el archivo original.',
+            originalDrive: 'Original en Drive', originalLocal: 'Original guardado en este dispositivo; se enviará a Drive cuando la conexión esté configurada.',
+            unsupportedOriginal: 'Formato no compatible. Use PDF, DOCX, HTML o TXT.'
+        }
+    };
+    Object.keys(IMPORTSTR).forEach(function (l) {
+        if (STR[l]) Object.assign(STR[l], IMPORTSTR[l]);
+    });
+
     var TRASHSTR = {
         'pt-PT': {
             trash: 'Lixo', trashEmpty: 'O Lixo está vazio.', deletedBadge: 'No Lixo', deletedOn: 'Eliminado em',
@@ -835,6 +874,7 @@
 
     var IDB_NAME = 'abeneFinalPdf';
     var IDB_STORE = 'finals';
+    var IDB_ORIGINALS = 'originals';
     var pdfPreviewUrl = '';
     var lastArchivePdfPromise = Promise.resolve();
 
@@ -935,12 +975,16 @@
                 reject(new Error('indexedDB'));
                 return;
             }
-            var req = indexedDB.open(IDB_NAME, 1);
+            var req = indexedDB.open(IDB_NAME, 2);
             req.onupgradeneeded = function () {
                 var db = req.result;
                 if (!db.objectStoreNames.contains(IDB_STORE)) {
                     var st = db.createObjectStore(IDB_STORE, { keyPath: 'id' });
                     st.createIndex('ownerId', 'ownerId', { unique: false });
+                }
+                if (!db.objectStoreNames.contains(IDB_ORIGINALS)) {
+                    var originals = db.createObjectStore(IDB_ORIGINALS, { keyPath: 'id' });
+                    originals.createIndex('ownerId', 'ownerId', { unique: false });
                 }
             };
             req.onsuccess = function () { resolve(req.result); };
@@ -956,6 +1000,36 @@
                 tx.onerror = function () { reject(tx.error); };
             });
         });
+    }
+    function originalIdbOp(mode, fn) {
+        return openPdfDb().then(function (db) {
+            return new Promise(function (resolve, reject) {
+                var tx = db.transaction(IDB_ORIGINALS, mode);
+                var st = tx.objectStore(IDB_ORIGINALS);
+                fn(st, resolve, reject);
+                tx.onerror = function () { reject(tx.error); };
+            });
+        });
+    }
+    function putOriginal(rec) {
+        return originalIdbOp('readwrite', function (st, resolve, reject) {
+            var req = st.put(rec);
+            req.onsuccess = function () { resolve(rec); };
+            req.onerror = function () { reject(req.error); };
+        });
+    }
+    function getOriginal(ownerId) {
+        return originalIdbOp('readonly', function (st, resolve) {
+            var idx = st.index('ownerId');
+            var req = idx.getAll(String(ownerId || ''));
+            req.onsuccess = function () { resolve((req.result || [])[0] || null); };
+        }).catch(function () { return null; });
+    }
+    function listAllOriginals() {
+        return originalIdbOp('readonly', function (st, resolve) {
+            var req = st.getAll();
+            req.onsuccess = function () { resolve(req.result || []); };
+        }).catch(function () { return []; });
     }
     function listFinals(ownerId) {
         return idbOp('readonly', function (st, resolve) {
@@ -1242,6 +1316,141 @@
             };
             reader.onerror = function () { reject(reader.error || new Error('read-fail')); };
             reader.readAsDataURL(blob);
+        });
+    }
+    function inferOriginalFile(file) {
+        file = file || {};
+        var name = String(file.name || 'Documento');
+        var stem = name.replace(/\.[^.]+$/, '');
+        var folded = clientSearchText(stem).replace(/[_-]+/g, ' ');
+        var type = /\b(orcamento|orçamento|devis|quote|presupuesto)\b/i.test(folded) ? 'orcamento'
+            : /\b(recibo|recu|receipt)\b/i.test(folded) ? 'recibo'
+            : /\b(relatorio|rapport|report|informe|inspecao|inspection)\b/i.test(folded) ? 'relatorio'
+            : 'documento';
+        var kind = 'day';
+        var value = '';
+        var match = stem.match(/(?:^|\D)(20\d{2})[._\/-](0?[1-9]|1[0-2])[._\/-](0?[1-9]|[12]\d|3[01])(?:\D|$)/);
+        if (match) value = match[1] + '-' + ('0' + match[2]).slice(-2) + '-' + ('0' + match[3]).slice(-2);
+        if (!value) {
+            match = stem.match(/(?:^|\D)(0?[1-9]|[12]\d|3[01])[._\/-](0?[1-9]|1[0-2])[._\/-](20\d{2})(?:\D|$)/);
+            if (match) value = match[3] + '-' + ('0' + match[2]).slice(-2) + '-' + ('0' + match[1]).slice(-2);
+        }
+        if (!value) {
+            match = stem.match(/(?:^|\D)(20\d{2})[._\/-](0?[1-9]|1[0-2])(?:\D|$)/);
+            if (match) { kind = 'month'; value = match[1] + '-' + ('0' + match[2]).slice(-2); }
+        }
+        if (!value) {
+            match = stem.match(/(?:^|\D)(20\d{2})(?:\D|$)/);
+            if (match) { kind = 'year'; value = match[1]; }
+        }
+        if (!value && Number(file.lastModified)) value = normalizeEntryDate(new Date(Number(file.lastModified)).toISOString());
+        if (!value) value = todayIso();
+        var clients = catalogClients();
+        var client = '';
+        clients.some(function (candidate) {
+            if (!candidate || candidate === tr('noClient')) return false;
+            var needle = clientSearchText(candidate);
+            if (needle.length > 2 && folded.indexOf(needle) !== -1) { client = candidate; return true; }
+            return false;
+        });
+        var job = loadLastJob();
+        var pasta = client ? pastaHint(client) : '';
+        return {
+            name: stem || 'Documento', type: type, client: client || '',
+            pasta: pasta || (client && job.client === client ? job.pasta : '') || '',
+            periodKind: kind, periodValue: value,
+            documentDate: kind === 'day' ? value : '', concluded: false
+        };
+    }
+    function syncOriginalToDrive(rec, entry) {
+        if (!rec || !rec.blob || typeof window.abeneSheetsEnabled !== 'function' ||
+            !window.abeneSheetsEnabled() || typeof window.abeneSheetsCall !== 'function' || navigator.onLine === false) {
+            return Promise.resolve(rec);
+        }
+        var period = entryPeriod(entry || {});
+        return blobToBase64(rec.blob).then(function (base64) {
+            return window.abeneSheetsCall('SAVE_ORIGINAL_FILE', {
+                ownerId: entry.id, name: entry.name || rec.fileName, fileName: rec.fileName,
+                mimeType: rec.mimeType, client: entry.client || '', pasta: entry.pasta || '', type: entry.type || 'documento',
+                periodKind: period.kind, periodValue: period.value, periodStart: period.start, periodEnd: period.end,
+                createdAt: entry.archivedAt || rec.createdAt, base64: base64
+            });
+        }).then(function (json) {
+            rec.driveFileId = json && json.id || '';
+            rec.driveUrl = json && json.url || '';
+            rec.cloudError = '';
+            return putOriginal(rec).then(function () {
+                var rows = loadStore();
+                rows.forEach(function (item) {
+                    if (item.id === entry.id) {
+                        item.originalDriveFileId = rec.driveFileId;
+                        item.originalDriveUrl = rec.driveUrl;
+                    }
+                });
+                saveStore(rows);
+                return rec;
+            });
+        }).catch(function (err) {
+            rec.cloudError = String((err && err.message) || err || 'sync-fail').slice(0, 180);
+            return putOriginal(rec).then(function () { return rec; });
+        });
+    }
+    function retryUnsyncedOriginals() {
+        if (typeof window.abeneSheetsEnabled !== 'function' || !window.abeneSheetsEnabled() ||
+            typeof window.abeneSheetsCall !== 'function' || navigator.onLine === false) return Promise.resolve([]);
+        var entries = loadStore();
+        return listAllOriginals().then(function (rows) {
+            return rows.filter(function (rec) { return rec && rec.blob && !rec.driveFileId; }).reduce(function (promise, rec) {
+                return promise.then(function () {
+                    var entry = entries.filter(function (item) { return item && String(item.id) === String(rec.ownerId); })[0];
+                    return entry ? syncOriginalToDrive(rec, entry) : null;
+                });
+            }, Promise.resolve()).then(function () { return rows; });
+        });
+    }
+    function attachOriginal(entryId, file) {
+        if (!entryId || !file) return Promise.reject(new Error('missing-original'));
+        var list = loadStore();
+        var entry = list.filter(function (item) { return item && item.id === entryId; })[0];
+        if (!entry) return Promise.reject(new Error('missing-entry'));
+        var rec = {
+            id: String(entryId) + ':original', ownerId: String(entryId), fileName: file.name || (entry.name + '.bin'),
+            mimeType: file.type || 'application/octet-stream', bytes: Number(file.size) || 0,
+            blob: file.slice ? file.slice(0, file.size, file.type || 'application/octet-stream') : file,
+            createdAt: new Date().toISOString(), driveFileId: '', driveUrl: '', cloudError: ''
+        };
+        entry.originalFileName = rec.fileName;
+        entry.originalMime = rec.mimeType;
+        entry.originalBytes = rec.bytes;
+        entry.originalDriveFileId = '';
+        entry.originalDriveUrl = '';
+        if (!saveStore(list)) return Promise.reject(new Error('archive-save'));
+        return putOriginal(rec).then(function () { return syncOriginalToDrive(rec, entry); });
+    }
+    function importOriginal(file, meta) {
+        meta = Object.assign(inferOriginalFile(file), meta || {});
+        var period = periodBounds(meta.periodKind, meta.periodValue);
+        var type = ['relatorio', 'orcamento', 'recibo', 'documento'].indexOf(meta.type) >= 0 ? meta.type : 'documento';
+        var safeFile = esc(file.name || meta.name || 'Documento');
+        var entry = {
+            id: uid(), name: String(meta.name || file.name || 'Documento').replace(/\.[^.]+$/, ''),
+            html: '<div data-abene-external="true"><h2>' + esc(meta.name || file.name || 'Documento') + '</h2><p>' + esc(tr('originalFile')) + ': ' + safeFile + '</p></div>',
+            type: type, client: String(meta.client || '').trim(), pasta: String(meta.pasta || '').trim(), nif: '', number: '', total: '',
+            documentDate: normalizeEntryDate(meta.documentDate) || (period.kind === 'day' ? period.value : ''),
+            periodKind: period.kind, periodValue: period.value, periodStart: period.start, periodEnd: period.end,
+            concluded: !!meta.concluded, protected: false, archivedAt: new Date().toISOString(),
+            hasDevis: type === 'orcamento', hasReceipt: type === 'recibo', hasReport: type === 'relatorio',
+            originalFileName: file.name || '', originalMime: file.type || 'application/octet-stream', originalBytes: Number(file.size) || 0
+        };
+        var id = upsertArchiveEntry(entry);
+        if (!id) return Promise.reject(new Error('archive-save'));
+        return attachOriginal(id, file).then(function () {
+            saveLastJob({ client: entry.client, pasta: entry.pasta });
+            state.folder = entry.client ? ('client:' + entry.client) : 'all';
+            state.selectedId = id;
+            refreshArquivoIfOpen();
+            toast(tr('importOk'));
+            return id;
         });
     }
     function syncFinalToDrive(rec, entry) {
@@ -1693,6 +1902,58 @@
         setPanelOpen('arqArchivePanel', true);
         if (cEl) cEl.focus();
     }
+    function openOriginalImportDialog(file) {
+        if (!file || !/\.(pdf|docx|html?|txt)$/i.test(String(file.name || ''))) {
+            toast(tr('unsupportedOriginal'));
+            return false;
+        }
+        pendingOriginalFile = file;
+        var hint = inferOriginalFile(file);
+        var types = [
+            ['relatorio', tr('typeRel')], ['orcamento', tr('typeOrc')], ['recibo', tr('typeRec')], ['documento', tr('typeDoc')]
+        ];
+        var body = '<p class="arq-hint">' + esc(tr('importHint')) + '</p>' +
+            '<p style="background:#eef6ff;padding:8px;border-left:4px solid ' + GOLD + ';">' + esc(tr('detectedHint')) + '</p>' +
+            '<div class="form-group"><label>' + esc(tr('originalFile')) + '</label><input id="arqImpName" value="' + esc(hint.name) + '" /></div>' +
+            '<div class="form-group"><label>' + esc(tr('docType')) + '</label><select id="arqImpType">' + types.map(function (item) {
+                return '<option value="' + item[0] + '"' + (item[0] === hint.type ? ' selected' : '') + '>' + esc(item[1]) + '</option>';
+            }).join('') + '</select></div>' +
+            '<div class="form-group"><label>' + esc(tr('client')) + '</label><input id="arqImpClient" value="' + esc(hint.client) + '" /></div>' +
+            '<div class="form-group"><label>' + esc(tr('pasta')) + '</label><input id="arqImpPasta" value="' + esc(hint.pasta) + '" /></div>' +
+            '<div class="form-group" style="display:grid;grid-template-columns:minmax(110px,.7fr) minmax(150px,1fr) auto;gap:8px;align-items:end;">' +
+            '<label>' + esc(tr('period')) + '<select id="arqImpPeriodKind"><option value="day">' + esc(tr('periodDay')) + '</option><option value="month">' + esc(tr('periodMonth')) + '</option><option value="year">' + esc(tr('periodYear')) + '</option></select></label>' +
+            '<label>' + esc(tr('period')) + '<input id="arqImpPeriodValue" /></label>' +
+            '<button type="button" class="btn-secondary" id="arqImpToday">' + esc(tr('periodToday')) + '</button></div>' +
+            '<label style="display:flex;gap:8px;align-items:center;margin-top:10px;"><input type="checkbox" id="arqImpDone"> ' + esc(tr('markDone')) + '</label>';
+        var footer = '<button type="button" class="btn-secondary" onclick="closeModal(\'genericModal\')">' + esc(tr('archiveCancel')) + '</button>' +
+            '<button type="button" class="btn-primary" onclick="abeneArquivoConfirmOriginalImport()">' + esc(tr('importGo')) + '</button>';
+        if (typeof window.openGenericModal !== 'function') return false;
+        window.openGenericModal(tr('importTitle'), body, footer);
+        setTimeout(function () {
+            setPeriodInput('arqImpPeriodKind', 'arqImpPeriodValue', hint.periodKind, hint.periodValue);
+            var kind = document.getElementById('arqImpPeriodKind');
+            if (kind) kind.onchange = function () { setPeriodInput('arqImpPeriodKind', 'arqImpPeriodValue', this.value); };
+            var today = document.getElementById('arqImpToday');
+            if (today) today.onclick = function () { setPeriodInput('arqImpPeriodKind', 'arqImpPeriodValue', 'day', todayIso()); };
+        }, 0);
+        return true;
+    }
+    window.abeneArquivoConfirmOriginalImport = function () {
+        var file = pendingOriginalFile;
+        if (!file) return;
+        var meta = {
+            name: String((document.getElementById('arqImpName') || {}).value || '').trim(),
+            type: String((document.getElementById('arqImpType') || {}).value || 'documento'),
+            client: String((document.getElementById('arqImpClient') || {}).value || '').trim(),
+            pasta: String((document.getElementById('arqImpPasta') || {}).value || '').trim(),
+            periodKind: String((document.getElementById('arqImpPeriodKind') || {}).value || 'day'),
+            periodValue: String((document.getElementById('arqImpPeriodValue') || {}).value || ''),
+            concluded: !!((document.getElementById('arqImpDone') || {}).checked)
+        };
+        pendingOriginalFile = null;
+        if (typeof window.closeModal === 'function') window.closeModal('genericModal');
+        importOriginal(file, meta).catch(function () { toast(tr('importFail')); });
+    };
     function commitArchivePanel() {
         var client = String((document.getElementById('arqArchClient') || {}).value || '').trim();
         var pasta = String((document.getElementById('arqArchPasta') || {}).value || '').trim();
@@ -1952,6 +2213,15 @@
                 window.downloadPackContabilista({ select: true });
             } else toast(tr('packEmpty'));
         };
+        document.getElementById('arqAttachBtn').onclick = function () {
+            var input = document.getElementById('arqAttachInput');
+            if (input) input.click();
+        };
+        document.getElementById('arqAttachInput').onchange = function () {
+            var file = this.files && this.files[0];
+            this.value = '';
+            if (file) openOriginalImportDialog(file);
+        };
         document.getElementById('arqNewClientBtn').onclick = createClientFolder;
         document.getElementById('arqNewPastaBtn').onclick = createPastaFolder;
         document.getElementById('arqDriveBtn').onclick = openDriveRoot;
@@ -2094,6 +2364,8 @@
             '</div><div class="arq-tool-actions">' +
             '<button type="button" class="arq-btn primary" id="arqZipBtn"></button>' +
             '<button type="button" class="arq-btn gold" id="arqPackBtn"></button>' +
+            '<button type="button" class="arq-btn" id="arqAttachBtn"></button>' +
+            '<input type="file" id="arqAttachInput" accept=".pdf,.docx,.html,.htm,.txt" hidden />' +
             '<button type="button" class="arq-btn" id="arqNewClientBtn"></button>' +
             '<button type="button" class="arq-btn" id="arqNewPastaBtn"></button>' +
             '<button type="button" class="arq-btn gold" id="arqDriveBtn"></button>' +
@@ -2264,6 +2536,8 @@
         document.getElementById('arqTrashSelectedBtn').textContent = tr(state.folder === 'trash' ? 'restoreSelected' : 'moveSelectedTrash');
         var packBtn = document.getElementById('arqPackBtn');
         if (packBtn) packBtn.textContent = tr('packAcct');
+        var attachBtn = document.getElementById('arqAttachBtn');
+        if (attachBtn) attachBtn.textContent = tr('attachFile');
         var nc = document.getElementById('arqNewClientBtn');
         if (nc) nc.textContent = tr('newClient');
         var np = document.getElementById('arqNewPastaBtn');
@@ -2625,6 +2899,8 @@
                 (canOrc ? '<button type="button" class="arq-btn" data-act="copy-orc">' + esc(tr('copyOrc')) + '</button>' : '') +
                 (canRec ? '<button type="button" class="arq-btn" data-act="copy-rec">' + esc(tr('copyRec')) + '</button>' : '') +
                 '<button type="button" class="arq-btn" data-act="dl">' + esc(tr('dlOne')) + '</button>' +
+                (e.originalFileName ? '<button type="button" class="arq-btn gold" data-act="original">' + esc(tr('downloadOriginal')) + '</button>' : '') +
+                (e.originalFileName && /\.pdf$/i.test(e.originalFileName) ? '<button type="button" class="arq-btn" data-act="original-view">' + esc(tr('viewOriginal')) + '</button>' : '') +
                 '<button type="button" class="arq-btn" data-act="gdocs">G · ' + esc(tr(e.gdocsFileId ? 'gdocsOpenEntry' : ((e.concluded || protectedEntry || e.readOnlyOrigin) ? 'gdocsCopyEntry' : 'gdocsCreateEntry'))) + '</button>' +
                 (!e.readOnlyOrigin && !e.concluded
                     ? '<button type="button" class="arq-btn" data-act="protect">' + esc(tr(protectedEntry ? 'unprotect' : 'protect')) + '</button>'
@@ -2658,6 +2934,7 @@
         var tab = state.previewTab === 'pdf' ? 'pdf' : 'doc';
         box.innerHTML = '<h3>' + esc(tr('preview')) + ' — ' + esc(e.name) + '</h3>' +
             '<p class="arq-hint">' + esc(typeLabel(e.type) + ' · ' + (e.client || tr('noClient')) + ' · ' + (e.pasta || tr('none'))) + '</p>' +
+            (e.originalFileName ? '<p class="arq-hint"><strong>' + esc(tr('originalFile')) + ':</strong> ' + esc(e.originalFileName) + ' · ' + esc(e.originalDriveFileId ? tr('originalDrive') : tr('originalLocal')) + '</p>' : '') +
             actions + form +
             '<div class="arq-pdf"><h4>' + esc(tr('pdfTitle')) + '</h4>' +
             '<p class="arq-hint">' + esc(tr('pdfHint')) + '</p>' +
@@ -2963,6 +3240,25 @@
         });
     }
     function runAction(act, e) {
+        if (act === 'original' || act === 'original-view') {
+            getOriginal(ownerIdOf(e)).then(function (rec) {
+                if (!rec || !rec.blob) {
+                    if (e.originalDriveUrl) window.open(e.originalDriveUrl, '_blank', 'noopener,noreferrer');
+                    else toast(tr('importFail'));
+                    return;
+                }
+                if (act === 'original-view' && /pdf/i.test(rec.mimeType || '') ) {
+                    showPdfBlob(rec.blob, rec.id);
+                    return;
+                }
+                var a = document.createElement('a');
+                a.href = URL.createObjectURL(rec.blob);
+                a.download = rec.fileName || e.originalFileName || 'documento';
+                a.click();
+                setTimeout(function () { URL.revokeObjectURL(a.href); }, 60000);
+            });
+            return;
+        }
         if (act === 'gdocs') {
             openEntryInGoogleDocs(e);
             return;
@@ -3157,18 +3453,20 @@
             return null;
         }
         var ds = docState() || {};
-        var period = periodBounds(opts.periodKind || 'day', opts.periodValue || meta.documentDate || todayIso());
+        var documentDate = normalizeEntryDate(opts.documentDate || meta.documentDate);
+        var period = periodBounds(opts.periodKind || 'day', opts.periodValue || documentDate || todayIso());
+        var entryType = ['relatorio', 'orcamento', 'recibo', 'completo', 'documento'].indexOf(opts.type) >= 0 ? opts.type : meta.type;
         var entry = {
             id: uid(),
             name: snap.name,
             html: snap.html,
-            type: meta.type,
+            type: entryType,
             client: String(client || meta.client || '').trim(),
             pasta: String(pasta || '').trim(),
             nif: String(opts.nif || meta.nif || job.nif || '').trim(),
-            number: meta.number,
+            number: String(opts.number || meta.number || '').trim(),
             total: meta.total,
-            documentDate: meta.documentDate,
+            documentDate: documentDate,
             periodKind: period.kind,
             periodValue: period.value,
             periodStart: period.start,
@@ -3177,9 +3475,9 @@
             protected: !concluded && !!snap.protected,
             protectedAt: (!concluded && snap.protected) ? new Date().toISOString() : '',
             archivedAt: new Date().toISOString(),
-            hasDevis: meta.hasDevis,
-            hasReceipt: meta.hasReceipt,
-            hasReport: meta.hasReport,
+            hasDevis: meta.hasDevis || entryType === 'orcamento' || entryType === 'completo',
+            hasReceipt: meta.hasReceipt || entryType === 'recibo' || entryType === 'completo',
+            hasReport: meta.hasReport || entryType === 'relatorio' || entryType === 'completo',
             gdocsFileId: ds.gdocsFileId || '',
             gdocsUrl: ds.gdocsUrl || ''
         };
@@ -3229,12 +3527,17 @@
         Promise.all(list.map(function (e) {
             var folder = [e.client || tr('noClient'), e.pasta || tr('none'), entryPeriod(e).value || 'Sem_periodo', typeLabel(e.type)]
                 .map(sanitizeName).join('/');
-            return listFinals(ownerIdOf(e)).then(function (rows) {
-                rows.forEach(function (r) {
-                    if (!r.blob) return;
-                    zip.file(folder + '/' + archiveFileBase(e) + '_' + r.etape + '_v' + r.rev + '.pdf', r.blob);
-                });
-            });
+            return Promise.all([
+                listFinals(ownerIdOf(e)).then(function (rows) {
+                    rows.forEach(function (r) {
+                        if (!r.blob) return;
+                        zip.file(folder + '/' + archiveFileBase(e) + '_' + r.etape + '_v' + r.rev + '.pdf', r.blob);
+                    });
+                }),
+                getOriginal(ownerIdOf(e)).then(function (rec) {
+                    if (rec && rec.blob) zip.file(folder + '/Original/' + sanitizeName(rec.fileName || e.originalFileName), rec.blob);
+                })
+            ]);
         })).then(function () {
             return zip.generateAsync({ type: 'blob' });
         }).then(function (blob) {
@@ -3243,7 +3546,7 @@
             var brand = ((typeof window.abeneBrandName === 'function') ? window.abeneBrandName() : 'Genius Raros').replace(/\s+/g, '-');
             a.download = brand + '-' + sanitizeName(label || 'Arquivo') + '-' + new Date().toISOString().slice(0, 10) + '.zip';
             a.click();
-            URL.revokeObjectURL(a.href);
+            setTimeout(function () { URL.revokeObjectURL(a.href); }, 60000);
             toast(tr('zipOk', { n: String(list.length) }));
         }).catch(function () { toast(tr('quota')); });
     }
@@ -3255,6 +3558,7 @@
         fillChrome();
         if (typeof closeAllDropdowns === 'function') closeAllDropdowns();
         if (typeof closeImageToolbar === 'function') closeImageToolbar();
+        retryUnsyncedOriginals().then(refreshArquivoIfOpen).catch(function () {});
         document.getElementById('arqOverlay').classList.add('open');
         try { document.body.classList.add('abene-arq-open'); } catch (eOpen) {}
         if (isMobileArchive()) {
@@ -3528,7 +3832,14 @@
         ownerIdOf: ownerIdOf,
         sanitizeName: sanitizeName,
         archiveFileBase: archiveFileBase,
+        inferOriginalFile: inferOriginalFile,
+        openOriginalImportDialog: openOriginalImportDialog,
+        importOriginal: importOriginal,
+        attachOriginal: attachOriginal,
+        getOriginal: getOriginal,
+        retryUnsyncedOriginals: retryUnsyncedOriginals,
         catalogFolders: loadFolders,
+        catalogClients: catalogClients,
         rememberFolder: rememberFolder,
         archiveCurrent: archiveCurrent,
         waitForArchivePdfs: function () { return lastArchivePdfPromise; },
@@ -3540,6 +3851,9 @@
         setMobilePane: setMobilePane,
         isMobileArchive: isMobileArchive
     };
+    window.addEventListener('online', function () {
+        retryUnsyncedOriginals().then(refreshArquivoIfOpen).catch(function () {});
+    });
     window.addEventListener('abene:languagechange', function () {
         var overlay = document.getElementById('arqOverlay');
         if (!overlay) return;

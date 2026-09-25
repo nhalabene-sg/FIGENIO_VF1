@@ -6,6 +6,9 @@ recibos comerciais e preparação de ficheiros para o contabilista.
 A interface abre por defeito em **português de Portugal**. Também estão
 disponíveis francês, inglês e espanhol.
 
+Le point de reprise détaillé (fonctionnalités, tests, limites et déploiement)
+est conservé dans [`docs/RAPPORT_CONTINUITE.md`](docs/RAPPORT_CONTINUITE.md).
+
 ## Publicar no GitHub Pages
 
 Publicar **todo o conteúdo desta pasta ABENE** na raiz do repositório:
@@ -59,11 +62,16 @@ enviados pelo Gmail do cliente. Os documentos enviados ao cliente são PDFs.
 - Os documentos do Lixo não entram nos packs nem nos índices do contabilista.
 - Português de Portugal é o idioma predefinido; Lixo, Corbeille, Trash e
   Papelera são apresentados conforme o idioma selecionado.
+- `Juntar ficheiro` conserva o PDF/DOCX/HTML/TXT original, sugere cliente,
+  tipo e período, e inclui o original nos ZIP e packs do contabilista.
+- `Abrir cópia fiel no Google Docs` cria uma cópia visual por páginas sem
+  substituir o Google Docs editável já ligado.
 
 Depois desta atualização, voltar a colar `apps-script/emaildrive.gs.txt` no
-Apps Script e criar uma **Nova versão** da implementação. O script acrescenta
-automaticamente as colunas `DeletedAt`, `Protected` e `ProtectedAt` à folha
-ARQUIVO, sem apagar os registos existentes.
+Apps Script e criar uma **Nova versão** da implementação. Além das colunas
+`DeletedAt`, `Protected` e `ProtectedAt`, o endpoint aditivo
+`SAVE_ORIGINAL_FILE` guarda no Drive os ficheiros originais juntos ao Arquivo,
+sem apagar os registos existentes.
 
 ## Licença
 

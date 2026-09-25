@@ -167,10 +167,12 @@ function pingPayload_(action) {
     mailEnabled: true,
     canSendEmail: true,
     canSendClientPdf: true,
+    canSaveOriginalFile: true,
     maxAttachmentBytes: 15 * 1024 * 1024,
     capabilities: {
       sendEmail: true,
       sendClientPdf: true,
+      saveOriginalFile: true,
       mail: true
     },
     safeDocumentSync: true,
@@ -226,6 +228,8 @@ function handle_(action, data) {
       return sendClientPdf_(data);
     case 'SAVE_FINAL_PDF':
       return json_(saveFinalPdf_(data));
+    case 'SAVE_ORIGINAL_FILE':
+      return json_(saveOriginalFile_(data));
     case 'SHARE':
       return json_({ ok: false, error: 'admin-only' });
     case 'COLLAB_PING':
@@ -1155,6 +1159,39 @@ function saveFinalPdf_(data) {
   var blob = Utilities.newBlob(bytes, 'application/pdf', filename);
   var file = writeBlobIn_(folder, filename, blob);
   log_('SAVE_FINAL_PDF', true, filename + ' ' + file.getId());
+  return { ok: true, id: file.getId(), url: file.getUrl(), name: filename, bytes: bytes.length, at: now_() };
+}
+
+/* Guarda o binário original anexado ao Arquivo sem o converter nem alterar.
+ * Mantém este canal separado de SYNC_DOCUMENT e do Google Docs nativo. */
+function saveOriginalFile_(data) {
+  data = data || {};
+  var raw = String(data.base64 || data.data || data.content || '').replace(/^data:[^;]+;base64,/, '');
+  if (!raw) return { ok: false, error: 'file-required' };
+  var bytes;
+  try { bytes = Utilities.base64Decode(raw); } catch (e) { return { ok: false, error: 'bad-file' }; }
+  if (!bytes || !bytes.length || bytes.length > 12 * 1024 * 1024) return { ok: false, error: 'bad-file-size' };
+  var originalName = sanitizeDrive_(String(data.fileName || data.name || 'documento'));
+  if (!/\.(pdf|docx|html?|txt)$/i.test(originalName)) return { ok: false, error: 'bad-file-type' };
+  var mime = String(data.mimeType || 'application/octet-stream').toLowerCase();
+  var allowedMime = /^(application\/pdf|application\/vnd\.openxmlformats-officedocument\.wordprocessingml\.document|text\/(html|plain)|application\/octet-stream)$/;
+  if (!allowedMime.test(mime)) return { ok: false, error: 'bad-file-type' };
+  if (/\.pdf$/i.test(originalName) && (bytes.length < 5 || bytes[0] !== 37 || bytes[1] !== 80 || bytes[2] !== 68 || bytes[3] !== 70 || bytes[4] !== 45)) {
+    return { ok: false, error: 'bad-pdf' };
+  }
+  if (/\.docx$/i.test(originalName) && (bytes.length < 4 || bytes[0] !== 80 || bytes[1] !== 75)) {
+    return { ok: false, error: 'bad-docx' };
+  }
+  var item = {
+    id: String(data.ownerId || ''), name: String(data.name || originalName).replace(/\.[^.]+$/, ''),
+    client: String(data.client || ''), pasta: String(data.pasta || ''), type: String(data.type || 'documento'),
+    archivedAt: String(data.createdAt || now_()), concluded: data.concluded === true
+  };
+  var folder = folderAt_(arquivoParts_(item).concat(['Originais']));
+  var filename = archiveBaseName_(item) + '_original_' + originalName;
+  var blob = Utilities.newBlob(bytes, mime, filename);
+  var file = writeBlobIn_(folder, filename, blob);
+  log_('SAVE_ORIGINAL_FILE', true, filename + ' ' + file.getId());
   return { ok: true, id: file.getId(), url: file.getUrl(), name: filename, bytes: bytes.length, at: now_() };
 }
 
