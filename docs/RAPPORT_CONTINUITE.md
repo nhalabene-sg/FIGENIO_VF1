@@ -146,4 +146,6 @@ Pour activer l’envoi des fichiers originaux vers Drive :
 
 ## Point de reprise
 
-Après le déploiement Pages, vérifier l’URL avec le hash du nouveau commit, faire un rechargement forcé, puis réaliser un essai réel avec : un rapport multipage, un devis seul, un PDF externe nommé avec client+période, le pack comptable et les deux choix Google Docs. Ne pas recommencer les modules déjà marqués PASS ci-dessus.
+Publication GitHub Pages effectuée le 25 septembre 2026 : version fonctionnelle `f9acc7d`. L’application, le présent rapport et `libs/abene-arquivo.js` ont été relus depuis le domaine Pages avec une réponse HTTP 200 ; le cache-bust `20260925-final-workflow-1` et le bouton `Juntar ficheiro` sont bien servis.
+
+Prochaine vérification réelle : après rechargement forcé, essayer avec le compte du client un rapport multipage, un devis seul, un PDF externe nommé avec client+période, le pack comptable et les deux choix Google Docs. Redéployer auparavant l’Apps Script si l’envoi de l’original vers Drive doit être testé. Ne pas recommencer les modules déjà marqués PASS ci-dessus.
