@@ -87,7 +87,7 @@
             packDownload: 'Descarregar pack', packScope: 'Origem', packScopeVisible: 'Documentos visíveis no Arquivo', packScopeCurrent: 'Documento atual', packScopeAll: 'Todo o Arquivo', packScopeSelected: 'Seleção atual do Arquivo',
             packPeriod: 'Período', packPeriodAll: 'Todas as datas', packPeriodToday: 'Hoje', packPeriodMonth: 'Este mês', packPeriodPreviousMonth: 'Mês anterior', packPeriodYear: 'Este ano', packPeriodCustom: 'Datas personalizadas',
             packDateFrom: 'Data inicial', packDateTo: 'Data final', packIncludeUndated: 'Incluir documentos sem data', packTypes: 'Tipos de documento', packContents: 'Conteúdo do ficheiro',
-            packTypeReport: 'Relatórios', packTypeQuote: 'Orçamentos', packTypeReceipt: 'Recibos', packTypeSupport: 'Documentos de suporte', packTypeReportOne: 'Relatório', packTypeQuoteOne: 'Orçamento', packTypeReceiptOne: 'Recibo', packTypeSupportOne: 'Documento de suporte',
+            packTypeReport: 'Relatórios', packTypeQuote: 'Orçamentos', packTypeReceipt: 'Recibos', packTypeReportOne: 'Relatório', packTypeQuoteOne: 'Orçamento', packTypeReceiptOne: 'Recibo',
             packSelectAll: 'Selecionar tudo', packSelectNone: 'Limpar seleção', packNoClient: 'Sem cliente', packNoDate: 'Sem data', packSummary: '{n} documento(s) · total indicativo {total} €', packNeedOutput: 'Escolha CSV, PDFs ou ambos.',
             packEmpty: 'Não há relatórios, orçamentos nem recibos disponíveis para o contabilista.', packNoResults: 'Nenhum documento corresponde a estes filtros.', packSelectOne: 'Selecione pelo menos um documento.',
             ruler: 'Régua', navigation: 'Navegação', grid: 'Grelha', viewPrint: 'Impressão', viewWeb: 'Web', viewRead: 'Leitura', viewOutline: 'Estrutura',
@@ -184,10 +184,6 @@
             exportAsHint: 'Escolha o formato a descarregar. Isto não substitui Guardar.',
             exportAsWord: 'Exportar Word (.docx)',
             exportAsWordHint: 'Para abrir e editar no Microsoft Word',
-            exportAsWordFaithful: 'Word fiel à página (.docx)',
-            exportAsWordEditable: 'Word editável (.docx)',
-            docxFaithfulExported: 'Word fiel preparado com a mesma apresentação das páginas ABENE.',
-            docxFaithfulFallback: 'Não foi possível criar o Word fiel. Foi preparada a versão editável.',
             exportAsPdf: 'Exportar PDF',
             exportAsPdfHint: 'Para enviar ou imprimir, com o aspeto do papel',
             toastSavedLocal: 'Guardado neste computador.',
@@ -198,7 +194,7 @@
             saveOfferArquivarBody: 'O documento foi guardado neste computador, mas ainda não está ligado ao Arquivo. Arquivar agora permite atualizar a mesma ficha nas próximas vezes que guardar.',
             saveOfferArquivarYes: 'Arquivar…',
             saveOfferArquivarNo: 'Agora não',
-            fileTpl: 'Modelos de documento', fileArquivo: 'Arquivo', fileArquivoTitle: 'Arquivo — pastas e documentos concluídos', groupArquivo: 'Arquivo', filePdf: 'Exportar PDF', fileDocx: 'Exportar DOCX', fileDoc: 'Exportar Word (.doc)', fileGdocs: 'Abrir no Google Docs', fileGdocsFaithful: 'Abrir cópia fiel no Google Docs', gdocsFaithfulOpened: 'Cópia fiel aberta no Google Docs. A apresentação é preservada como páginas; o Google Docs editável ligado não foi substituído.',
+            fileTpl: 'Modelos de documento', fileArquivo: 'Arquivo', fileArquivoTitle: 'Arquivo — pastas e documentos concluídos', groupArquivo: 'Arquivo', filePdf: 'Exportar PDF', fileDocx: 'Exportar DOCX', fileDoc: 'Exportar Word (.doc)', fileGdocs: 'Abrir no Google Docs',
             fileStats: 'Estatísticas', filePrint: 'Imprimir', fileProps: 'Propriedades',
             navTitle: 'Navegação', navHeadings: 'Títulos', navPages: 'Páginas', navSearch: 'Pesquisa',
             navEmpty: 'Nenhum título encontrado. Utilize os estilos Título para criar a navegação.',
@@ -382,7 +378,7 @@
             packDownload: 'Télécharger le pack', packScope: 'Source', packScopeVisible: 'Documents visibles dans les Archives', packScopeCurrent: 'Document actuel', packScopeAll: 'Toutes les Archives', packScopeSelected: 'Sélection actuelle des Archives',
             packPeriod: 'Période', packPeriodAll: 'Toutes les dates', packPeriodToday: 'Aujourd’hui', packPeriodMonth: 'Ce mois-ci', packPeriodPreviousMonth: 'Mois précédent', packPeriodYear: 'Cette année', packPeriodCustom: 'Dates personnalisées',
             packDateFrom: 'Date de début', packDateTo: 'Date de fin', packIncludeUndated: 'Inclure les documents sans date', packTypes: 'Types de documents', packContents: 'Contenu du fichier',
-            packTypeReport: 'Rapports', packTypeQuote: 'Devis', packTypeReceipt: 'Reçus', packTypeSupport: 'Documents justificatifs', packTypeReportOne: 'Rapport', packTypeQuoteOne: 'Devis', packTypeReceiptOne: 'Reçu', packTypeSupportOne: 'Document justificatif',
+            packTypeReport: 'Rapports', packTypeQuote: 'Devis', packTypeReceipt: 'Reçus', packTypeReportOne: 'Rapport', packTypeQuoteOne: 'Devis', packTypeReceiptOne: 'Reçu',
             packSelectAll: 'Tout sélectionner', packSelectNone: 'Effacer la sélection', packNoClient: 'Sans client', packNoDate: 'Sans date', packSummary: '{n} document(s) · total indicatif {total} €', packNeedOutput: 'Choisissez les CSV, les PDF ou les deux.',
             packEmpty: 'Aucun rapport, devis ou reçu n’est disponible pour le comptable.', packNoResults: 'Aucun document ne correspond à ces filtres.', packSelectOne: 'Sélectionnez au moins un document.',
             ruler: 'Règle', navigation: 'Navigation', grid: 'Quadrillage', viewPrint: 'Impression', viewWeb: 'Web', viewRead: 'Lecture', viewOutline: 'Plan',
@@ -478,10 +474,6 @@
             exportAsHint: 'Choisissez le format à télécharger. Cela ne remplace pas Enregistrer.',
             exportAsWord: 'Exporter Word (.docx)',
             exportAsWordHint: 'Pour ouvrir et modifier dans Microsoft Word',
-            exportAsWordFaithful: 'Word fidèle à la mise en page (.docx)',
-            exportAsWordEditable: 'Word modifiable (.docx)',
-            docxFaithfulExported: 'Word fidèle préparé avec la même présentation que les pages ABENE.',
-            docxFaithfulFallback: 'Impossible de créer le Word fidèle. La version modifiable a été préparée.',
             exportAsPdf: 'Exporter PDF',
             exportAsPdfHint: 'Pour envoyer ou imprimer, avec la mise en page',
             toastSavedLocal: 'Enregistré sur cet ordinateur.',
@@ -493,7 +485,7 @@
             saveOfferArquivarYes: 'Archiver…',
             saveOfferArquivarNo: 'Pas maintenant',
             saveAsLegal: 'Les devis et reçus commerciaux ne sont pas des factures AT.',
-            fileTpl: 'Modèles de document', fileArquivo: 'Archives', fileArquivoTitle: 'Archives — dossiers et documents conclus', groupArquivo: 'Archives', filePdf: 'Exporter en PDF', fileDocx: 'Exporter DOCX', fileDoc: 'Exporter Word (.doc)', fileGdocs: 'Ouvrir dans Google Docs', fileGdocsFaithful: 'Ouvrir une copie fidèle dans Google Docs', gdocsFaithfulOpened: 'Copie fidèle ouverte dans Google Docs. La présentation est conservée sous forme de pages ; le Google Docs modifiable lié n’a pas été remplacé.',
+            fileTpl: 'Modèles de document', fileArquivo: 'Archives', fileArquivoTitle: 'Archives — dossiers et documents conclus', groupArquivo: 'Archives', filePdf: 'Exporter en PDF', fileDocx: 'Exporter DOCX', fileDoc: 'Exporter Word (.doc)', fileGdocs: 'Ouvrir dans Google Docs',
             fileStats: 'Statistiques', filePrint: 'Imprimer', fileProps: 'Propriétés',
             navTitle: 'Navigation', navHeadings: 'Titres', navPages: 'Pages', navSearch: 'Recherche',
             navEmpty: 'Aucun titre trouvé. Utilisez les styles Titre pour créer la navigation.',
@@ -677,7 +669,7 @@
             packDownload: 'Download pack', packScope: 'Source', packScopeVisible: 'Documents visible in Archive', packScopeCurrent: 'Current document', packScopeAll: 'Entire Archive', packScopeSelected: 'Current Archive selection',
             packPeriod: 'Period', packPeriodAll: 'All dates', packPeriodToday: 'Today', packPeriodMonth: 'This month', packPeriodPreviousMonth: 'Previous month', packPeriodYear: 'This year', packPeriodCustom: 'Custom dates',
             packDateFrom: 'Start date', packDateTo: 'End date', packIncludeUndated: 'Include documents without a date', packTypes: 'Document types', packContents: 'File contents',
-            packTypeReport: 'Reports', packTypeQuote: 'Quotes', packTypeReceipt: 'Receipts', packTypeSupport: 'Supporting documents', packTypeReportOne: 'Report', packTypeQuoteOne: 'Quote', packTypeReceiptOne: 'Receipt', packTypeSupportOne: 'Supporting document',
+            packTypeReport: 'Reports', packTypeQuote: 'Quotes', packTypeReceipt: 'Receipts', packTypeReportOne: 'Report', packTypeQuoteOne: 'Quote', packTypeReceiptOne: 'Receipt',
             packSelectAll: 'Select all', packSelectNone: 'Clear selection', packNoClient: 'No client', packNoDate: 'No date', packSummary: '{n} document(s) · indicative total {total} €', packNeedOutput: 'Choose CSV files, PDFs, or both.',
             packEmpty: 'No reports, quotes or receipts are available for the accountant.', packNoResults: 'No document matches these filters.', packSelectOne: 'Select at least one document.',
             ruler: 'Ruler', navigation: 'Navigation', grid: 'Gridlines', viewPrint: 'Print Layout', viewWeb: 'Web Layout', viewRead: 'Read Mode', viewOutline: 'Outline',
@@ -773,10 +765,6 @@
             exportAsHint: 'Choose a download format. This does not replace Save.',
             exportAsWord: 'Export Word (.docx)',
             exportAsWordHint: 'To open and edit in Microsoft Word',
-            exportAsWordFaithful: 'Layout-faithful Word (.docx)',
-            exportAsWordEditable: 'Editable Word (.docx)',
-            docxFaithfulExported: 'Layout-faithful Word prepared with the same appearance as the ABENE pages.',
-            docxFaithfulFallback: 'The layout-faithful Word could not be created. The editable version was prepared.',
             exportAsPdf: 'Export PDF',
             exportAsPdfHint: 'To send or print, matching the paper layout',
             toastSavedLocal: 'Saved on this computer.',
@@ -788,7 +776,7 @@
             saveOfferArquivarYes: 'Archive…',
             saveOfferArquivarNo: 'Not now',
             saveAsLegal: 'Quotes and commercial receipts are not AT invoices.',
-            fileTpl: 'Document templates', fileArquivo: 'Archive', fileArquivoTitle: 'Archive — folders and concluded documents', groupArquivo: 'Archive', filePdf: 'Export PDF', fileDocx: 'Export DOCX', fileDoc: 'Export Word (.doc)', fileGdocs: 'Open in Google Docs', fileGdocsFaithful: 'Open faithful copy in Google Docs', gdocsFaithfulOpened: 'Faithful copy opened in Google Docs. The page appearance is preserved; the linked editable Google Doc was not replaced.',
+            fileTpl: 'Document templates', fileArquivo: 'Archive', fileArquivoTitle: 'Archive — folders and concluded documents', groupArquivo: 'Archive', filePdf: 'Export PDF', fileDocx: 'Export DOCX', fileDoc: 'Export Word (.doc)', fileGdocs: 'Open in Google Docs',
             fileStats: 'Statistics', filePrint: 'Print', fileProps: 'Properties',
             navTitle: 'Navigation', navHeadings: 'Headings', navPages: 'Pages', navSearch: 'Search',
             navEmpty: 'No headings found. Apply Heading styles to build the outline.',
@@ -972,7 +960,7 @@
             packDownload: 'Descargar pack', packScope: 'Origen', packScopeVisible: 'Documentos visibles en Archivo', packScopeCurrent: 'Documento actual', packScopeAll: 'Todo el Archivo', packScopeSelected: 'Selección actual de Archivo',
             packPeriod: 'Período', packPeriodAll: 'Todas las fechas', packPeriodToday: 'Hoy', packPeriodMonth: 'Este mes', packPeriodPreviousMonth: 'Mes anterior', packPeriodYear: 'Este año', packPeriodCustom: 'Fechas personalizadas',
             packDateFrom: 'Fecha inicial', packDateTo: 'Fecha final', packIncludeUndated: 'Incluir documentos sin fecha', packTypes: 'Tipos de documentos', packContents: 'Contenido del archivo',
-            packTypeReport: 'Informes', packTypeQuote: 'Presupuestos', packTypeReceipt: 'Recibos', packTypeSupport: 'Documentos justificativos', packTypeReportOne: 'Informe', packTypeQuoteOne: 'Presupuesto', packTypeReceiptOne: 'Recibo', packTypeSupportOne: 'Documento justificativo',
+            packTypeReport: 'Informes', packTypeQuote: 'Presupuestos', packTypeReceipt: 'Recibos', packTypeReportOne: 'Informe', packTypeQuoteOne: 'Presupuesto', packTypeReceiptOne: 'Recibo',
             packSelectAll: 'Seleccionar todo', packSelectNone: 'Limpiar selección', packNoClient: 'Sin cliente', packNoDate: 'Sin fecha', packSummary: '{n} documento(s) · total indicativo {total} €', packNeedOutput: 'Elija CSV, PDF o ambos.',
             packEmpty: 'No hay informes, presupuestos ni recibos disponibles para el contable.', packNoResults: 'Ningún documento coincide con estos filtros.', packSelectOne: 'Seleccione al menos un documento.',
             ruler: 'Regla', navigation: 'Navegación', grid: 'Cuadrícula', viewPrint: 'Impresión', viewWeb: 'Web', viewRead: 'Lectura', viewOutline: 'Esquema',
@@ -1068,10 +1056,6 @@
             exportAsHint: 'Elija el formato a descargar. Esto no sustituye Guardar.',
             exportAsWord: 'Exportar Word (.docx)',
             exportAsWordHint: 'Para abrir y editar en Microsoft Word',
-            exportAsWordFaithful: 'Word fiel al diseño (.docx)',
-            exportAsWordEditable: 'Word editable (.docx)',
-            docxFaithfulExported: 'Word fiel preparado con la misma presentación de las páginas ABENE.',
-            docxFaithfulFallback: 'No se pudo crear el Word fiel. Se preparó la versión editable.',
             exportAsPdf: 'Exportar PDF',
             exportAsPdfHint: 'Para enviar o imprimir, con el aspecto del papel',
             toastSavedLocal: 'Guardado en este ordenador.',
@@ -1083,7 +1067,7 @@
             saveOfferArquivarYes: 'Archivar…',
             saveOfferArquivarNo: 'Ahora no',
             saveAsLegal: 'Los presupuestos y recibos comerciales no son facturas AT.',
-            fileTpl: 'Modelos de documento', fileArquivo: 'Archivo', fileArquivoTitle: 'Archivo — carpetas y documentos concluidos', groupArquivo: 'Archivo', filePdf: 'Exportar PDF', fileDocx: 'Exportar DOCX', fileDoc: 'Exportar Word (.doc)', fileGdocs: 'Abrir en Google Docs', fileGdocsFaithful: 'Abrir copia fiel en Google Docs', gdocsFaithfulOpened: 'Copia fiel abierta en Google Docs. Se conserva la presentación por páginas; el Google Docs editable vinculado no fue sustituido.',
+            fileTpl: 'Modelos de documento', fileArquivo: 'Archivo', fileArquivoTitle: 'Archivo — carpetas y documentos concluidos', groupArquivo: 'Archivo', filePdf: 'Exportar PDF', fileDocx: 'Exportar DOCX', fileDoc: 'Exportar Word (.doc)', fileGdocs: 'Abrir en Google Docs',
             fileStats: 'Estadísticas', filePrint: 'Imprimir', fileProps: 'Propiedades',
             navTitle: 'Navegación', navHeadings: 'Títulos', navPages: 'Páginas', navSearch: 'Búsqueda',
             navEmpty: 'No se encontraron títulos. Use los estilos Título para crear la navegación.',
@@ -1243,8 +1227,7 @@
             clientAddress: 'Morada do cliente', clientEmail: 'E-mail do cliente', clientPhone: 'Telefone do cliente',
             quoteNo: 'N.º orçamento', validity: 'Validade (dias)', description: 'Descrição', qty: 'Qtd',
             unitPrice: 'Preço unit. (€)', addItem: 'Adicionar artigo', vat: 'IVA (%)', discount: 'Desconto (%)',
-            conditions: 'Condições / Notas', quotePayPlan: 'Plano de pagamento (escolha uma opção)', quotePayMethods: 'Meios de pagamento (pode escolher vários)', quotePayCustom: 'Só texto livre / personalizado', quoteClauses: 'Cláusulas opcionais', quoteCondHint: 'As opções marcadas permanecem ativas até serem desmarcadas. Pode completar ou alterar livremente o texto abaixo.', generateQuote: 'Gerar orçamento', generateReceipt: 'Gerar recibo',
-            quoteCustomizeButton: 'Personalizar textos das opções…', quoteCustomizeTitle: 'Personalizar textos do orçamento', quoteCustomizeHint: 'As alterações ficam predefinidas para os próximos orçamentos. Pode restaurar os textos originais quando quiser.', quoteOptionName: 'Nome da opção', quoteOptionDetail: 'Texto detalhado incluído no orçamento', quoteSaveDefaults: 'Guardar como predefinição', quoteRestoreOriginal: 'Restaurar textos originais', quoteRestoreConfirm: 'Restaurar todos os textos originais do orçamento?', quoteDefaultsSaved: 'Textos guardados para os próximos orçamentos.', quoteOriginalRestored: 'Textos originais restaurados.',
+            conditions: 'Condições / Notas', quotePayPlan: 'Plano de pagamento (escolha uma opção)', quotePayMethods: 'Meios de pagamento (pode escolher vários)', quotePayCustom: 'Só texto livre / personalizado', quoteClauses: 'Cláusulas opcionais', quoteCondHint: 'As opções marcadas permanecem ativas até serem desmarcadas. Pode completar ou alterar livremente o texto abaixo.', quoteSaveDefaults: 'Guardar como padrão para próximos orçamentos', quoteRestoreDefaults: 'Repor texto padrão original', quoteDefaultsHint: 'Fica guardado neste navegador; com Google ativo, o padrão entra na sincronização. No outro computador, atualize os dados Google. O orçamento aberto não muda.', quoteDefaultsSaved: 'Texto guardado como padrão para os próximos orçamentos; o orçamento atual não foi alterado.', quoteDefaultsRestored: 'O padrão original foi reposto para os próximos orçamentos; o texto do orçamento atual foi mantido.', quoteDefaultsUpdateFailed: 'Não foi possível atualizar o padrão neste dispositivo.', generateQuote: 'Gerar orçamento', generateReceipt: 'Gerar recibo',
             payerInfo: 'Informações do pagador', name: 'Nome', recDetails: 'Detalhes do recibo', recNo: 'N.º recibo',
             recObjectLbl: 'Objeto / Motivo do pagamento', amount: 'Montante (€)', payMethod: 'Modo de pagamento',
             payBank: 'Transferência bancária', payCheque: 'Cheque', payCash: 'Numerário', payCard: 'Cartão',
@@ -1448,8 +1431,7 @@
             clientAddress: 'Adresse du client', clientEmail: 'E-mail du client', clientPhone: 'Téléphone du client',
             quoteNo: 'N° Devis', validity: 'Validité (jours)', description: 'Description', qty: 'Qté',
             unitPrice: 'Prix unit. (€)', addItem: 'Ajouter un article', vat: 'TVA (%)', discount: 'Remise (%)',
-            conditions: 'Conditions / Notes', quotePayPlan: 'Plan de paiement (choisir une option)', quotePayMethods: 'Moyens de paiement (plusieurs choix possibles)', quotePayCustom: 'Texte libre / personnalisé uniquement', quoteClauses: 'Clauses optionnelles', quoteCondHint: 'Les options cochées restent actives jusqu’à ce qu’elles soient décochées. Vous pouvez compléter ou modifier librement le texte ci-dessous.', generateQuote: 'Générer le devis', generateReceipt: 'Générer le reçu',
-            quoteCustomizeButton: 'Personnaliser les textes des options…', quoteCustomizeTitle: 'Personnaliser les textes du devis', quoteCustomizeHint: 'Les modifications deviennent les valeurs par défaut des prochains devis. Vous pourrez restaurer les textes d’origine à tout moment.', quoteOptionName: 'Nom de l’option', quoteOptionDetail: 'Texte détaillé inclus dans le devis', quoteSaveDefaults: 'Enregistrer comme valeurs par défaut', quoteRestoreOriginal: 'Restaurer les textes d’origine', quoteRestoreConfirm: 'Restaurer tous les textes d’origine du devis ?', quoteDefaultsSaved: 'Textes enregistrés pour les prochains devis.', quoteOriginalRestored: 'Textes d’origine restaurés.',
+            conditions: 'Conditions / Notes', quotePayPlan: 'Plan de paiement (choisir une option)', quotePayMethods: 'Moyens de paiement (plusieurs choix possibles)', quotePayCustom: 'Texte libre / personnalisé uniquement', quoteClauses: 'Clauses optionnelles', quoteCondHint: 'Les options cochées restent actives jusqu’à ce qu’elles soient décochées. Vous pouvez compléter ou modifier librement le texte ci-dessous.', quoteSaveDefaults: 'Enregistrer pour les prochains devis', quoteRestoreDefaults: 'Rétablir le texte standard', quoteDefaultsHint: 'Enregistré sur ce navigateur ; si Google est actif, ce réglage est inclus dans la synchronisation. Sur l’autre ordinateur, actualisez les données Google. Le devis ouvert ne change pas.', quoteDefaultsSaved: 'Texte enregistré pour les prochains devis ; le devis actuel n’a pas été modifié.', quoteDefaultsRestored: 'Le texte standard est rétabli pour les prochains devis ; le texte actuel a été conservé.', quoteDefaultsUpdateFailed: 'Impossible de mettre à jour ce réglage sur cet appareil.', generateQuote: 'Générer le devis', generateReceipt: 'Générer le reçu',
             payerInfo: 'Informations du payeur', name: 'Nom', recDetails: 'Détails du reçu', recNo: 'N° Reçu',
             recObjectLbl: 'Objet / Motif du paiement', amount: 'Montant (€)', payMethod: 'Mode de paiement',
             payBank: 'Virement bancaire', payCheque: 'Chèque', payCash: 'Espèces', payCard: 'Carte bancaire',
@@ -1648,8 +1630,7 @@
             clientAddress: 'Client address', clientEmail: 'Client email', clientPhone: 'Client phone',
             quoteNo: 'Quote no.', validity: 'Validity (days)', description: 'Description', qty: 'Qty',
             unitPrice: 'Unit price (€)', addItem: 'Add item', vat: 'VAT (%)', discount: 'Discount (%)',
-            conditions: 'Terms / Notes', quotePayPlan: 'Payment plan (choose one option)', quotePayMethods: 'Payment methods (choose several if needed)', quotePayCustom: 'Free / custom text only', quoteClauses: 'Optional clauses', quoteCondHint: 'Checked options remain active until you uncheck them. You may freely complete or edit the text below.', generateQuote: 'Generate quote', generateReceipt: 'Generate receipt',
-            quoteCustomizeButton: 'Customize option texts…', quoteCustomizeTitle: 'Customize quote texts', quoteCustomizeHint: 'Changes become the defaults for future quotes. You can restore the original texts at any time.', quoteOptionName: 'Option name', quoteOptionDetail: 'Detailed text included in the quote', quoteSaveDefaults: 'Save as defaults', quoteRestoreOriginal: 'Restore original texts', quoteRestoreConfirm: 'Restore all original quote texts?', quoteDefaultsSaved: 'Texts saved for future quotes.', quoteOriginalRestored: 'Original texts restored.',
+            conditions: 'Terms / Notes', quotePayPlan: 'Payment plan (choose one option)', quotePayMethods: 'Payment methods (choose several if needed)', quotePayCustom: 'Free / custom text only', quoteClauses: 'Optional clauses', quoteCondHint: 'Checked options remain active until you uncheck them. You may freely complete or edit the text below.', quoteSaveDefaults: 'Save for future quotes', quoteRestoreDefaults: 'Restore original standard text', quoteDefaultsHint: 'Saved in this browser; when Google sync is active, this setting is included. Refresh Google data on the other computer. The open quote stays unchanged.', quoteDefaultsSaved: 'Text saved for future quotes; the current quote was not changed.', quoteDefaultsRestored: 'The original standard text is restored for future quotes; the current text was kept.', quoteDefaultsUpdateFailed: 'Could not update this setting on this device.', generateQuote: 'Generate quote', generateReceipt: 'Generate receipt',
             payerInfo: 'Payer information', name: 'Name', recDetails: 'Receipt details', recNo: 'Receipt no.',
             recObjectLbl: 'Purpose / Reason for payment', amount: 'Amount (€)', payMethod: 'Payment method',
             payBank: 'Bank transfer', payCheque: 'Cheque', payCash: 'Cash', payCard: 'Card',
@@ -1848,8 +1829,7 @@
             clientAddress: 'Dirección del cliente', clientEmail: 'Correo del cliente', clientPhone: 'Teléfono del cliente',
             quoteNo: 'N.º presupuesto', validity: 'Validez (días)', description: 'Descripción', qty: 'Cant.',
             unitPrice: 'Precio unit. s/ IVA', addItem: 'Añadir artículo', vat: 'IVA (%)', discount: 'Descuento (%)',
-            conditions: 'Condiciones / Notas', quotePayPlan: 'Plan de pago (elija una opción)', quotePayMethods: 'Métodos de pago (puede elegir varios)', quotePayCustom: 'Solo texto libre / personalizado', quoteClauses: 'Cláusulas opcionales', quoteCondHint: 'Las opciones marcadas permanecen activas hasta que las desmarque. Puede completar o modificar libremente el texto de abajo.', generateQuote: 'Generar presupuesto', generateReceipt: 'Generar recibo',
-            quoteCustomizeButton: 'Personalizar textos de las opciones…', quoteCustomizeTitle: 'Personalizar textos del presupuesto', quoteCustomizeHint: 'Los cambios serán los valores predeterminados de los próximos presupuestos. Puede restaurar los textos originales cuando quiera.', quoteOptionName: 'Nombre de la opción', quoteOptionDetail: 'Texto detallado incluido en el presupuesto', quoteSaveDefaults: 'Guardar como predeterminados', quoteRestoreOriginal: 'Restaurar textos originales', quoteRestoreConfirm: '¿Restaurar todos los textos originales del presupuesto?', quoteDefaultsSaved: 'Textos guardados para los próximos presupuestos.', quoteOriginalRestored: 'Textos originales restaurados.',
+            conditions: 'Condiciones / Notas', quotePayPlan: 'Plan de pago (elija una opción)', quotePayMethods: 'Métodos de pago (puede elegir varios)', quotePayCustom: 'Solo texto libre / personalizado', quoteClauses: 'Cláusulas opcionales', quoteCondHint: 'Las opciones marcadas permanecen activas hasta que las desmarque. Puede completar o modificar libremente el texto de abajo.', quoteSaveDefaults: 'Guardar para próximos presupuestos', quoteRestoreDefaults: 'Restablecer texto estándar original', quoteDefaultsHint: 'Se guarda en este navegador; con Google activo se incluye en la sincronización. En el otro ordenador, actualice los datos de Google. El presupuesto abierto no cambia.', quoteDefaultsSaved: 'Texto guardado para futuros presupuestos; el actual no se modificó.', quoteDefaultsRestored: 'Se restableció el texto original para futuros presupuestos; el texto actual se conservó.', quoteDefaultsUpdateFailed: 'No se pudo actualizar este ajuste en este dispositivo.', generateQuote: 'Generar presupuesto', generateReceipt: 'Generar recibo',
             payerInfo: 'Datos del pagador', name: 'Nombre', recDetails: 'Detalles del recibo', recNo: 'N.º recibo',
             recObjectLbl: 'Objeto / Motivo del pago', amount: 'Importe', payMethod: 'Modo de pago',
             payBank: 'Transferencia bancaria', payCheque: 'Cheque', payCash: 'Efectivo', payCard: 'Tarjeta',
@@ -2921,6 +2901,83 @@
     };
     Object.keys(TOOLBAR_UI).forEach(function (lang) {
         if (I18N[lang]) Object.assign(I18N[lang], TOOLBAR_UI[lang]);
+    });
+
+    var DOC_SYNC_UI = {
+        'fr-FR': {
+            docSyncOtherSession: 'Une autre session peut modifier ce document',
+            docSyncRemoteNewer: 'Version plus récente dans Drive',
+            docSyncConflictChoose: 'Conflit — choisissez une version',
+            docSyncUpdateDrive: 'Mettre à jour depuis Drive',
+            docSyncKeepMine: 'Conserver ma version'
+        },
+        'en-US': {
+            docSyncOtherSession: 'Another session may be editing this document',
+            docSyncRemoteNewer: 'Newer version in Drive',
+            docSyncConflictChoose: 'Conflict — choose a version',
+            docSyncUpdateDrive: 'Update from Drive',
+            docSyncKeepMine: 'Keep my version'
+        },
+        'es-ES': {
+            docSyncOtherSession: 'Otra sesión puede estar editando este documento',
+            docSyncRemoteNewer: 'Versión más reciente en Drive',
+            docSyncConflictChoose: 'Conflicto — elija una versión',
+            docSyncUpdateDrive: 'Actualizar desde Drive',
+            docSyncKeepMine: 'Mantener mi versión'
+        }
+    };
+    Object.keys(DOC_SYNC_UI).forEach(function (lang) {
+        if (I18N[lang]) Object.assign(I18N[lang], DOC_SYNC_UI[lang]);
+    });
+
+    var QUOTE_OPTION_UI = {
+        'pt-PT': {
+            quoteOptionCustomize: 'Personalizar nomes e textos das opções',
+            quoteOptionCustomizeTitle: 'Personalizar opções do orçamento',
+            quoteOptionCustomizeHint: 'Personalize o nome e o texto detalhado das opções. Apenas as opções selecionadas entram no orçamento.',
+            quoteOptionName: 'Nome da opção', quoteOptionDetail: 'Texto incluído no orçamento',
+            quoteOptionSave: 'Guardar alterações', quoteOptionRestore: 'Repor textos originais',
+            quoteOptionRestoreConfirm: 'Repor todos os nomes e textos originais das opções?',
+            quoteOptionSaved: 'Opções guardadas para os próximos orçamentos.',
+            quoteOptionRestored: 'Os nomes e textos originais foram repostos.',
+            quoteOptionSaveError: 'Não foi possível guardar as opções neste dispositivo.'
+        },
+        'fr-FR': {
+            quoteOptionCustomize: 'Personnaliser les noms et textes des options',
+            quoteOptionCustomizeTitle: 'Personnaliser les options du devis',
+            quoteOptionCustomizeHint: 'Personnalisez le nom et le texte détaillé des options. Seules les options sélectionnées sont ajoutées au devis.',
+            quoteOptionName: 'Nom de l’option', quoteOptionDetail: 'Texte inclus dans le devis',
+            quoteOptionSave: 'Enregistrer les modifications', quoteOptionRestore: 'Rétablir les textes d’origine',
+            quoteOptionRestoreConfirm: 'Rétablir tous les noms et textes d’origine des options ?',
+            quoteOptionSaved: 'Options enregistrées pour les prochains devis.',
+            quoteOptionRestored: 'Les noms et textes d’origine ont été rétablis.',
+            quoteOptionSaveError: 'Impossible d’enregistrer les options sur cet appareil.'
+        },
+        'en-US': {
+            quoteOptionCustomize: 'Customize option names and text',
+            quoteOptionCustomizeTitle: 'Customize quote options',
+            quoteOptionCustomizeHint: 'Customize each option’s name and detailed text. Only selected options are added to the quote.',
+            quoteOptionName: 'Option name', quoteOptionDetail: 'Text included in the quote',
+            quoteOptionSave: 'Save changes', quoteOptionRestore: 'Restore original text',
+            quoteOptionRestoreConfirm: 'Restore the original names and text for all options?',
+            quoteOptionSaved: 'Options saved for future quotes.',
+            quoteOptionRestored: 'The original names and text have been restored.',
+            quoteOptionSaveError: 'Could not save the options on this device.'
+        },
+        'es-ES': {
+            quoteOptionCustomize: 'Personalizar nombres y textos de las opciones',
+            quoteOptionCustomizeTitle: 'Personalizar opciones del presupuesto',
+            quoteOptionCustomizeHint: 'Personalice el nombre y el texto detallado de las opciones. Solo se añaden al presupuesto las opciones seleccionadas.',
+            quoteOptionName: 'Nombre de la opción', quoteOptionDetail: 'Texto incluido en el presupuesto',
+            quoteOptionSave: 'Guardar cambios', quoteOptionRestore: 'Restablecer textos originales',
+            quoteOptionRestoreConfirm: '¿Restablecer los nombres y textos originales de todas las opciones?',
+            quoteOptionSaved: 'Opciones guardadas para próximos presupuestos.',
+            quoteOptionRestored: 'Se restablecieron los nombres y textos originales.',
+            quoteOptionSaveError: 'No se pudieron guardar las opciones en este dispositivo.'
+        }
+    };
+    Object.keys(QUOTE_OPTION_UI).forEach(function (lang) {
+        if (I18N[lang]) Object.assign(I18N[lang], QUOTE_OPTION_UI[lang]);
     });
 
     function currentLang() {

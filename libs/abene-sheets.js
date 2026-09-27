@@ -551,6 +551,21 @@
         if (json.company && typeof json.company === 'object') {
             var cur = company();
             var merged = Object.assign({}, cur, json.company);
+            if (typeof merged.quoteConditionDefaults === 'string') {
+                var rawQuoteDefaults = merged.quoteConditionDefaults.trim();
+                if (!rawQuoteDefaults) {
+                    merged.quoteConditionDefaults = null;
+                } else {
+                    try {
+                        var quoteDefaults = JSON.parse(rawQuoteDefaults);
+                        merged.quoteConditionDefaults = quoteDefaults && typeof quoteDefaults === 'object' && !Array.isArray(quoteDefaults)
+                            ? quoteDefaults
+                            : null;
+                    } catch (quoteDefaultsError) {
+                        merged.quoteConditionDefaults = cur.quoteConditionDefaults;
+                    }
+                }
+            }
             merged.appsScriptUrl = cur.appsScriptUrl;
             merged.syncToken = cur.syncToken;
             merged.databaseEnabled = cur.databaseEnabled;
