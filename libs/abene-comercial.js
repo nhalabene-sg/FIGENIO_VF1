@@ -1161,7 +1161,7 @@
         var dateEl = document.getElementById('devisDate');
         if (dateEl && !dateEl.value) dateEl.value = todayIso();
         if (window.abeneContabilidade && window.abeneContabilidade.fillDevisFromTables) {
-            window.abeneContabilidade.fillDevisFromTables(false);
+            // Importar tabelas do relatório só após ação explícita do utilizador.
             window.abeneContabilidade.refreshDevisTotals();
         }
         setupQuoteConditions();
